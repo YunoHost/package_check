@@ -1,0 +1,42 @@
+## Nom du 1er scénario de test
+	# Manifest
+		domain="$DOMAIN"
+		path="$PATH"
+		admin="$USER"
+		language="en_EN"
+		is_public="No"
+		password="$PASSWORD"
+		port="666"
+	# Checks
+		setup_sub_dir=1
+		setup_root=1
+		setup_private=1
+		setup_public=1
+		wrong_user=1
+		wrong_path=1
+		incorrect_path=1
+		corrupt_source=1
+		fail_download_source=1
+		port_already_use=1
+		final_path_already_use=1
+## Nom du 2e scénario de test
+	# Manifest
+		domain="$DOMAIN"
+		path="$PATH"
+		admin="$USER"
+		language="en_EN"
+		is_public="Yes"
+		password="$PASSWORD"
+		port="666"
+	# Checks
+		setup_sub_dir=1
+		setup_root=1
+		setup_private=1
+		setup_public=1
+		wrong_user=1
+		wrong_path=1
+		incorrect_path=1
+		corrupt_source=1
+		fail_download_source=1
+		port_already_use=1
+		final_path_already_use=1
