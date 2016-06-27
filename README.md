@@ -5,7 +5,7 @@ Package checker for YunoHost
 
 Une ébauche d'un script pour automatiser les tests d'installation des packages Yunohost
 
-Usage:
+Usage:  
 Pour une app dans un dossier: `package_check.sh APP_ynh`
 Pour une app sur github: `package_check.sh https://github.com/USER/APP_ynh`
 
