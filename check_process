@@ -10,6 +10,7 @@
 	# Checks
 		setup_sub_dir=1
 		setup_root=1
+		setup_nourl=0
 		setup_private=1
 		setup_public=1
 		wrong_user=1
@@ -31,6 +32,7 @@
 	# Checks
 		setup_sub_dir=1
 		setup_root=1
+		setup_nourl=0
 		setup_private=1
 		setup_public=1
 		wrong_user=1
