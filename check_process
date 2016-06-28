@@ -1,4 +1,4 @@
-## Nom du 1er scénario de test
+## Nom du test
 	auto_remove=1
 	# Manifest
 		domain="$DOMAIN"	(DOMAIN)
@@ -10,17 +10,17 @@
 		port="666"	(PORT)
 	# Checks
 		setup_sub_dir=1
-		setup_root=0
+		setup_root=1
 		setup_nourl=0
-		setup_private=0
-		setup_public=0
-		upgrade=0
-		backup_restore=0
+		setup_private=1
+		setup_public=1
+		upgrade=1
+		backup_restore=1
 		multi_instance=1
-		wrong_user=0
-		wrong_path=0
-		incorrect_path=0
+		wrong_user=1
+		wrong_path=1
+		incorrect_path=1
 		corrupt_source=0
 		fail_download_source=0
-		port_already_use=0
+		port_already_use=1
 		final_path_already_use=0

@@ -332,10 +332,10 @@ do
 			if echo "$LIGNE" | grep -q "setup_public="; then	# Test d'installation en public
 				setup_public=$(echo "$LIGNE" | cut -d '=' -f2)
 			fi
-			if echo "$LIGNE" | grep -q "upgrade="; then	# Test d'installation en public
+			if echo "$LIGNE" | grep -q "upgrade="; then	# Test d'upgrade
 				upgrade=$(echo "$LIGNE" | cut -d '=' -f2)
 			fi
-			if echo "$LIGNE" | grep -q "backup_restore="; then	# Test d'installation en public
+			if echo "$LIGNE" | grep -q "backup_restore="; then	# Test de backup et restore
 				backup_restore=$(echo "$LIGNE" | cut -d '=' -f2)
 			fi
 			if echo "$LIGNE" | grep -q "multi_instance="; then	# Test d'installation multiple
@@ -369,3 +369,6 @@ done < "$APP_CHECK/check_process"
 
 TESTING_PROCESS
 TEST_RESULTS
+
+# Clean
+rm debug_output temp_Test_results.log url_output
