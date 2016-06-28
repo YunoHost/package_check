@@ -19,6 +19,9 @@ SETUP_APP () {
 }
 
 REMOVE_APP () {
+	if [ "$auto_remove" -eq 0 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
+		read -p "Appuyer sur une touche pour supprimer l'application et continuer les tests..." < /dev/tty
+	fi
 	ECHO_FORMAT "\nSuppression...\n" "white" "bold"
 	COPY_LOG 1
 	sudo yunohost --debug app remove $APPID > /dev/null 2>&1
@@ -48,11 +51,26 @@ CHECK_URL () {
 CHECK_SETUP_SUBDIR () {
 	# Test d'installation en sous-dossier
 	ECHO_FORMAT "\n\n>> Installation en sous-dossier...\n" "white" "bold"
+	if [ -z "$MANIFEST_DOMAIN" ]; then
+		echo "Clé de manifest pour 'domain' introuvable dans le fichier check_process. Impossible de procéder à ce test"
+		return
+	fi
+	if [ -z "$MANIFEST_PATH" ]; then
+		echo "Clé de manifest pour 'path' introuvable dans le fichier check_process. Impossible de procéder à ce test"
+		return
+	fi
+	if [ -z "$MANIFEST_USER" ]; then
+		echo "Clé de manifest pour 'user' introuvable dans le fichier check_process. Impossible de procéder à ce test"
+		return
+	fi
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$DOMAIN\&/")
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-Z/-$]*\&@$MANIFEST_USER=$USER_TEST\&@")
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
+	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
+	fi
 	# Installation de l'app
 	SETUP_APP
 	LOG_EXTRACTOR
@@ -92,11 +110,26 @@ CHECK_SETUP_SUBDIR () {
 CHECK_SETUP_ROOT () {
 	# Test d'installation à la racine
 	ECHO_FORMAT "\n\n>> Installation à la racine...\n" "white" "bold"
+	if [ -z "$MANIFEST_DOMAIN" ]; then
+		echo "Clé de manifest pour 'domain' introuvable dans le fichier check_process. Impossible de procéder à ce test"
+		return
+	fi
+	if [ -z "$MANIFEST_PATH" ]; then
+		echo "Clé de manifest pour 'path' introuvable dans le fichier check_process. Impossible de procéder à ce test"
+		return
+	fi
+	if [ -z "$MANIFEST_USER" ]; then
+		echo "Clé de manifest pour 'user' introuvable dans le fichier check_process. Impossible de procéder à ce test"
+		return
+	fi
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$DOMAIN\&/")
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-Z/-$]*\&@$MANIFEST_USER=$USER_TEST\&@")
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
+	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
+	fi
 	# Installation de l'app
 	SETUP_APP
 	LOG_EXTRACTOR
@@ -137,10 +170,6 @@ CHECK_SETUP_NO_URL () {
 	# Test d'installation sans accès par url
 	ECHO_FORMAT "\n\n>> Installation sans accès par url...\n" "white" "bold"
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$DOMAIN\&/")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")	# Domain et path ne devrait théoriquement pas être utilisés
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-Z/-$]*\&@$MANIFEST_USER=$USER_TEST\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
 	# Installation de l'app
 	SETUP_APP
 	LOG_EXTRACTOR
@@ -182,6 +211,9 @@ CHECK_UPGRADE () {
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$DOMAIN\&/")
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-Z/-$]*\&@$MANIFEST_USER=$USER_TEST\&@")
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
+	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
+	fi
 	if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Utilise ce mode d'installation
 		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
 		CHECK_PATH="$PATH_TEST"
@@ -192,9 +224,10 @@ CHECK_UPGRADE () {
 		echo "Aucun mode d'installation n'a fonctionné, impossible d'effectuer ce test..."
 		return;
 	fi
-	ECHO_FORMAT "\nInstallation préalable..." "white" "bold"
+	ECHO_FORMAT "\nInstallation préalable...\n" "white" "bold"
 	# Installation de l'app
 	SETUP_APP
+	LOG_EXTRACTOR
 	ECHO_FORMAT "\nUpgrade sur la même version du package...\n" "white" "bold"
 	# Upgrade de l'app
 	COPY_LOG 1
@@ -225,6 +258,9 @@ CHECK_BACKUP_RESTORE () {
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$DOMAIN\&/")
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-Z/-$]*\&@$MANIFEST_USER=$USER_TEST\&@")
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
+	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
+	fi
 	if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Utilise ce mode d'installation
 		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
 		CHECK_PATH="$PATH_TEST"
@@ -235,9 +271,10 @@ CHECK_BACKUP_RESTORE () {
 		echo "Aucun mode d'installation n'a fonctionné, impossible d'effectuer ce test..."
 		return;
 	fi
-	ECHO_FORMAT "\nInstallation préalable..." "white" "bold"
+	ECHO_FORMAT "\nInstallation préalable...\n" "white" "bold"
 	# Installation de l'app
 	SETUP_APP
+	LOG_EXTRACTOR
 	ECHO_FORMAT "\nBackup de l'application...\n" "white" "bold"
 	# Backup de l'app
 	COPY_LOG 1
@@ -286,7 +323,19 @@ CHECK_PUBLIC_PRIVATE () {
 	fi
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
-		return;
+		return
+	fi
+	if [ -z "$MANIFEST_PUBLIC" ]; then
+		echo "Clé de manifest pour 'is_public' introuvable dans le fichier check_process. Impossible de procéder à ce test"
+		return
+	fi
+	if [ -z "$MANIFEST_PUBLIC_public" ]; then
+		echo "Valeur 'public' pour la clé de manifest 'is_public' introuvable dans le fichier check_process. Impossible de procéder à ce test"
+		return
+	fi
+	if [ -z "$MANIFEST_PUBLIC_private" ]; then
+		echo "Valeur 'private' pour la clé de manifest 'is_public' introuvable dans le fichier check_process. Impossible de procéder à ce test"
+		return
 	fi
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$DOMAIN\&/")
@@ -345,40 +394,169 @@ CHECK_PUBLIC_PRIVATE () {
 	REMOVE_APP
 }
 
-CHECK_ADMIN () {
-	# Test d'erreur d'utilisateur
-	ECHO_FORMAT "\n\n>> Erreur d'utilisateur...\n" "white" "bold"
+CHECK_MULTI_INSTANCE () {
+	# Test d'installation en multi-instance
+	ECHO_FORMAT "\n\n>> Installation multi-instance...\n" "white" "bold"
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
+		return
 	fi
-echo "Non implémenté"
-# GLOBAL_CHECK_ADMIN=0
+	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$DOMAIN\&/")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-Z/-$]*\&@$MANIFEST_USER=$USER_TEST\&@")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
+	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
+	fi
+	if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Utilise ce mode d'installation
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
+		CHECK_PATH="$PATH_TEST"
+	else
+		echo "L'installation en sous-dossier n'a pas fonctionné, impossible d'effectuer ce test..."
+		return;
+	fi
+	# Installation de l'app une première fois
+	SETUP_APP
+	LOG_EXTRACTOR
+	APPID_first=$APPID	# Stocke le nom de la première instance
+	CHECK_PATH_first=$CHECK_PATH	# Stocke le path de la première instance
+	YUNOHOST_RESULT_first=$YUNOHOST_RESULT	# Stocke le résulat de l'installation de la première instance
+	# Installation de l'app une deuxième fois
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST-2\&@")
+	CHECK_PATH="$PATH_TEST-2"
+	SETUP_APP
+	LOG_EXTRACTOR
+	# Test l'accès à la 1ère instance de l'app
+	CHECK_PATH=$CHECK_PATH_first
+	CHECK_URL
+	# Test l'accès à la 2e instance de l'app
+	CHECK_PATH="$PATH_TEST-2"
+	CHECK_URL
+	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$YUNOHOST_RESULT_first" -eq 0 ]; then
+		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
+		GLOBAL_CHECK_MULTI_INSTANCE=1	# Installation multi-instance réussie
+	else
+		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
+		GLOBAL_CHECK_MULTI_INSTANCE=-1	# Installation multi-instance échouée
+	fi
+	# Suppression de la 2e app
+	REMOVE_APP
+	# Suppression de la 1ère app
+	APPID=$APPID_first
+	REMOVE_APP
 }
-CHECK_DOMAIN () {
-	# Test d'erreur de path ou de domaine
-	ECHO_FORMAT "\n\n>> Erreur de domaine...\n" "white" "bold"
+
+CHECK_COMMON_ERROR () {
+	# Test d'erreur depuis le manifest
+	if [ "$1" == "wrong_user" ]; then
+		ECHO_FORMAT "\n\n>> Erreur d'utilisateur...\n" "white" "bold"
+	fi
+	if [ "$1" == "wrong_path" ]; then
+		ECHO_FORMAT "\n\n>> Erreur de domaine...\n" "white" "bold"
+	fi
+	if [ "$1" == "incorrect_path" ]; then
+		ECHO_FORMAT "\n\n>> Path mal formé...\n" "white" "bold"
+	fi
+	if [ "$1" == "port_already_use" ]; then
+		ECHO_FORMAT "\n\n>> Port déjà utilisé...\n" "white" "bold"
+		if [ -z "$MANIFEST_PORT" ]; then
+			echo "Clé de manifest pour 'port' introuvable dans le fichier check_process. Impossible de procéder à ce test"
+			return
+		fi
+	fi
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
+		return
 	fi
-echo "Non implémenté"
-# GLOBAL_CHECK_DOMAIN=0
-}
-CHECK_PATH () {
-	# Test d'erreur de forme de path
-	ECHO_FORMAT "\n\n>> Path mal formé...\n" "white" "bold"
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
-		echo "L'installation a échouée, impossible d'effectuer ce test..."
+	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
+	if [ "$1" == "wrong_path" ]; then	# Force un domaine incorrect
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=domain.tld\&/")
+	else
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$DOMAIN\&/")
 	fi
-echo "Non implémenté"
-# GLOBAL_CHECK_PATH=0
+	if [ "$1" == "wrong_user" ]; then	# Force un user incorrect
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-Z/-$]*\&@$MANIFEST_USER=NO_USER\&@")
+	else
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-Z/-$]*\&@$MANIFEST_USER=$USER_TEST\&@")
+	fi
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
+	if [ "$1" == "incorrect_path" ]; then	# Force un path mal formé: Ce sera path/ au lieu de /path
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=path/\&@")
+	else
+		if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Utilise ce mode d'installation
+			MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
+			CHECK_PATH="$PATH_TEST"
+		elif [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then	# Sinon utilise une install root, si elle a fonctionné
+			MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
+			CHECK_PATH="/"
+		else
+			echo "Aucun mode d'installation n'a fonctionné, impossible d'effectuer ce test..."
+			return;
+		fi
+	fi
+	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
+	fi
+	if [ "$1" == "port_already_use" ]; then	# Force un port déjà utilisé
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PORT=[0-9$]*\&@$MANIFEST_PORT=6660\&@")
+		sudo yunohost firewall allow Both 6660 > /dev/null 2>&1
+	fi
+	# Installation de l'app
+	SETUP_APP
+	LOG_EXTRACTOR
+	if [ "$YUNOHOST_RESULT" -eq 0 ]; then	# wrong_user et wrong_path doivent aboutir à échec de l'installation. C'est l'inverse pour incorrect_path et port_already_use.
+		if [ "$1" == "wrong_user" ]; then
+			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
+			GLOBAL_CHECK_ADMIN=-1	# Installation privée réussie
+		fi
+		if [ "$1" == "wrong_path" ]; then
+			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
+			GLOBAL_CHECK_DOMAIN=-1	# Installation privée réussie
+		fi
+		if [ "$1" == "incorrect_path" ]; then
+			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
+			GLOBAL_CHECK_PATH=1	# Installation privée réussie
+		fi
+		if [ "$1" == "port_already_use" ]; then
+			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
+			GLOBAL_CHECK_PORT=1	# Installation privée réussie
+		fi
+	else
+		if [ "$1" == "wrong_user" ]; then
+			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
+			GLOBAL_CHECK_ADMIN=1	# Installation privée échouée
+		fi
+		if [ "$1" == "wrong_path" ]; then
+			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
+			GLOBAL_CHECK_DOMAIN=1	# Installation privée échouée
+		fi
+		if [ "$1" == "incorrect_path" ]; then
+			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
+			GLOBAL_CHECK_PATH=-1	# Installation privée échouée
+		fi
+		if [ "$1" == "port_already_use" ]; then
+			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
+			GLOBAL_CHECK_PORT=-1	# Installation privée échouée
+		fi
+	fi
+	if [ "$1" == "incorrect_path" ] || [ "$1" == "port_already_use" ]; then
+		# Test l'accès à l'app
+		CHECK_URL
+	fi
+	# Suppression de l'app
+	REMOVE_APP
+	if [ "$1" == "port_already_use" ]; then	# Libère le port ouvert pour le test
+		sudo yunohost firewall disallow Both 6660 > /dev/null
+	fi
 }
+
 CHECK_CORRUPT () {
 	# Test d'erreur sur source corrompue
 	ECHO_FORMAT "\n\n>> Source corrompue après téléchargement...\n" "white" "bold"
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 	fi
-echo "Non implémenté"
+echo -n "Non implémenté"
 # GLOBAL_CHECK_CORRUPT=0
 }
 CHECK_DL () {
@@ -387,17 +565,8 @@ CHECK_DL () {
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 	fi
-echo "Non implémenté"
+echo -n "Non implémenté"
 # GLOBAL_CHECK_DL=0
-}
-CHECK_PORT () {
-	# Test d'erreur de port
-	ECHO_FORMAT "\n\n>> Port déjà utilisé...\n" "white" "bold"
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
-		echo "L'installation a échouée, impossible d'effectuer ce test..."
-	fi
-echo "Non implémenté"
-# GLOBAL_CHECK_PORT=0
 }
 CHECK_FINALPATH () {
 	# Test sur final path déjà utilisé.
@@ -405,7 +574,7 @@ CHECK_FINALPATH () {
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 	fi
-echo "Non implémenté"
+echo -n "Non implémenté"
 # GLOBAL_CHECK_FINALPATH=0
 }
 
@@ -421,21 +590,29 @@ TESTING_PROCESS () {
 	if [ "$setup_nourl" -eq 1 ]; then
 		CHECK_SETUP_NO_URL	# Test d'installation sans accès par url
 	fi
-	CHECK_UPGRADE
+	if [ "$upgrade" -eq 1 ]; then
+		CHECK_UPGRADE	# Test d'upgrade
+	fi
 	if [ "$setup_private" -eq 1 ]; then
 		CHECK_PUBLIC_PRIVATE private	# Test d'installation en privé
 	fi
 	if [ "$setup_public" -eq 1 ]; then
 		CHECK_PUBLIC_PRIVATE public	# Test d'installation en public
 	fi
+	if [ "$multi_instance" -eq 1 ]; then
+		CHECK_MULTI_INSTANCE	# Test d'installation multiple
+	fi
 	if [ "$wrong_user" -eq 1 ]; then
-		CHECK_ADMIN	# Test d'erreur d'utilisateur
+		CHECK_COMMON_ERROR wrong_user	# Test d'erreur d'utilisateur
 	fi
 	if [ "$wrong_path" -eq 1 ]; then
-		CHECK_DOMAIN	# Test d'erreur de path ou de domaine
+		CHECK_COMMON_ERROR wrong_path	# Test d'erreur de path ou de domaine
 	fi
 	if [ "$incorrect_path" -eq 1 ]; then
-		CHECK_PATH	# Test d'erreur de forme de path
+		CHECK_COMMON_ERROR incorrect_path	# Test d'erreur de forme de path
+	fi
+	if [ "$port_already_use" -eq 1 ]; then
+		CHECK_COMMON_ERROR port_already_use	# Test d'erreur de port
 	fi
 	if [ "$corrupt_source" -eq 1 ]; then
 		CHECK_CORRUPT	# Test d'erreur sur source corrompue -> Comment je vais provoquer ça!?
@@ -443,11 +620,10 @@ TESTING_PROCESS () {
 	if [ "$fail_download_source" -eq 1 ]; then
 		CHECK_DL	# Test d'erreur de téléchargement de la source -> Comment!?
 	fi
-	if [ "$port_already_use" -eq 1 ]; then
-		CHECK_PORT	# Test d'erreur de port
-	fi
 	if [ "$final_path_already_use" -eq 1 ]; then
 		CHECK_FINALPATH	# Test sur final path déjà utilisé.
 	fi
-	CHECK_BACKUP_RESTORE
+	if [ "$backup_restore" -eq 1 ]; then
+		CHECK_BACKUP_RESTORE	# Test de backup puis de Restauration
+	fi
 }

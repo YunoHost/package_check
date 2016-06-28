@@ -7,17 +7,20 @@
 		language="fr"
 		is_public="Yes"	(PUBLIC|public=Yes|private=No)
 		password="$PASSWORD"	(PASSWORD)
-		port="666"
+		port="666"	(PORT)
 	# Checks
 		setup_sub_dir=1
-		setup_root=1
+		setup_root=0
 		setup_nourl=0
-		setup_private=1
-		setup_public=1
-		wrong_user=1
-		wrong_path=1
-		incorrect_path=1
-		corrupt_source=1
-		fail_download_source=1
-		port_already_use=1
-		final_path_already_use=1
+		setup_private=0
+		setup_public=0
+		upgrade=0
+		backup_restore=0
+		multi_instance=1
+		wrong_user=0
+		wrong_path=0
+		incorrect_path=0
+		corrupt_source=0
+		fail_download_source=0
+		port_already_use=0
+		final_path_already_use=0

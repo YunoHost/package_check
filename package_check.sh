@@ -14,16 +14,21 @@ source /usr/share/yunohost/helpers
 if ! ynh_user_exists "$USER_TEST" ; then	# Si il n'existe pas, il faut le créer.
 	USER_TEST_CLEAN=${USER_TEST//"_"/""}
 	sudo yunohost user create --firstname "$USER_TEST_CLEAN" --mail "$USER_TEST_CLEAN@$DOMAIN" --lastname "$USER_TEST_CLEAN" --password "$PASSWORD_TEST" "$USER_TEST"
+	if [ "$?" -ne 0 ]; then
+		echo "La création de l'utilisateur de test a échoué. Impossible de continuer."
+		exit 1
+	fi
 fi
 
 # Vérifie le type d'emplacement du package à tester
 if echo "$1" | grep -Eq "https?:\/\/"
 then
 	GIT_PACKAGE=1
-	git clone $1 $(basename $1)
-	$1 = $(basename $1)
+	git clone $1 "../$(basename $1)"
+	APP_CHECK="$(basename $1)"
+else
+	APP_CHECK="$1"
 fi
-APP_CHECK=$1
 
 # Vérifie l'existence du fichier check_process
 if [ ! -e $APP_CHECK/check_process ]; then
@@ -32,29 +37,224 @@ if [ ! -e $APP_CHECK/check_process ]; then
 	exit 1
 fi
 
+TEST_RESULTS () {
+	ECHO_FORMAT "\n\nInstallation: "
+	if [ "$GLOBAL_CHECK_SETUP" -eq 1 ]; then
+		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_SETUP" -eq -1 ]; then
+		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Suppression: "
+	if [ "$GLOBAL_CHECK_REMOVE" -eq 1 ]; then
+		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_REMOVE" -eq -1 ]; then
+		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Installation en sous-dossier: "
+	if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then
+		ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_SUB_DIR" -eq -1 ]; then
+		ECHO_FORMAT "\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Suppression depuis sous-dossier: "
+	if [ "$GLOBAL_CHECK_REMOVE_SUBDIR" -eq 1 ]; then
+		ECHO_FORMAT "\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_REMOVE_SUBDIR" -eq -1 ]; then
+		ECHO_FORMAT "\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Installation à la racine: "
+	if [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then
+		ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_ROOT" -eq -1 ]; then
+		ECHO_FORMAT "\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Suppression depuis racine: "
+	if [ "$GLOBAL_CHECK_REMOVE_ROOT" -eq 1 ]; then
+		ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_REMOVE_ROOT" -eq -1 ]; then
+		ECHO_FORMAT "\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Upgrade: "
+	if [ "$GLOBAL_CHECK_UPGRADE" -eq 1 ]; then
+		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_UPGRADE" -eq -1 ]; then
+		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Installation privée: "
+	if [ "$GLOBAL_CHECK_PRIVATE" -eq 1 ]; then
+		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_PRIVATE" -eq -1 ]; then
+		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Installation publique: "
+	if [ "$GLOBAL_CHECK_PUBLIC" -eq 1 ]; then
+		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_PUBLIC" -eq -1 ]; then
+		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Installation multi-instance: "
+	if [ "$GLOBAL_CHECK_MULTI_INSTANCE" -eq 1 ]; then
+		ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_MULTI_INSTANCE" -eq -1 ]; then
+		ECHO_FORMAT "\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Mauvais utilisateur: "
+	if [ "$GLOBAL_CHECK_ADMIN" -eq 1 ]; then
+		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_ADMIN" -eq -1 ]; then
+		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Erreur de domaine: "
+	if [ "$GLOBAL_CHECK_DOMAIN" -eq 1 ]; then
+		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_DOMAIN" -eq -1 ]; then
+		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Correction de path: "
+	if [ "$GLOBAL_CHECK_PATH" -eq 1 ]; then
+		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_PATH" -eq -1 ]; then
+		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Port déjà utilisé: "
+	if [ "$GLOBAL_CHECK_PORT" -eq 1 ]; then
+		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_PORT" -eq -1 ]; then
+		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Source corrompue: "
+	if [ "$GLOBAL_CHECK_CORRUPT" -eq 1 ]; then
+		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_CORRUPT" -eq -1 ]; then
+		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Erreur de téléchargement de la source: "
+	if [ "$GLOBAL_CHECK_DL" -eq 1 ]; then
+		ECHO_FORMAT "\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_DL" -eq -1 ]; then
+		ECHO_FORMAT "\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Dossier déjà utilisé: "
+	if [ "$GLOBAL_CHECK_FINALPATH" -eq 1 ]; then
+		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_FINALPATH" -eq -1 ]; then
+		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Backup: "
+	if [ "$GLOBAL_CHECK_BACKUP" -eq 1 ]; then
+		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_BACKUP" -eq -1 ]; then
+		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
+	fi
+
+	ECHO_FORMAT "Restore: "
+	if [ "$GLOBAL_CHECK_RESTORE" -eq 1 ]; then
+		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_CHECK_RESTORE" -eq -1 ]; then
+		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\t\t\tNot evaluated.\n\n" "white"
+	fi
+}
+
+INIT_VAR() {
+	GLOBAL_CHECK_SETUP=0
+	GLOBAL_CHECK_SUB_DIR=0
+	GLOBAL_CHECK_ROOT=0
+	GLOBAL_CHECK_REMOVE=0
+	GLOBAL_CHECK_REMOVE_SUBDIR=0
+	GLOBAL_CHECK_REMOVE_ROOT=0
+	GLOBAL_CHECK_UPGRADE=0
+	GLOBAL_CHECK_BACKUP=0
+	GLOBAL_CHECK_RESTORE=0
+	GLOBAL_CHECK_PRIVATE=0
+	GLOBAL_CHECK_PUBLIC=0
+	GLOBAL_CHECK_MULTI_INSTANCE=0
+	GLOBAL_CHECK_ADMIN=0
+	GLOBAL_CHECK_DOMAIN=0
+	GLOBAL_CHECK_PATH=0
+	GLOBAL_CHECK_CORRUPT=0
+	GLOBAL_CHECK_DL=0
+	GLOBAL_CHECK_PORT=0
+	GLOBAL_CHECK_FINALPATH=0
+	IN_PROCESS=0
+	MANIFEST=0
+	CHECKS=0
+	auto_remove=1
+
+	setup_sub_dir=0
+	setup_root=0
+	setup_nourl=0
+	setup_private=0
+	setup_public=0
+	upgrade=0
+	backup_restore=0
+	multi_instance=0
+	wrong_user=0
+	wrong_path=0
+	incorrect_path=0
+	corrupt_source=0
+	fail_download_source=0
+	port_already_use=0
+	final_path_already_use=0
+}
+
+INIT_VAR
+
 ## Parsing du fichier check_process de manière séquentielle.
-GLOBAL_CHECK_SETUP=0
-GLOBAL_CHECK_SUB_DIR=0
-GLOBAL_CHECK_ROOT=0
-GLOBAL_CHECK_REMOVE=0
-GLOBAL_CHECK_REMOVE_SUBDIR=0
-GLOBAL_CHECK_REMOVE_ROOT=0
-GLOBAL_CHECK_UPGRADE=0
-GLOBAL_CHECK_BACKUP=0
-GLOBAL_CHECK_RESTORE=0
-GLOBAL_CHECK_PRIVATE=0
-GLOBAL_CHECK_PUBLIC=0
-GLOBAL_CHECK_ADMIN=0
-GLOBAL_CHECK_DOMAIN=0
-GLOBAL_CHECK_PATH=0
-GLOBAL_CHECK_CORRUPT=0
-GLOBAL_CHECK_DL=0
-GLOBAL_CHECK_PORT=0
-GLOBAL_CHECK_FINALPATH=0
-IN_PROCESS=0
-MANIFEST=0
-CHECKS=0
-AUTO_REMOVE=1
 while read LIGNE
 do
 	if echo "$LIGNE" | grep -q "auto_remove="; then	# Indication d'auto remove
@@ -63,6 +263,9 @@ do
 	if echo "$LIGNE" | grep -q "^##"; then	# Début d'un scénario de test
 		if [ "$IN_PROCESS" -eq 1 ]; then	# Un scénario est déjà en cours. Donc on a atteind la fin du scénario.
 			TESTING_PROCESS
+			TEST_RESULTS
+			INIT_VAR
+			read -p "Appuyer sur une touche pour démarrer le scénario de test suivant..." < /dev/tty
 		fi
 		PROCESS_NAME=${LIGNE#\#\# }
 		IN_PROCESS=1
@@ -76,17 +279,6 @@ do
 		if echo "$LIGNE" | grep -q "# Checks"; then	# Tests à effectuer
 			MANIFEST=0
 			CHECKS=1
-			setup_sub_dir=0
-			setup_root=0
-			setup_private=0
-			setup_public=0
-			wrong_user=0
-			wrong_path=0
-			incorrect_path=0
-			corrupt_source=0
-			fail_download_source=0
-			port_already_use=0
-			final_path_already_use=0
 		fi
 		if [ "$MANIFEST" -eq 1 ]
 		then	# Analyse des arguments du manifest
@@ -113,6 +305,10 @@ do
 					MANIFEST_PASSWORD=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au mot de passe
 					LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
 				fi
+				if echo "$LIGNE" | grep -q "(PORT)"; then	# Port dans le manifest
+					MANIFEST_PORT=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au port
+					LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
+				fi
 				if [ "${#MANIFEST_ARGS}" -gt 0 ]; then	# Si il y a déjà des arguments
 					MANIFEST_ARGS="$MANIFEST_ARGS&"	#, précède de &
 				fi
@@ -135,6 +331,15 @@ do
 			fi
 			if echo "$LIGNE" | grep -q "setup_public="; then	# Test d'installation en public
 				setup_public=$(echo "$LIGNE" | cut -d '=' -f2)
+			fi
+			if echo "$LIGNE" | grep -q "upgrade="; then	# Test d'installation en public
+				upgrade=$(echo "$LIGNE" | cut -d '=' -f2)
+			fi
+			if echo "$LIGNE" | grep -q "backup_restore="; then	# Test d'installation en public
+				backup_restore=$(echo "$LIGNE" | cut -d '=' -f2)
+			fi
+			if echo "$LIGNE" | grep -q "multi_instance="; then	# Test d'installation multiple
+				multi_instance=$(echo "$LIGNE" | cut -d '=' -f2)
 			fi
 			if echo "$LIGNE" | grep -q "wrong_user="; then	# Test d'erreur d'utilisateur
 				wrong_user=$(echo "$LIGNE" | cut -d '=' -f2)
@@ -163,165 +368,4 @@ do
 done < "$APP_CHECK/check_process"
 
 TESTING_PROCESS
-
-ECHO_FORMAT "\n\nInstallation: "
-if [ "$GLOBAL_CHECK_SETUP" -eq 1 ]; then
-	ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_SETUP" -eq -1 ]; then
-	ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Installation en sous-dossier: "
-if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then
-	ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_SUB_DIR" -eq -1 ]; then
-	ECHO_FORMAT "\t\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\t\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Installation à la racine: "
-if [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then
-	ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_ROOT" -eq -1 ]; then
-	ECHO_FORMAT "\t\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\t\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Suppression: "
-if [ "$GLOBAL_CHECK_REMOVE" -eq 1 ]; then
-	ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_REMOVE" -eq -1 ]; then
-	ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Suppression depuis sous-dossier: "
-if [ "$GLOBAL_CHECK_REMOVE_SUBDIR" -eq 1 ]; then
-	ECHO_FORMAT "\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_REMOVE_SUBDIR" -eq -1 ]; then
-	ECHO_FORMAT "\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Suppression depuis racine: "
-if [ "$GLOBAL_CHECK_REMOVE_ROOT" -eq 1 ]; then
-	ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_REMOVE_ROOT" -eq -1 ]; then
-	ECHO_FORMAT "\t\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\t\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Upgrade: "
-if [ "$GLOBAL_CHECK_UPGRADE" -eq 1 ]; then
-	ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_UPGRADE" -eq -1 ]; then
-	ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Backup: "
-if [ "$GLOBAL_CHECK_BACKUP" -eq 1 ]; then
-	ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_BACKUP" -eq -1 ]; then
-	ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Restore: "
-if [ "$GLOBAL_CHECK_RESTORE" -eq 1 ]; then
-	ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_RESTORE" -eq -1 ]; then
-	ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Installation privée: "
-if [ "$GLOBAL_CHECK_PRIVATE" -eq 1 ]; then
-	ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_PRIVATE" -eq -1 ]; then
-	ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Installation publique: "
-if [ "$GLOBAL_CHECK_PUBLIC" -eq 1 ]; then
-	ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_PUBLIC" -eq -1 ]; then
-	ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Mauvais utilisateur: "
-if [ "$GLOBAL_CHECK_ADMIN" -eq 1 ]; then
-	ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_ADMIN" -eq -1 ]; then
-	ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Erreur de domaine: "
-if [ "$GLOBAL_CHECK_DOMAIN" -eq 1 ]; then
-	ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_DOMAIN" -eq -1 ]; then
-	ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Correction de path: "
-if [ "$GLOBAL_CHECK_PATH" -eq 1 ]; then
-	ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_PATH" -eq -1 ]; then
-	ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Source corrompue: "
-if [ "$GLOBAL_CHECK_CORRUPT" -eq 1 ]; then
-	ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_CORRUPT" -eq -1 ]; then
-	ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Erreur de téléchargement de la source: "
-if [ "$GLOBAL_CHECK_DL" -eq 1 ]; then
-	ECHO_FORMAT "\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_DL" -eq -1 ]; then
-	ECHO_FORMAT "\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Port déjà utilisé: "
-if [ "$GLOBAL_CHECK_PORT" -eq 1 ]; then
-	ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_PORT" -eq -1 ]; then
-	ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-fi
-
-ECHO_FORMAT "Dossier déjà utilisé: "
-if [ "$GLOBAL_CHECK_FINALPATH" -eq 1 ]; then
-	ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-elif [ "$GLOBAL_CHECK_FINALPATH" -eq -1 ]; then
-	ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-else
-	ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-fi
+TEST_RESULTS
