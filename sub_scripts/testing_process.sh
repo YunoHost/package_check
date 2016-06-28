@@ -1,6 +1,7 @@
 #!/bin/bash
 
 RESULT="Test_results.log"
+BACKUP_HOOKS="conf_ssowat data_home conf_ynh_firewall conf_cron"	# La liste des hooks disponible pour le backup se trouve dans /usr/share/yunohost/hooks/backup/
 
 echo "Chargement des fonctions de testing_process.sh"
 
@@ -46,7 +47,7 @@ CHECK_URL () {
 
 CHECK_SETUP_SUBDIR () {
 	# Test d'installation en sous-dossier
-	ECHO_FORMAT "\n>> Installation en sous-dossier...\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Installation en sous-dossier...\n" "white" "bold"
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$DOMAIN\&/")
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
@@ -54,6 +55,7 @@ CHECK_SETUP_SUBDIR () {
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
 	# Installation de l'app
 	SETUP_APP
+	LOG_EXTRACTOR
 	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		GLOBAL_CHECK_SETUP=1	# Installation réussie
@@ -65,7 +67,6 @@ CHECK_SETUP_SUBDIR () {
 		fi
 		GLOBAL_CHECK_SUB_DIR=-1	# Installation en sous-dossier échouée
 	fi
-	LOG_EXTRACTOR
 	# Test l'accès à l'app
 	CHECK_PATH=$PATH_TEST
 	CHECK_URL
@@ -73,6 +74,7 @@ CHECK_SETUP_SUBDIR () {
 	REMOVE_APP
 	if [ "$YUNOHOST_RESULT" -eq 0 ]	# Si l'installation a été un succès. On teste la suppression
 	then
+		LOG_EXTRACTOR
 		if [ "$YUNOHOST_REMOVE" -eq 0 ]; then
 			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 			GLOBAL_CHECK_REMOVE_SUBDIR=1	# Suppression en sous-dossier réussie
@@ -84,13 +86,12 @@ CHECK_SETUP_SUBDIR () {
 			fi
 			GLOBAL_CHECK_REMOVE_SUBDIR=-1	# Suppression en sous-dossier échouée
 		fi
-		LOG_EXTRACTOR
 	fi
 }
 
 CHECK_SETUP_ROOT () {
 	# Test d'installation à la racine
-	ECHO_FORMAT "\n>> Installation à la racine...\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Installation à la racine...\n" "white" "bold"
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$DOMAIN\&/")
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
@@ -98,6 +99,7 @@ CHECK_SETUP_ROOT () {
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
 	# Installation de l'app
 	SETUP_APP
+	LOG_EXTRACTOR
 	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		GLOBAL_CHECK_SETUP=1	# Installation réussie
@@ -109,7 +111,6 @@ CHECK_SETUP_ROOT () {
 		fi
 		GLOBAL_CHECK_ROOT=-1	# Installation à la racine échouée
 	fi
-	LOG_EXTRACTOR
 	# Test l'accès à l'app
 	CHECK_PATH="/"
 	CHECK_URL
@@ -117,6 +118,7 @@ CHECK_SETUP_ROOT () {
 	REMOVE_APP
 	if [ "$YUNOHOST_RESULT" -eq 0 ]	# Si l'installation a été un succès. On teste la suppression
 	then
+		LOG_EXTRACTOR
 		if [ "$YUNOHOST_REMOVE" -eq 0 ]; then
 			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 			GLOBAL_CHECK_REMOVE_ROOT=1	# Suppression à la racine réussie
@@ -128,13 +130,12 @@ CHECK_SETUP_ROOT () {
 			fi
 			GLOBAL_CHECK_REMOVE_ROOT=-1	# Suppression à la racine échouée
 		fi
-		LOG_EXTRACTOR
 	fi
 }
 
 CHECK_SETUP_NO_URL () {
 	# Test d'installation sans accès par url
-	ECHO_FORMAT "\n>> Installation sans accès par url...\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Installation sans accès par url...\n" "white" "bold"
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$DOMAIN\&/")
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")	# Domain et path ne devrait théoriquement pas être utilisés
@@ -142,6 +143,7 @@ CHECK_SETUP_NO_URL () {
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
 	# Installation de l'app
 	SETUP_APP
+	LOG_EXTRACTOR
 	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		GLOBAL_CHECK_SETUP=1	# Installation réussie
@@ -151,11 +153,11 @@ CHECK_SETUP_NO_URL () {
 			GLOBAL_CHECK_SETUP=-1	# Installation échouée
 		fi
 	fi
-	LOG_EXTRACTOR
 	# Suppression de l'app
 	REMOVE_APP
 	if [ "$YUNOHOST_RESULT" -eq 0 ]	# Si l'installation a été un succès. On teste la suppression
 	then
+		LOG_EXTRACTOR
 		if [ "$YUNOHOST_REMOVE" -eq 0 ]; then
 			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 			GLOBAL_CHECK_REMOVE_ROOT=1	# Suppression réussie
@@ -166,13 +168,12 @@ CHECK_SETUP_NO_URL () {
 			fi
 			GLOBAL_CHECK_REMOVE_ROOT=-1	# Suppression échouée
 		fi
-		LOG_EXTRACTOR
 	fi
 }
 
 CHECK_UPGRADE () {
 	# Test d'upgrade
-	ECHO_FORMAT "\n>> Upgrade...\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Upgrade...\n" "white" "bold"
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 		return;
@@ -200,6 +201,7 @@ CHECK_UPGRADE () {
 	sudo yunohost --debug app upgrade $APPID -f $APP_CHECK > /dev/null 2>&1
 	YUNOHOST_RESULT=$?
 	COPY_LOG 2
+	LOG_EXTRACTOR
 	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		GLOBAL_CHECK_UPGRADE=1	# Upgrade réussie
@@ -207,39 +209,80 @@ CHECK_UPGRADE () {
 		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
 		GLOBAL_CHECK_UPGRADE=-1	# Upgrade échouée
 	fi
-	LOG_EXTRACTOR
 	# Test l'accès à l'app
 	CHECK_URL
 	# Suppression de l'app
 	REMOVE_APP
 }
 
-CHECK_BACKUP () {
+CHECK_BACKUP_RESTORE () {
 	# Test de backup
-	ECHO_FORMAT "\n>> Backup...\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Backup...\n" "white" "bold"
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 	fi
-echo "Non implémenté"
-# GLOBAL_CHECK_BACKUP=0
-}
-CHECK_RESTORE () {
-	# Test de restore
-	ECHO_FORMAT "\n>> Restore...\n" "white" "bold"
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
-		echo "L'installation a échouée, impossible d'effectuer ce test..."
+	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$DOMAIN\&/")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-Z/-$]*\&@$MANIFEST_USER=$USER_TEST\&@")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
+	if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Utilise ce mode d'installation
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
+		CHECK_PATH="$PATH_TEST"
+	elif [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then	# Sinon utilise une install root, si elle a fonctionné
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
+		CHECK_PATH="/"
+	else
+		echo "Aucun mode d'installation n'a fonctionné, impossible d'effectuer ce test..."
+		return;
 	fi
-echo "Non implémenté"
-# GLOBAL_CHECK_RESTORE=0
+	ECHO_FORMAT "\nInstallation préalable..." "white" "bold"
+	# Installation de l'app
+	SETUP_APP
+	ECHO_FORMAT "\nBackup de l'application...\n" "white" "bold"
+	# Backup de l'app
+	COPY_LOG 1
+	sudo yunohost --debug backup create -n Backup_test --apps $APPID --hooks $BACKUP_HOOKS > /dev/null 2>&1
+	YUNOHOST_RESULT=$?
+	COPY_LOG 2
+	LOG_EXTRACTOR
+	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
+		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
+		GLOBAL_CHECK_BACKUP=1	# Backup réussi
+	else
+		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
+		GLOBAL_CHECK_BACKUP=-1	# Backup échoué
+	fi
+	# Suppression de l'app
+	REMOVE_APP
+	ECHO_FORMAT "\nRestauration de l'application...\n" "white" "bold"
+	# Restore de l'app
+	COPY_LOG 1
+	sudo yunohost --debug backup restore Backup_test --force --apps $APPID > /dev/null 2>&1
+	YUNOHOST_RESULT=$?
+	COPY_LOG 2
+	LOG_EXTRACTOR
+	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
+		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
+		GLOBAL_CHECK_RESTORE=1	# Restore réussi
+	else
+		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
+		GLOBAL_CHECK_RESTORE=-1	# Restore échoué
+	fi
+	# Test l'accès à l'app
+	CHECK_URL
+	# Suppression de l'app
+	REMOVE_APP
+	# Suppression de l'archive
+	sudo yunohost backup delete Backup_test > /dev/null 2>&1
 }
 
 CHECK_PUBLIC_PRIVATE () {
 	# Test d'installation en public/privé
 	if [ "$1" == "private" ]; then
-		ECHO_FORMAT "\n>> Installation privée...\n" "white" "bold"
+		ECHO_FORMAT "\n\n>> Installation privée...\n" "white" "bold"
 	fi
 	if [ "$1" == "public" ]; then
-		ECHO_FORMAT "\n>> Installation publique...\n" "white" "bold"
+		ECHO_FORMAT "\n\n>> Installation publique...\n" "white" "bold"
 	fi
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
@@ -280,6 +323,7 @@ CHECK_PUBLIC_PRIVATE () {
 			YUNOHOST_RESULT=1
 		fi
 	fi	
+	LOG_EXTRACTOR
 	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		if [ "$1" == "private" ]; then
@@ -297,14 +341,13 @@ CHECK_PUBLIC_PRIVATE () {
 			GLOBAL_CHECK_PUBLIC=-1	# Installation publique échouée
 		fi
 	fi
-	LOG_EXTRACTOR
 	# Suppression de l'app
 	REMOVE_APP
 }
 
 CHECK_ADMIN () {
 	# Test d'erreur d'utilisateur
-	ECHO_FORMAT "\n>> Erreur d'utilisateur...\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Erreur d'utilisateur...\n" "white" "bold"
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 	fi
@@ -313,7 +356,7 @@ echo "Non implémenté"
 }
 CHECK_DOMAIN () {
 	# Test d'erreur de path ou de domaine
-	ECHO_FORMAT "\n>> Erreur de domaine...\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Erreur de domaine...\n" "white" "bold"
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 	fi
@@ -322,7 +365,7 @@ echo "Non implémenté"
 }
 CHECK_PATH () {
 	# Test d'erreur de forme de path
-	ECHO_FORMAT "\n>> Path mal formé...\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Path mal formé...\n" "white" "bold"
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 	fi
@@ -331,7 +374,7 @@ echo "Non implémenté"
 }
 CHECK_CORRUPT () {
 	# Test d'erreur sur source corrompue
-	ECHO_FORMAT "\n>> Source corrompue après téléchargement...\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Source corrompue après téléchargement...\n" "white" "bold"
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 	fi
@@ -340,7 +383,7 @@ echo "Non implémenté"
 }
 CHECK_DL () {
 	# Test d'erreur de téléchargement de la source
-	ECHO_FORMAT "\n>> Erreur de téléchargement de la source...\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Erreur de téléchargement de la source...\n" "white" "bold"
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 	fi
@@ -349,7 +392,7 @@ echo "Non implémenté"
 }
 CHECK_PORT () {
 	# Test d'erreur de port
-	ECHO_FORMAT "\n>> Port déjà utilisé...\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Port déjà utilisé...\n" "white" "bold"
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 	fi
@@ -358,7 +401,7 @@ echo "Non implémenté"
 }
 CHECK_FINALPATH () {
 	# Test sur final path déjà utilisé.
-	ECHO_FORMAT "\n>> Final path déjà utilisé...\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Final path déjà utilisé...\n" "white" "bold"
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 	fi
@@ -379,8 +422,6 @@ TESTING_PROCESS () {
 		CHECK_SETUP_NO_URL	# Test d'installation sans accès par url
 	fi
 	CHECK_UPGRADE
-	CHECK_BACKUP
-	CHECK_RESTORE
 	if [ "$setup_private" -eq 1 ]; then
 		CHECK_PUBLIC_PRIVATE private	# Test d'installation en privé
 	fi
@@ -408,4 +449,5 @@ TESTING_PROCESS () {
 	if [ "$final_path_already_use" -eq 1 ]; then
 		CHECK_FINALPATH	# Test sur final path déjà utilisé.
 	fi
+	CHECK_BACKUP_RESTORE
 }

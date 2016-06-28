@@ -47,6 +47,8 @@ PARSE_LOG () {
 		if echo "$LOG_LIGNE_TEMP" | grep -q "^>ERROR: "; then
 			ECHO_FORMAT "Error:" "red" "underlined"
 			ECHO_FORMAT " $(echo "$LOG_LIGNE_TEMP\n" | sed 's/^>ERROR: //')" "red"
+			YUNOHOST_RESULT=1
+			YUNOHOST_REMOVE=1
 		fi
 		if echo "$LOG_LIGNE_TEMP" | grep -q "^>WARNING: "; then
 			ECHO_FORMAT "Warning:" "lyellow" "underlined"
@@ -62,6 +64,7 @@ CLEAR_LOG () {
 	sed -i '/% Total    % Received % Xferd/d' "temp_$RESULT"	# Ligne de warning des statistiques d'un wget
 	sed -i '/Dload  Upload   Total   Spent/d' "temp_$RESULT"	# 2e ligne de warning des statistiques d'un wget
 	sed -i '/--:--:-- --:--:-- --:--:--/d' "temp_$RESULT"	# 3e ligne de warning des statistiques d'un wget
+	sed -i '/^>WARNING: yunohost.backup backup_restore - \[[0-9.]*\] YunoHost est déjà installé$/d' "temp_$RESULT"	# Ligne de warning du backup car Yunohost est déjà installé
 	sed -i '/^$/d' "temp_$RESULT"	# Retire les lignes vides
 }
 

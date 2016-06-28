@@ -5,7 +5,7 @@
 		path="$PATH"	(PATH)
 		admin="$USER"	(USER)
 		language="fr"
-		is_public="No"	(PUBLIC|public=Yes|private=No)
+		is_public="Yes"	(PUBLIC|public=Yes|private=No)
 		password="$PASSWORD"	(PASSWORD)
 		port="666"
 	# Checks
