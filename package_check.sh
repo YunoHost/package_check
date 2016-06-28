@@ -253,6 +253,7 @@ INIT_VAR() {
 }
 
 INIT_VAR
+echo -n "" > $COMPLETE_LOG	# Initialise le fichier de log
 
 ## Parsing du fichier check_process de manière séquentielle.
 while read LIGNE
@@ -370,9 +371,10 @@ done < "$APP_CHECK/check_process"
 TESTING_PROCESS
 TEST_RESULTS
 
+echo "Le log complet des installations et suppressions est disponible dans le fichier $COMPLETE_LOG"
 # Clean
 rm debug_output temp_Test_results.log url_output
 
 if [ "$GIT_PACKAGE" -eq 1 ]; then
-	rm -r "$APP_CHECK"
+	sudo rm -r "$APP_CHECK"
 fi

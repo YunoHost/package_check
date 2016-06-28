@@ -2,6 +2,7 @@
 
 OUTPUTD="debug_output"
 YUNOHOST_LOG="/var/log/yunohost/yunohost-cli.log"
+COMPLETE_LOG="Complete.log"
 
 echo "Chargement des fonctions de log_extractor.sh"
 
@@ -70,6 +71,7 @@ CLEAR_LOG () {
 
 LOG_EXTRACTOR () {
 	echo -n "" > temp_$RESULT	# Initialise le fichier des résulats d'analyse
+	cat "$OUTPUTD" >> "$COMPLETE_LOG"
 	while read LOG_LIGNE
 	do	# Lit le log pour extraire les warning et les erreurs.
 		if echo "$LOG_LIGNE" | grep -q " ERROR    "; then

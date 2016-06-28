@@ -426,12 +426,6 @@ CHECK_MULTI_INSTANCE () {
 	CHECK_PATH="$PATH_TEST-2"
 	SETUP_APP
 	LOG_EXTRACTOR
-	# Test l'accès à la 1ère instance de l'app
-	CHECK_PATH=$CHECK_PATH_first
-	CHECK_URL
-	# Test l'accès à la 2e instance de l'app
-	CHECK_PATH="$PATH_TEST-2"
-	CHECK_URL
 	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$YUNOHOST_RESULT_first" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		GLOBAL_CHECK_MULTI_INSTANCE=1	# Installation multi-instance réussie
@@ -439,6 +433,12 @@ CHECK_MULTI_INSTANCE () {
 		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
 		GLOBAL_CHECK_MULTI_INSTANCE=-1	# Installation multi-instance échouée
 	fi
+	# Test l'accès à la 1ère instance de l'app
+	CHECK_PATH=$CHECK_PATH_first
+	CHECK_URL
+	# Test l'accès à la 2e instance de l'app
+	CHECK_PATH="$PATH_TEST-2"
+	CHECK_URL
 	# Suppression de la 2e app
 	REMOVE_APP
 	# Suppression de la 1ère app
