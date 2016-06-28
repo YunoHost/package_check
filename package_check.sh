@@ -25,7 +25,7 @@ if echo "$1" | grep -Eq "https?:\/\/"
 then
 	GIT_PACKAGE=1
 	git clone $1 "../$(basename $1)"
-	APP_CHECK="$(basename $1)"
+	APP_CHECK="../$(basename $1)"
 else
 	APP_CHECK="$1"
 fi
@@ -372,3 +372,7 @@ TEST_RESULTS
 
 # Clean
 rm debug_output temp_Test_results.log url_output
+
+if [ "$GIT_PACKAGE" -eq 1 ]; then
+	rm -r "$APP_CHECK"
+fi
