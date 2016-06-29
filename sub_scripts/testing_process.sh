@@ -3,7 +3,7 @@
 RESULT="Test_results.log"
 BACKUP_HOOKS="conf_ssowat data_home conf_ynh_firewall conf_cron"	# La liste des hooks disponible pour le backup se trouve dans /usr/share/yunohost/hooks/backup/
 
-echo "Chargement des fonctions de testing_process.sh"
+echo -e "\nChargement des fonctions de testing_process.sh"
 
 source $abs_path/sub_scripts/log_extractor.sh
 

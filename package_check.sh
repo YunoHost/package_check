@@ -11,6 +11,7 @@ source $abs_path/sub_scripts/testing_process.sh
 source /usr/share/yunohost/helpers
 
 # Vérifie l'existence de l'utilisateur de test
+echo -e "\nVérification de l'existence de l'utilisateur de test..."
 if ! ynh_user_exists "$USER_TEST" ; then	# Si il n'existe pas, il faut le créer.
 	USER_TEST_CLEAN=${USER_TEST//"_"/""}
 	sudo yunohost user create --firstname "$USER_TEST_CLEAN" --mail "$USER_TEST_CLEAN@$DOMAIN" --lastname "$USER_TEST_CLEAN" --password "$PASSWORD_TEST" "$USER_TEST"
@@ -21,6 +22,7 @@ if ! ynh_user_exists "$USER_TEST" ; then	# Si il n'existe pas, il faut le créer
 fi
 
 # Vérifie l'existence du sous-domaine de test
+echo "Vérification de l'existence de domaine de test..."
 SOUS_DOMAIN="sous.$DOMAIN"
 if [ "$(sudo yunohost domain list | grep -c "$SOUS_DOMAIN")" -eq 0 ] ; then	# Si il n'existe pas, il faut le créer.
 	sudo yunohost domain add "$SOUS_DOMAIN"
@@ -31,6 +33,7 @@ if [ "$(sudo yunohost domain list | grep -c "$SOUS_DOMAIN")" -eq 0 ] ; then	# Si
 fi
 
 # Vérifie le type d'emplacement du package à tester
+GIT_PACKAGE=0
 if echo "$1" | grep -Eq "https?:\/\/"
 then
 	GIT_PACKAGE=1
@@ -244,6 +247,15 @@ INIT_VAR() {
 	MANIFEST=0
 	CHECKS=0
 	auto_remove=1
+
+	MANIFEST_DOMAIN="null"
+	MANIFEST_PATH="null"
+	MANIFEST_USER="null"
+	MANIFEST_PUBLIC="null"
+	MANIFEST_PUBLIC_public="null"
+	MANIFEST_PUBLIC_private="null"
+	MANIFEST_PASSWORD="null"
+	MANIFEST_PORT="null"
 
 	setup_sub_dir=0
 	setup_root=0
