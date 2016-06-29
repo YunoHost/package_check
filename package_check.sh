@@ -20,6 +20,16 @@ if ! ynh_user_exists "$USER_TEST" ; then	# Si il n'existe pas, il faut le créer
 	fi
 fi
 
+# Vérifie l'existence du sous-domaine de test
+SOUS_DOMAIN="sous.$DOMAIN"
+if [ "$(sudo yunohost domain list | grep -c "$SOUS_DOMAIN")" -eq 0 ] ; then	# Si il n'existe pas, il faut le créer.
+	sudo yunohost domain add "$SOUS_DOMAIN"
+	if [ "$?" -ne 0 ]; then
+		echo "La création du sous-domain de test a échoué. Impossible de continuer."
+		exit 1
+	fi
+fi
+
 # Vérifie le type d'emplacement du package à tester
 if echo "$1" | grep -Eq "https?:\/\/"
 then
@@ -373,7 +383,7 @@ TEST_RESULTS
 
 echo "Le log complet des installations et suppressions est disponible dans le fichier $COMPLETE_LOG"
 # Clean
-rm debug_output temp_Test_results.log url_output
+rm -f debug_output temp_Test_results.log url_output
 
 if [ "$GIT_PACKAGE" -eq 1 ]; then
 	sudo rm -r "$APP_CHECK"

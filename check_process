@@ -1,12 +1,12 @@
 ## Nom du test
 	auto_remove=1
 	# Manifest
-		domain="$DOMAIN"	(DOMAIN)
-		path="$PATH"	(PATH)
-		admin="$USER"	(USER)
+		domain="domain.tld"	(DOMAIN)
+		path="/path"	(PATH)
+		admin="john"	(USER)
 		language="fr"
 		is_public="Yes"	(PUBLIC|public=Yes|private=No)
-		password="$PASSWORD"	(PASSWORD)
+		password="pass"	(PASSWORD)
 		port="666"	(PORT)
 	# Checks
 		setup_sub_dir=1
