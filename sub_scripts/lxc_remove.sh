@@ -1,6 +1,6 @@
 #!/bin/bash
 
-LXC_NAME=$(cat sub_scripts/lxc_build.sh | grep LXC_NAME= | cut -d '=' -f2)
+LXC_NAME=$(cat lxc_build.sh | grep LXC_NAME= | cut -d '=' -f2)
 
 # Check root
 CHECK_ROOT=$EUID
@@ -11,24 +11,25 @@ then	# $EUID est vide sur une exécution avec sudo. Et vaut 0 pour root
    exit 1
 fi
 
-echo "Retire l'ip forwarding."
+echo ">> Retire l'ip forwarding."
 sudo rm /etc/sysctl.d/lxc_pchecker.conf
 sudo sysctl -p
 
-echo "Désactive le bridge réseau"
+echo ">> Désactive le bridge réseau"
 sudo ifdown lxc-pchecker
 
-echo "Supprime le brige réseau"
+echo ">> Supprime le brige réseau"
 sudo rm /etc/network/interfaces.d/lxc-pchecker
 
-echo "Suppression de la machine et de son snapshots"
+echo ">> Suppression de la machine et de son snapshots"
+sudo lxc-stop -n $LXC_NAME
 sudo lxc-snapshot -n $LXC_NAME -d snap0
 sudo rm -f /var/lib/lxcsnaps/$LXC_NAME/snap0.tar.gz
 sudo lxc-destroy -n $LXC_NAME -f
 
-echo "Remove lxc lxctl"
+echo ">> Remove lxc lxctl"
 sudo apt-get remove lxc lxctl
 
-echo "Suppression des lignes de pchecker_lxc dans .ssh/config"
-BEGIN_LINE=$(cat $HOME/.ssh/config | grep -n "^# ssh pchecker_lxc$" | cut -d':' -f 1)
-sed -i "$BEGIN_LINE,/^IdentityFile/d" $HOME/.ssh/config
+echo ">> Suppression des lignes de pchecker_lxc dans .ssh/config"
+BEGIN_LINE=$(cat $HOME/.ssh/config | grep "^# ssh pchecker_lxc$")
+sed -i "/^$BEGIN_LINE$/,/^IdentityFile$/d" $HOME/.ssh/config
