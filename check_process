@@ -22,5 +22,5 @@
 		incorrect_path=1
 		corrupt_source=0
 		fail_download_source=0
-		port_already_use=1
+		port_already_use=1	(66)
 		final_path_already_use=0

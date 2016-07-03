@@ -36,9 +36,10 @@ COPY_LOG () {
 	if [ "$1" -eq 1 ]; then
 		log_line=$(sudo wc -l "$YUNOHOST_LOG" | cut -d ' ' -f 1)	# Compte le nombre de ligne du fichier de log Yunohost
 		log_line=$(( $log_line + 1 ))	# Ignore la première ligne, reprise de l'ancien log.
+		echo -n "" > "$OUTPUTD"	# Efface le fichier de log temporaire
 	fi
 	if [ "$1" -eq 2 ]; then
-		sudo tail -n +$log_line "$YUNOHOST_LOG" > "$OUTPUTD"	# Copie le fichier de log à partir de la dernière ligne du log préexistant
+		sudo tail -n +$log_line "$YUNOHOST_LOG" >> "$OUTPUTD"	# Copie le fichier de log à partir de la dernière ligne du log préexistant
 	fi
 }
 
@@ -78,6 +79,11 @@ LOG_EXTRACTOR () {
 			echo -n ">ERROR: " >> "temp_$RESULT"
 			echo "$LOG_LIGNE" | sed 's/^.* ERROR *//' >> "temp_$RESULT"
 		fi
+		if echo "$LOG_LIGNE" | grep -q "yunohost.*: error:"; then	# Récupère aussi les erreurs de la moulinette
+			echo -n ">ERROR: " >> "temp_$RESULT"
+			echo "$LOG_LIGNE" >> "temp_$RESULT"
+		fi
+
 		if echo "$LOG_LIGNE" | grep -q " WARNING  "; then
 			echo -n ">WARNING: " >> "temp_$RESULT"
 			echo "$LOG_LIGNE" | sed 's/^.* WARNING *//' >> "temp_$RESULT"

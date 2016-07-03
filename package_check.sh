@@ -1,54 +1,128 @@
 #!/bin/bash
 
+# Arguments du script
+# -b	Mode bash, le script est autonome. Il ignore la valeur de $auto_remove
+# --no-lxc	N'utilise pas la virtualisation en conteneur lxc. La virtualisation est utilisée par défaut si disponible.
+# --build-lxc	Installe lxc et créer la machine si nécessaire. Incompatible avec -b en raison de la connexion ssh à valider lors du build.
+
+if [ "$#" -eq 0 ]
+then
+	echo "Le script prend en argument le package à tester."
+	exit 1
+fi
+
+## Récupère les arguments
+# --bash-mode
+bash_mode=$(echo "$*" | grep -c -e "--bash-mode")	# bash_mode vaut 1 si l'argument est présent.
+# --no-lxc
+no_lxc=$(echo "$*" | grep -c -e "--no-lxc")	# no_lxc vaut 1 si l'argument est présent.
+# --build-lxc
+build_lxc=$(echo "$*" | grep -c -e "--build-lxc")	# build_lxc vaut 1 si l'argument est présent.
+arg_app=$(echo "$*" | sed 's/--bash-mode\|--no-lxc\|--build-lxc//g' | sed 's/^ *\| *$//g')	# Supprime les arguments déjà lu pour ne garder que l'app. Et supprime les espaces au début et à la fin
+# echo "arg_app=$arg_app."
+
 USER_TEST=package_checker
 PASSWORD_TEST=checker_pwd
 PATH_TEST=/check
-DOMAIN=$(sudo yunohost domain list -l 1 | cut -d" " -f 2)
+LXC_NAME=$(cat sub_scripts/lxc_build.sh | grep LXC_NAME= | cut -d '=' -f2)
+
+if [ "$no_lxc" -eq 0 ]
+then
+	DOMAIN=$(sudo cat /var/lib/lxc/$LXC_NAME/rootfs/etc/yunohost/current_host)
+else
+	DOMAIN=$(sudo yunohost domain list -l 1 | cut -d" " -f 2)
+fi
+SOUS_DOMAIN="sous.$DOMAIN"
 
 abs_path=$(cd $(dirname $0); pwd)	# Récupère le chemin absolu du script.
 
+source $abs_path/sub_scripts/lxc_launcher.sh
 source $abs_path/sub_scripts/testing_process.sh
 source /usr/share/yunohost/helpers
 
-# Vérifie l'existence de l'utilisateur de test
-echo -e "\nVérification de l'existence de l'utilisateur de test..."
-if ! ynh_user_exists "$USER_TEST" ; then	# Si il n'existe pas, il faut le créer.
-	USER_TEST_CLEAN=${USER_TEST//"_"/""}
-	sudo yunohost user create --firstname "$USER_TEST_CLEAN" --mail "$USER_TEST_CLEAN@$DOMAIN" --lastname "$USER_TEST_CLEAN" --password "$PASSWORD_TEST" "$USER_TEST"
-	if [ "$?" -ne 0 ]; then
-		echo "La création de l'utilisateur de test a échoué. Impossible de continuer."
+# Vérifie la connexion internet.
+ping -q -c 2 yunohost.org > /dev/null 2>&1
+if [ "$?" -ne 0 ]; then	# En cas d'échec de connexion, tente de pinger un autre domaine pour être sûr
+	ping -q -c 2 framasoft.org > /dev/null 2>&1
+	if [ "$?" -ne 0 ]; then	# En cas de nouvel échec de connexion. On considère que la connexion est down...
+		ECHO_FORMAT "Impossible d'établir une connexion à internet.\n" "red"
 		exit 1
 	fi
 fi
 
-# Vérifie l'existence du sous-domaine de test
-echo "Vérification de l'existence de domaine de test..."
-SOUS_DOMAIN="sous.$DOMAIN"
-if [ "$(sudo yunohost domain list | grep -c "$SOUS_DOMAIN")" -eq 0 ] ; then	# Si il n'existe pas, il faut le créer.
-	sudo yunohost domain add "$SOUS_DOMAIN"
-	if [ "$?" -ne 0 ]; then
-		echo "La création du sous-domain de test a échoué. Impossible de continuer."
-		exit 1
+if [ "$no_lxc" -eq 0 ]
+then	# Si le conteneur lxc est utilisé
+	lxc_ok=0
+	# Vérifie la présence du virtualisateur en conteneur LXC
+	if dpkg-query -W -f '${Status}' "lxc" 2>/dev/null | grep -q "ok installed"; then
+		if sudo lxc-ls | grep -q "$LXC_NAME"; then	# Si lxc est installé, vérifie la présence de la machine $LXC_NAME
+			lxc_ok=1
+		fi
+	fi
+	if [ "$lxc_ok" -eq 0 ]
+	then
+		if [ "$build_lxc" -eq 1 ]
+		then
+			./sub_scripts/lxc_build.sh	# Lance la construction de la machine virtualisée.
+		else
+			ECHO_FORMAT "Lxc n'est pas installé, ou la machine $LXC_NAME n'est pas créée.\n" "red"
+			ECHO_FORMAT "Utilisez le script 'lxc_build.sh' pour installer lxc et créer la machine.\n" "red"
+			ECHO_FORMAT "Ou utilisez l'argument --no-lxc\n" "red"
+			exit 1
+		fi
+	fi
+	# Stoppe toute activité éventuelle du conteneur, en cas d'arrêt incorrect précédemment
+	LXC_STOP
+	LXC_TURNOFF
+else	# Vérifie l'utilisateur et le domain si lxc n'est pas utilisé.
+	# Vérifie l'existence de l'utilisateur de test
+	echo -e "\nVérification de l'existence de l'utilisateur de test..."
+	if ! ynh_user_exists "$USER_TEST"
+	then	# Si il n'existe pas, il faut le créer.
+		USER_TEST_CLEAN=${USER_TEST//"_"/""}
+		sudo yunohost user create --firstname "$USER_TEST_CLEAN" --mail "$USER_TEST_CLEAN@$DOMAIN" --lastname "$USER_TEST_CLEAN" --password "$PASSWORD_TEST" "$USER_TEST"
+		if [ "$?" -ne 0 ]; then
+			ECHO_FORMAT "La création de l'utilisateur de test a échoué. Impossible de continuer.\n" "red"
+			exit 1
+		fi
+	fi
+
+	# Vérifie l'existence du sous-domaine de test
+	echo "Vérification de l'existence du domaine de test..."
+	if [ "$(sudo yunohost domain list | grep -c "$SOUS_DOMAIN")" -eq 0 ]; then	# Si il n'existe pas, il faut le créer.
+		sudo yunohost domain add "$SOUS_DOMAIN"
+		if [ "$?" -ne 0 ]; then
+			ECHO_FORMAT "La création du sous-domain de test a échoué. Impossible de continuer.\n" "red"
+			exit 1
+		fi
 	fi
 fi
 
 # Vérifie le type d'emplacement du package à tester
 GIT_PACKAGE=0
-if echo "$1" | grep -Eq "https?:\/\/"
+if echo "$arg_app" | grep -Eq "https?:\/\/"
 then
 	GIT_PACKAGE=1
-	git clone $1 "../$(basename $1)"
-	APP_CHECK="../$(basename $1)"
+	git clone $arg_app "$(basename $arg_app)_check"
 else
-	APP_CHECK="$1"
+	# Si c'est un dossier local, il est copié dans le dossier du script.
+	sudo cp -a "$arg_app" "$(basename $arg_app)_check"
 fi
+APP_CHECK="$(basename $arg_app)_check"
+if [ ! -d "$APP_CHECK" ]; then
+	ECHO_FORMAT "Le dossier de l'application a tester est introuvable...\n" "red"
+	exit 1
+fi
+sudo rm -rf $APP_CHECK/.git	# Purge des fichiers de git
 
 # Vérifie l'existence du fichier check_process
 if [ ! -e $APP_CHECK/check_process ]; then
-	echo -e "\nImpossible de trouver le fichier check_process pour procéder aux tests."
-	echo "Merci d'ajouter un fichier check_process à la racine de l'app à tester."
+	ECHO_FORMAT "\nImpossible de trouver le fichier check_process pour procéder aux tests.\n" "red"
+	ECHO_FORMAT "Merci d'ajouter un fichier check_process à la racine de l'app à tester.\n" "red"
 	exit 1
 fi
+
+
 
 TEST_RESULTS () {
 	ECHO_FORMAT "\n\nInstallation: "
@@ -219,8 +293,28 @@ TEST_RESULTS () {
 	elif [ "$GLOBAL_CHECK_RESTORE" -eq -1 ]; then
 		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
 	else
-		ECHO_FORMAT "\t\t\t\tNot evaluated.\n\n" "white"
+		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
 	fi
+	ECHO_FORMAT "\t\t    Notes de résultats: $note/$tnote - " "white" "bold"
+	note=$(( note * 20 / tnote ))
+	if [ $note -le 5 ]; then
+		color_note="red"
+		typo_note="bold"
+	elif [ $note -le 10 ]; then
+		color_note="red"
+		typo_note=""
+	elif [ $note -le 15 ]; then
+		color_note="lyellow"
+		typo_note=""
+	elif [ $note -gt 15 ]; then
+		color_note="lgreen"
+		typo_note=""
+	elif [ $note -eq 20 ]; then
+		color_note="lgreen"
+		typo_note="bold"
+	fi
+	ECHO_FORMAT "$note/20\n" "$color_note" "$typo_note"
+	ECHO_FORMAT "\t   Ensemble de tests effectués: $tnote/19\n\n" "white" "bold"
 }
 
 INIT_VAR() {
@@ -276,6 +370,13 @@ INIT_VAR() {
 
 INIT_VAR
 echo -n "" > $COMPLETE_LOG	# Initialise le fichier de log
+echo -n "" > $RESULT	# Initialise le fichier des résulats d'analyse
+note=0
+tnote=0
+all_test=0
+if [ "$no_lxc" -eq 0 ]; then
+	LXC_INIT
+fi
 
 ## Parsing du fichier check_process de manière séquentielle.
 while read LIGNE
@@ -288,7 +389,9 @@ do
 			TESTING_PROCESS
 			TEST_RESULTS
 			INIT_VAR
-			read -p "Appuyer sur une touche pour démarrer le scénario de test suivant..." < /dev/tty
+			if [ "$bash_mode" -ne 1 ]; then
+				read -p "Appuyer sur une touche pour démarrer le scénario de test suivant..." < /dev/tty
+			fi
 		fi
 		PROCESS_NAME=${LIGNE#\#\# }
 		IN_PROCESS=1
@@ -342,48 +445,98 @@ do
 		then	# Analyse des tests à effectuer sur ce scenario.
 			if echo "$LIGNE" | grep -q "setup_sub_dir="; then	# Test d'installation en sous-dossier
 				setup_sub_dir=$(echo "$LIGNE" | cut -d '=' -f2)
+				if [ "$setup_sub_dir" -eq 1 ]; then
+					all_test=$((all_test+1))
+				fi
 			fi
 			if echo "$LIGNE" | grep -q "setup_root="; then	# Test d'installation à la racine
 				setup_root=$(echo "$LIGNE" | cut -d '=' -f2)
+				if [ "$setup_root" -eq 1 ]; then
+					all_test=$((all_test+1))
+				fi
 			fi
 			if echo "$LIGNE" | grep -q "setup_nourl="; then	# Test d'installation sans accès par url
 				setup_nourl=$(echo "$LIGNE" | cut -d '=' -f2)
+				if [ "$setup_nourl" -eq 1 ]; then
+					all_test=$((all_test+1))
+				fi
 			fi
 			if echo "$LIGNE" | grep -q "setup_private="; then	# Test d'installation en privé
 				setup_private=$(echo "$LIGNE" | cut -d '=' -f2)
+				if [ "$setup_private" -eq 1 ]; then
+					all_test=$((all_test+1))
+				fi
 			fi
 			if echo "$LIGNE" | grep -q "setup_public="; then	# Test d'installation en public
 				setup_public=$(echo "$LIGNE" | cut -d '=' -f2)
+				if [ "$setup_public" -eq 1 ]; then
+					all_test=$((all_test+1))
+				fi
 			fi
 			if echo "$LIGNE" | grep -q "upgrade="; then	# Test d'upgrade
 				upgrade=$(echo "$LIGNE" | cut -d '=' -f2)
+				if [ "$upgrade" -eq 1 ]; then
+					all_test=$((all_test+1))
+				fi
 			fi
 			if echo "$LIGNE" | grep -q "backup_restore="; then	# Test de backup et restore
 				backup_restore=$(echo "$LIGNE" | cut -d '=' -f2)
+				if [ "$backup_restore" -eq 1 ]; then
+					all_test=$((all_test+1))
+				fi
 			fi
 			if echo "$LIGNE" | grep -q "multi_instance="; then	# Test d'installation multiple
 				multi_instance=$(echo "$LIGNE" | cut -d '=' -f2)
+				if [ "$multi_instance" -eq 1 ]; then
+					all_test=$((all_test+1))
+				fi
 			fi
 			if echo "$LIGNE" | grep -q "wrong_user="; then	# Test d'erreur d'utilisateur
 				wrong_user=$(echo "$LIGNE" | cut -d '=' -f2)
+				if [ "$wrong_user" -eq 1 ]; then
+					all_test=$((all_test+1))
+				fi
 			fi
 			if echo "$LIGNE" | grep -q "wrong_path="; then	# Test d'erreur de path ou de domaine
 				wrong_path=$(echo "$LIGNE" | cut -d '=' -f2)
+				if [ "$wrong_path" -eq 1 ]; then
+					all_test=$((all_test+1))
+				fi
 			fi
 			if echo "$LIGNE" | grep -q "incorrect_path="; then	# Test d'erreur de forme de path
 				incorrect_path=$(echo "$LIGNE" | cut -d '=' -f2)
+				if [ "$incorrect_path" -eq 1 ]; then
+					all_test=$((all_test+1))
+				fi
 			fi
 			if echo "$LIGNE" | grep -q "corrupt_source="; then	# Test d'erreur sur source corrompue
 				corrupt_source=$(echo "$LIGNE" | cut -d '=' -f2)
+				if [ "$corrupt_source" -eq 1 ]; then
+					all_test=$((all_test+1))
+				fi
 			fi
 			if echo "$LIGNE" | grep -q "fail_download_source="; then	# Test d'erreur de téléchargement de la source
 				fail_download_source=$(echo "$LIGNE" | cut -d '=' -f2)
+				if [ "$fail_download_source" -eq 1 ]; then
+					all_test=$((all_test+1))
+				fi
 			fi
 			if echo "$LIGNE" | grep -q "port_already_use="; then	# Test d'erreur de port
 				port_already_use=$(echo "$LIGNE" | cut -d '=' -f2)
+				if echo "$LIGNE" | grep -q "([0-9]*)"
+				then	# Le port est mentionné ici.
+					MANIFEST_PORT="$(echo "$LIGNE" | cut -d '(' -f2 | cut -d ')' -f1)"	# Récupère le numéro du port; Le numéro de port est précédé de # pour indiquer son absence du manifest.
+					port_already_use=${port_already_use:0:1}	# Garde uniquement la valeur de port_already_use
+				fi
+				if [ "$port_already_use" -eq 1 ]; then
+					all_test=$((all_test+1))
+				fi
 			fi
 			if echo "$LIGNE" | grep -q "final_path_already_use="; then	# Test sur final path déjà utilisé.
 				final_path_already_use=$(echo "$LIGNE" | cut -d '=' -f2)
+				if [ "$final_path_already_use" -eq 1 ]; then
+					all_test=$((all_test+1))
+				fi
 			fi
 		fi
 
@@ -391,12 +544,13 @@ do
 done < "$APP_CHECK/check_process"
 
 TESTING_PROCESS
+if [ "$no_lxc" -eq 0 ]; then
+	LXC_TURNOFF
+fi
 TEST_RESULTS
 
 echo "Le log complet des installations et suppressions est disponible dans le fichier $COMPLETE_LOG"
 # Clean
 rm -f debug_output temp_Test_results.log url_output
 
-if [ "$GIT_PACKAGE" -eq 1 ]; then
-	sudo rm -r "$APP_CHECK"
-fi
+sudo rm -rf "$APP_CHECK"
