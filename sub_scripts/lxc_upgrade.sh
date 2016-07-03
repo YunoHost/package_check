@@ -4,14 +4,33 @@ PLAGE_IP=$(cat sub_scripts/lxc_build.sh | grep PLAGE_IP= | cut -d '"' -f2)
 LXC_NAME=$(cat sub_scripts/lxc_build.sh | grep LXC_NAME= | cut -d '=' -f2)
 
 echo "Active le bridge réseau"
-sudo ifup lxc-pchecker
+if ! sudo ifquery lxc-pchecker --state > /dev/null
+then
+	sudo ifup lxc-pchecker
+fi
 
 echo "Configure le parefeu"
-sudo iptables -A FORWARD -i lxc-pchecker -o eth0 -j ACCEPT
-sudo iptables -A FORWARD -i eth0 -o lxc-pchecker -j ACCEPT
-sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE
+if ! sudo iptables -D FORWARD -i lxc-pchecker -o eth0 -j ACCEPT 2> /dev/null
+then
+	sudo iptables -A FORWARD -i lxc-pchecker -o eth0 -j ACCEPT
+fi
+if ! sudo iptables -C FORWARD -i eth0 -o lxc-pchecker -j ACCEPT 2> /dev/null
+then
+	sudo iptables -A FORWARD -i eth0 -o lxc-pchecker -j ACCEPT
+fi
+if ! sudo iptables -t nat -C POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE 2> /dev/null
+then
+	sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE
+fi
 
 echo "Démarrage de la machine"
+if [ $(sudo lxc-info --name $LXC_NAME | grep -c "STOPPED") -eq 0 ]; then
+	# Si la machine n'est pas à l'arrêt.
+	sudo lxc-stop -n $LXC_NAME	# Arrête la machine LXC
+fi
+# Restaure le snapshot
+sudo rsync -aEAX --delete -i /var/lib/lxcsnaps/$LXC_NAME/snap0/rootfs/ /var/lib/lxc/$LXC_NAME/rootfs/	# Pour être sûr!
+
 sudo lxc-start -n $LXC_NAME -d
 sleep 3
 sudo lxc-ls -f

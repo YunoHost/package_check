@@ -21,7 +21,8 @@ Le script est capable d'effectuer les tests suivant:
 - Test de path mal formé (path/ au lieu de /path)
 - Test de port déjà utilisé
 
-> ATTENTION: Ce script devrait être utilisé uniquement dans un environnement de test dédié. Jamais sur un serveur en production. Il va provoquer de nombreuses erreurs d'installation du package et pourrait donc laisser des résidus indésirables.
+Par défaut, Package checker utilise un conteneur LXC pour créer un environnement de test propre sans résidus d'installations précédentes. Ce comportement peut être contourné avec le paramètre --no-lxc
+> ATTENTION: Si LXC n'est pas utilisé, le script devrait être utilisé uniquement dans un environnement de test dédié, jamais sur un serveur en production. Il va provoquer de nombreuses erreurs d'installation du package et pourrait donc laisser des résidus indésirables.
 
 Usage:  
 Pour une app dans un dossier: `./package_check.sh APP_ynh`  
@@ -59,7 +60,7 @@ Il est nécessaire de fournir, à la racine du package de l'app à tester, un fi
 		incorrect_path=1
 		corrupt_source=0
 		fail_download_source=0
-		port_already_use=1
+		port_already_use=1 (XXXX)
 		final_path_already_use=0
 ```
 ### `## Nom du test`
@@ -83,3 +84,29 @@ Certaines clés de manifest sont indispensables au script pour effectuer certain
 Ensemble des tests à effectuer.  
 Chaque test marqué à 1 sera effectué par le script.  
 Si un test est absent de la liste, il sera ignoré. Cela revient à le noter à 0.
+
+#### `port_already_use`
+Le test` port_already_use` peut éventuellement prendre en argument un numéro de port. Si celui-ci n'est pas dans le manifest.  
+Le numéro de port doit alors être noté entre parenthèse, il servira au test de port.  
+
+---
+Le script `package_check.sh` accepte 3 arguments en plus du package à tester.
+- `--bash-mode`: Rend le script autonome. Aucune intervention de l'utilisateur ne sera nécessaire.  
+	La valeur de auto_remove est ignorée. (Incompatible avec --build-lxc)
+- `--no-lxc`: N'utilise pas la virtualisation en conteneur LXC. Les tests seront effectué directement sur la machine hôte.
+- `--build-lxc`: Installe LXC et créer le conteneur debian Yunohost si nécessaire. (Incompatible avec --bash-mode)
+
+---
+## LXC
+
+Package checker utilise la virtualisation en conteneur pour assurer l'intégrité de l'environnement de test.  
+L'usage de LXC apporte une meilleure stabilité au processus de test, un test de suppression échoué n'entraine pas l'échec des tests suivant, et permet de garder un environnement de test sans résidus de test précédents. En revanche, l'usage de LXC augmente la durée des tests, en raison des manipulations du conteneur et de la réinstallation systématique des dépendances de l'application.
+
+Il faut prévoir également un espace suffisant sur l'hôte, au minimum 4Go pour le conteneur, son snapshot et sa copie de sauvegarde.
+
+L'usage de LXC est facilité par 3 scripts, permettant de gérer la création, la mise à jour et la suppression.
+- `lxc_build.sh`: lxc_build installe LXC et ses dépendances, puis créer le conteneur debian.  
+	Il ajoute ensuite le support réseau, installe Yunohost et le configure. Et enfin configure un accès ssh.  
+	L'accès ssh par défaut est `ssh -t pchecker_lxc`
+- `lxc_upgrade.sh`: Effectue la mise à jour du conteneur à l'aide d'apt-get et recréer le snapshot.
+- `lxc_remove.sh`: Supprime le conteneur LXC, son snapshot et sa sauvegarde. Désinstalle LXC et déconfigure le réseau associé.

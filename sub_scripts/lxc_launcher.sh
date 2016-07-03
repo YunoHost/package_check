@@ -58,7 +58,7 @@ LXC_STOP () {
 		fi		
 		# Restaure le snapshot.
 		echo "Restauration du snapshot de la machine lxc" | tee -a $RESULT
-		sudo rsync -aEAX --delete -i /var/lib/lxcsnaps/$LXC_NAME/snap0/rootfs/ /var/lib/lxc/$LXC_NAME/rootfs/ >> $RESULT 2>&1
+		sudo rsync -aEAX --delete -i /var/lib/lxcsnaps/$LXC_NAME/snap0/rootfs/ /var/lib/lxc/$LXC_NAME/rootfs/ > /dev/null 2>> $RESULT
 	fi
 }
 

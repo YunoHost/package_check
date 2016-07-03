@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Arguments du script
-# -b	Mode bash, le script est autonome. Il ignore la valeur de $auto_remove
+# --bash-mode	Mode bash, le script est autonome. Il ignore la valeur de $auto_remove
 # --no-lxc	N'utilise pas la virtualisation en conteneur lxc. La virtualisation est utilisée par défaut si disponible.
 # --build-lxc	Installe lxc et créer la machine si nécessaire. Incompatible avec -b en raison de la connexion ssh à valider lors du build.
 
@@ -300,20 +300,25 @@ TEST_RESULTS () {
 	if [ $note -le 5 ]; then
 		color_note="red"
 		typo_note="bold"
+		smiley=":'("	# La contribution à Shasha. Qui m'a forcé à ajouté les smiley sous la contrainte ;)
 	elif [ $note -le 10 ]; then
 		color_note="red"
 		typo_note=""
+		smiley=":("
 	elif [ $note -le 15 ]; then
 		color_note="lyellow"
 		typo_note=""
+		smiley=":s"
 	elif [ $note -gt 15 ]; then
 		color_note="lgreen"
 		typo_note=""
+		smiley=":)"
 	elif [ $note -eq 20 ]; then
 		color_note="lgreen"
 		typo_note="bold"
+		smiley="\o/"
 	fi
-	ECHO_FORMAT "$note/20\n" "$color_note" "$typo_note"
+	ECHO_FORMAT "$note/20 $smiley\n" "$color_note" "$typo_note"
 	ECHO_FORMAT "\t   Ensemble de tests effectués: $tnote/19\n\n" "white" "bold"
 }
 
