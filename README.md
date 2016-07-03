@@ -84,10 +84,23 @@ Certaines clés de manifest sont indispensables au script pour effectuer certain
 Ensemble des tests à effectuer.  
 Chaque test marqué à 1 sera effectué par le script.  
 Si un test est absent de la liste, il sera ignoré. Cela revient à le noter à 0.
-
-#### `port_already_use`
-Le test` port_already_use` peut éventuellement prendre en argument un numéro de port. Si celui-ci n'est pas dans le manifest.  
-Le numéro de port doit alors être noté entre parenthèse, il servira au test de port.  
+- `setup_sub_dir`: Installation dans le path /check.
+- `setup_root`: Installation à la racine du domaine.
+- `setup_nourl`: Installation sans accès http. Ce test ne devrait être choisi que pour les applications ne disposant pas d'une interface web.
+- `setup_private`: Installation en privé.
+- `setup_public`: Installation en public.
+- `upgrade`: Upgrade du package sur la même version. Test uniquement le script upgrade.
+- `backup_restore`: Backup et restauration.
+- `multi_instance`: Installation de l'application 2 fois de suite, pour vérifier sa capacité à être multi-instance.
+- `wrong_user`: Provoque une erreur avec un nom d'utilisateur incorrect.
+- `wrong_path`: Provoque une erreur avec un domain incorrect.
+- `incorrect_path`: Provoque une erreur avec un path malformé, path/.
+- `corrupt_source`: *Non implémenté pour le moment...*
+- `fail_download_source`: *Non implémenté pour le moment...*
+- `port_already_use`: Provoque une erreur sur le port en l'ouvrant avant le script d'install.  
+	Le test` port_already_use` peut éventuellement prendre en argument un numéro de port. Si celui-ci n'est pas dans le manifest.  
+	Le numéro de port doit alors être noté entre parenthèse, il servira au test de port.  
+- `final_path_already_use`: *Non implémenté pour le moment...*
 
 ---
 Le script `package_check.sh` accepte 3 arguments en plus du package à tester.
