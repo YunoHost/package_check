@@ -1,6 +1,7 @@
-## Nom du test
+;; Nom du test
 	auto_remove=1
-	# Manifest
+# Commentaire ignoré
+	; Manifest
 		domain="domain.tld"	(DOMAIN)
 		path="/path"	(PATH)
 		admin="john"	(USER)
@@ -8,7 +9,7 @@
 		is_public="Yes"	(PUBLIC|public=Yes|private=No)
 		password="pass"	(PASSWORD)
 		port="666"	(PORT)
-	# Checks
+	; Checks
 		setup_sub_dir=1
 		setup_root=1
 		setup_nourl=0

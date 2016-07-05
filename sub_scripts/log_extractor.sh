@@ -28,7 +28,11 @@ ECHO_FORMAT () {
 	if [ "$3" == "underlined" ]; then
 		echo -en "\e[4m"
 	fi
-	echo -en "$1" | tee -a $RESULT
+	copy_log=--
+	if [ "$4" == "clog" ]; then
+ 		copy_log=$COMPLETE_LOG
+	fi
+	echo -en "$1" | tee -a "$RESULT" "$copy_log"
 	echo -en "\e[0m"
 }
 

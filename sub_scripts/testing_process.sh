@@ -8,7 +8,8 @@ echo -e "\nChargement des fonctions de testing_process.sh"
 source $abs_path/sub_scripts/log_extractor.sh
 
 SETUP_APP () {
-# echo -e "MANIFEST_ARGS=$MANIFEST_ARGS_MOD"
+# echo -e "MANIFEST_ARGS=$MANIFEST_ARGS"
+# echo -e "MANIFEST_ARGS_MOD=$MANIFEST_ARGS_MOD"
 	COPY_LOG 1
 	LXC_START "sudo yunohost --debug app install $APP_CHECK -a \"$MANIFEST_ARGS_MOD\""
 	YUNOHOST_RESULT=$?
@@ -32,12 +33,13 @@ REMOVE_APP () {
 
 CHECK_URL () {
 	ECHO_FORMAT "\nAccès par l'url...\n" "white" "bold"
+	rm -f url_output	# Supprime le précédent fichier html si il est encore présent
 	if [ "$no_lxc" -eq 0 ]; then
 		IP_CURL="$(cat sub_scripts/lxc_build.sh | grep PLAGE_IP= | cut -d '"' -f2).2"
 	else
 		IP_CURL="127.0.0.1"
 	fi
-		echo "$IP_CURL $SOUS_DOMAIN #package_check" | sudo tee -a /etc/hosts > /dev/null	# Renseigne le hosts pour le domain à tester, pour passer directement sur localhost
+	echo -e "$IP_CURL $DOMAIN #package_check\n$IP_CURL $SOUS_DOMAIN #package_check" | sudo tee -a /etc/hosts > /dev/null	# Renseigne le hosts pour le domain à tester, pour passer directement sur localhost
 	curl -LksS $SOUS_DOMAIN/$CHECK_PATH -o url_output
 	URL_TITLE=$(grep "<title>" url_output | cut -d '>' -f 2 | cut -d '<' -f1)
 	ECHO_FORMAT "Titre de la page: $URL_TITLE\n" "white"
@@ -51,14 +53,12 @@ CHECK_URL () {
 		grep "<body" -A 20 url_output | sed 1d | tee -a $RESULT
 		echo -e "\e[0m"
 	fi
-	if [ "$no_lxc" -eq 0 ]; then
-		sudo sed -i '/#package_check/d' /etc/hosts	# Supprime la ligne dans le hosts
-	fi
+	sudo sed -i '/#package_check/d' /etc/hosts	# Supprime la ligne dans le hosts
 }
 
 CHECK_SETUP_SUBDIR () {
 	# Test d'installation en sous-dossier
-	ECHO_FORMAT "\n\n>> Installation en sous-dossier... [Test $cur_test/$all_test]\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Installation en sous-dossier... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
 	if [ -z "$MANIFEST_DOMAIN" ]; then
 		echo "Clé de manifest pour 'domain' introuvable dans le fichier check_process. Impossible de procéder à ce test"
@@ -124,7 +124,7 @@ CHECK_SETUP_SUBDIR () {
 
 CHECK_SETUP_ROOT () {
 	# Test d'installation à la racine
-	ECHO_FORMAT "\n\n>> Installation à la racine... [Test $cur_test/$all_test]\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Installation à la racine... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
 	if [ -z "$MANIFEST_DOMAIN" ]; then
 		echo "Clé de manifest pour 'domain' introuvable dans le fichier check_process. Impossible de procéder à ce test"
@@ -149,9 +149,10 @@ CHECK_SETUP_ROOT () {
 	# Installation de l'app
 	SETUP_APP
 	LOG_EXTRACTOR
-	if [ "$install_pass" -gt 0 ]; then
+	if [ "$install_pass" -gt 0 ]; then	# Si install_pass>0, une installation a déjà été faite.
 		tnote=$((tnote+1))
 	else
+		install_pass=1
 		tnote=$((tnote+2))
 	fi
 	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
@@ -178,12 +179,12 @@ CHECK_SETUP_ROOT () {
 	if [ "$YUNOHOST_RESULT" -eq 0 ]	# Si l'installation a été un succès. On teste la suppression
 	then
 		LOG_EXTRACTOR
-		if [ "$install_pass" -eq 2 ]; then
+		if [ "$install_pass" -eq 2 ]; then	# Si install_pass=2, une suppression a déjà été faite.
 			tnote=$((tnote+1))
 		else
+			install_pass=2
 			tnote=$((tnote+2))
 		fi
-		install_pass=3
 		if [ "$YUNOHOST_REMOVE" -eq 0 ]; then
 			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 			if [ "$GLOBAL_CHECK_REMOVE" -eq 0 ]; then
@@ -201,18 +202,18 @@ CHECK_SETUP_ROOT () {
 			GLOBAL_CHECK_REMOVE_ROOT=-1	# Suppression à la racine échouée
 		fi
 	fi
-	install_pass=$((install_pass+1))
 }
 
 CHECK_SETUP_NO_URL () {
 	# Test d'installation sans accès par url
-	ECHO_FORMAT "\n\n>> Installation sans accès par url... [Test $cur_test/$all_test]\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Installation sans accès par url... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
 	# Installation de l'app
 	SETUP_APP
 	LOG_EXTRACTOR
-	if [ "$install_pass" -eq 0 ]; then
+	if [ "$install_pass" -eq 0 ]; then	# Si install_pass=0, aucune installation n'a été faite.
+		install_pass=1
 		tnote=$((tnote+1))
 	fi
 	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
@@ -221,6 +222,7 @@ CHECK_SETUP_NO_URL () {
 			note=$((note+1))
 		fi
 		GLOBAL_CHECK_SETUP=1	# Installation réussie
+		GLOBAL_CHECK_SUB_DIR=1
 	else
 		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
 		if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
@@ -232,7 +234,8 @@ CHECK_SETUP_NO_URL () {
 	if [ "$YUNOHOST_RESULT" -eq 0 ]	# Si l'installation a été un succès. On teste la suppression
 	then
 		LOG_EXTRACTOR
-		if [ "$install_pass" -eq 1 ] || [ "$install_pass" -eq 3 ]; then
+		if [ "$install_pass" -ne 2 ]; then	# Si install_pass!=2, aucune suppression n'a été faite.
+			install_pass=2
 			tnote=$((tnote+1))
 		fi
 		if [ "$YUNOHOST_REMOVE" -eq 0 ]; then
@@ -253,7 +256,7 @@ CHECK_SETUP_NO_URL () {
 
 CHECK_UPGRADE () {
 	# Test d'upgrade
-	ECHO_FORMAT "\n\n>> Upgrade... [Test $cur_test/$all_test]\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Upgrade... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
@@ -306,7 +309,7 @@ CHECK_UPGRADE () {
 
 CHECK_BACKUP_RESTORE () {
 	# Test de backup
-	ECHO_FORMAT "\n\n>> Backup... [Test $cur_test/$all_test]\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Backup/Restore... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
@@ -379,10 +382,10 @@ CHECK_BACKUP_RESTORE () {
 CHECK_PUBLIC_PRIVATE () {
 	# Test d'installation en public/privé
 	if [ "$1" == "private" ]; then
-		ECHO_FORMAT "\n\n>> Installation privée... [Test $cur_test/$all_test]\n" "white" "bold"
+		ECHO_FORMAT "\n\n>> Installation privée... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	fi
 	if [ "$1" == "public" ]; then
-		ECHO_FORMAT "\n\n>> Installation publique... [Test $cur_test/$all_test]\n" "white" "bold"
+		ECHO_FORMAT "\n\n>> Installation publique... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	fi
 	cur_test=$((cur_test+1))
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
@@ -464,7 +467,7 @@ CHECK_PUBLIC_PRIVATE () {
 
 CHECK_MULTI_INSTANCE () {
 	# Test d'installation en multi-instance
-	ECHO_FORMAT "\n\n>> Installation multi-instance... [Test $cur_test/$all_test]\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Installation multi-instance... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
@@ -522,16 +525,16 @@ CHECK_MULTI_INSTANCE () {
 CHECK_COMMON_ERROR () {
 	# Test d'erreur depuis le manifest
 	if [ "$1" == "wrong_user" ]; then
-		ECHO_FORMAT "\n\n>> Erreur d'utilisateur... [Test $cur_test/$all_test]\n" "white" "bold"
+		ECHO_FORMAT "\n\n>> Erreur d'utilisateur... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	fi
 	if [ "$1" == "wrong_path" ]; then
-		ECHO_FORMAT "\n\n>> Erreur de domaine... [Test $cur_test/$all_test]\n" "white" "bold"
+		ECHO_FORMAT "\n\n>> Erreur de domaine... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	fi
 	if [ "$1" == "incorrect_path" ]; then
-		ECHO_FORMAT "\n\n>> Path mal formé... [Test $cur_test/$all_test]\n" "white" "bold"
+		ECHO_FORMAT "\n\n>> Path mal formé... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	fi
 	if [ "$1" == "port_already_use" ]; then
-		ECHO_FORMAT "\n\n>> Port déjà utilisé... [Test $cur_test/$all_test]\n" "white" "bold"
+		ECHO_FORMAT "\n\n>> Port déjà utilisé... [Test $cur_test/$all_test]\n" "white" "bold" clog
 		if [ -z "$MANIFEST_PORT" ]; then
 			echo "Clé de manifest pour 'port' introuvable ou port non renseigné dans le fichier check_process. Impossible de procéder à ce test"
 			return
@@ -639,7 +642,7 @@ CHECK_COMMON_ERROR () {
 
 CHECK_CORRUPT () {
 	# Test d'erreur sur source corrompue
-	ECHO_FORMAT "\n\n>> Source corrompue après téléchargement... [Test $cur_test/$all_test]\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Source corrompue après téléchargement... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
@@ -649,7 +652,7 @@ echo -n "Non implémenté"
 }
 CHECK_DL () {
 	# Test d'erreur de téléchargement de la source
-	ECHO_FORMAT "\n\n>> Erreur de téléchargement de la source... [Test $cur_test/$all_test]\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Erreur de téléchargement de la source... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
@@ -659,7 +662,7 @@ echo -n "Non implémenté"
 }
 CHECK_FINALPATH () {
 	# Test sur final path déjà utilisé.
-	ECHO_FORMAT "\n\n>> Final path déjà utilisé... [Test $cur_test/$all_test]\n" "white" "bold"
+	ECHO_FORMAT "\n\n>> Final path déjà utilisé... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."

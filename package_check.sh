@@ -106,7 +106,7 @@ then
 	git clone $arg_app "$(basename $arg_app)_check"
 else
 	# Si c'est un dossier local, il est copié dans le dossier du script.
-	sudo cp -a "$arg_app" "$(basename $arg_app)_check"
+	sudo cp -a --remove-destination "$arg_app" "$(basename $arg_app)_check"
 fi
 APP_CHECK="$(basename $arg_app)_check"
 if [ ! -d "$APP_CHECK" ]; then
@@ -296,28 +296,32 @@ TEST_RESULTS () {
 		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
 	fi
 	ECHO_FORMAT "\t\t    Notes de résultats: $note/$tnote - " "white" "bold"
-	note=$(( note * 20 / tnote ))
-	if [ $note -le 5 ]; then
-		color_note="red"
-		typo_note="bold"
-		smiley=":'("	# La contribution à Shasha. Qui m'a forcé à ajouté les smiley sous la contrainte ;)
-	elif [ $note -le 10 ]; then
-		color_note="red"
-		typo_note=""
-		smiley=":("
-	elif [ $note -le 15 ]; then
-		color_note="lyellow"
-		typo_note=""
-		smiley=":s"
-	elif [ $note -gt 15 ]; then
-		color_note="lgreen"
-		typo_note=""
-		smiley=":)"
-	elif [ $note -eq 20 ]; then
-		color_note="lgreen"
-		typo_note="bold"
-		smiley="\o/"
+	if [ "$note" -gt 0 ]
+	then
+		note=$(( note * 20 / tnote ))
 	fi
+		if [ "$note" -le 5 ]; then
+			color_note="red"
+			typo_note="bold"
+			smiley=":'("	# La contribution à Shasha. Qui m'a forcé à ajouté les smiley sous la contrainte ;)
+		elif [ "$note" -le 10 ]; then
+			color_note="red"
+			typo_note=""
+			smiley=":("
+		elif [ "$note" -le 15 ]; then
+			color_note="lyellow"
+			typo_note=""
+			smiley=":s"
+		elif [ "$note" -gt 15 ]; then
+			color_note="lgreen"
+			typo_note=""
+			smiley=":)"
+		fi
+		if [ "$note" -ge 20 ]; then
+			color_note="lgreen"
+			typo_note="bold"
+			smiley="\o/"
+		fi
 	ECHO_FORMAT "$note/20 $smiley\n" "$color_note" "$typo_note"
 	ECHO_FORMAT "\t   Ensemble de tests effectués: $tnote/19\n\n" "white" "bold"
 }
@@ -346,6 +350,10 @@ INIT_VAR() {
 	MANIFEST=0
 	CHECKS=0
 	auto_remove=1
+	install_pass=0
+	note=0
+	tnote=0
+	all_test=0
 
 	MANIFEST_DOMAIN="null"
 	MANIFEST_PATH="null"
@@ -376,20 +384,22 @@ INIT_VAR() {
 INIT_VAR
 echo -n "" > $COMPLETE_LOG	# Initialise le fichier de log
 echo -n "" > $RESULT	# Initialise le fichier des résulats d'analyse
-note=0
-tnote=0
-all_test=0
 if [ "$no_lxc" -eq 0 ]; then
 	LXC_INIT
 fi
 
 ## Parsing du fichier check_process de manière séquentielle.
-while read LIGNE
+while read <&4 LIGNE
 do
-	if echo "$LIGNE" | grep -q "auto_remove="; then	# Indication d'auto remove
+	LIGNE=$(echo $LIGNE | sed 's/^ *"//g')	# Efface les espaces en début de ligne
+	if [ "${LIGNE:0:1}" == "#" ]; then
+		# Ligne de commentaire, ignorée.
+		continue
+	fi
+	if echo "$LIGNE" | grep -q "^auto_remove="; then	# Indication d'auto remove
 		auto_remove=$(echo "$LIGNE" | cut -d '=' -f2)
 	fi
-	if echo "$LIGNE" | grep -q "^##"; then	# Début d'un scénario de test
+	if echo "$LIGNE" | grep -q "^;;"; then	# Début d'un scénario de test
 		if [ "$IN_PROCESS" -eq 1 ]; then	# Un scénario est déjà en cours. Donc on a atteind la fin du scénario.
 			TESTING_PROCESS
 			TEST_RESULTS
@@ -398,16 +408,18 @@ do
 				read -p "Appuyer sur une touche pour démarrer le scénario de test suivant..." < /dev/tty
 			fi
 		fi
-		PROCESS_NAME=${LIGNE#\#\# }
+		PROCESS_NAME=${LIGNE#;; }
 		IN_PROCESS=1
+		MANIFEST=0
+		CHECKS=0
 	fi
 	if [ "$IN_PROCESS" -eq 1 ]
 	then	# Analyse des arguments du scenario de test
-		if echo "$LIGNE" | grep -q "# Manifest"; then	# Arguments du manifest
+		if echo "$LIGNE" | grep -q "^; Manifest"; then	# Arguments du manifest
 			MANIFEST=1
 			MANIFEST_ARGS=""	# Initialise la chaine des arguments d'installation
 		fi
-		if echo "$LIGNE" | grep -q "# Checks"; then	# Tests à effectuer
+		if echo "$LIGNE" | grep -q "^; Checks"; then	# Tests à effectuer
 			MANIFEST=0
 			CHECKS=1
 		fi
@@ -440,93 +452,93 @@ do
 					MANIFEST_PORT=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au port
 					LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
 				fi
-				if [ "${#MANIFEST_ARGS}" -gt 0 ]; then	# Si il y a déjà des arguments
-					MANIFEST_ARGS="$MANIFEST_ARGS&"	#, précède de &
-				fi
-				MANIFEST_ARGS="$MANIFEST_ARGS$(echo $LIGNE | sed 's/[ \"]//g')"	# Ajoute l'argument du manifest, en retirant les espaces et les guillemets.
+# 				if [ "${#MANIFEST_ARGS}" -gt 0 ]; then	# Si il y a déjà des arguments
+# 					MANIFEST_ARGS="$MANIFEST_ARGS&"	#, précède de &
+# 				fi
+				MANIFEST_ARGS="$MANIFEST_ARGS$(echo $LIGNE | sed 's/^ *\| *$\|\"//g')&"	# Ajoute l'argument du manifest, en retirant les espaces de début et de fin ainsi que les guillemets.
 			fi
 		fi
 		if [ "$CHECKS" -eq 1 ]
 		then	# Analyse des tests à effectuer sur ce scenario.
-			if echo "$LIGNE" | grep -q "setup_sub_dir="; then	# Test d'installation en sous-dossier
+			if echo "$LIGNE" | grep -q "^setup_sub_dir="; then	# Test d'installation en sous-dossier
 				setup_sub_dir=$(echo "$LIGNE" | cut -d '=' -f2)
 				if [ "$setup_sub_dir" -eq 1 ]; then
 					all_test=$((all_test+1))
 				fi
 			fi
-			if echo "$LIGNE" | grep -q "setup_root="; then	# Test d'installation à la racine
+			if echo "$LIGNE" | grep -q "^setup_root="; then	# Test d'installation à la racine
 				setup_root=$(echo "$LIGNE" | cut -d '=' -f2)
 				if [ "$setup_root" -eq 1 ]; then
 					all_test=$((all_test+1))
 				fi
 			fi
-			if echo "$LIGNE" | grep -q "setup_nourl="; then	# Test d'installation sans accès par url
+			if echo "$LIGNE" | grep -q "^setup_nourl="; then	# Test d'installation sans accès par url
 				setup_nourl=$(echo "$LIGNE" | cut -d '=' -f2)
 				if [ "$setup_nourl" -eq 1 ]; then
 					all_test=$((all_test+1))
 				fi
 			fi
-			if echo "$LIGNE" | grep -q "setup_private="; then	# Test d'installation en privé
+			if echo "$LIGNE" | grep -q "^setup_private="; then	# Test d'installation en privé
 				setup_private=$(echo "$LIGNE" | cut -d '=' -f2)
 				if [ "$setup_private" -eq 1 ]; then
 					all_test=$((all_test+1))
 				fi
 			fi
-			if echo "$LIGNE" | grep -q "setup_public="; then	# Test d'installation en public
+			if echo "$LIGNE" | grep -q "^setup_public="; then	# Test d'installation en public
 				setup_public=$(echo "$LIGNE" | cut -d '=' -f2)
 				if [ "$setup_public" -eq 1 ]; then
 					all_test=$((all_test+1))
 				fi
 			fi
-			if echo "$LIGNE" | grep -q "upgrade="; then	# Test d'upgrade
+			if echo "$LIGNE" | grep -q "^upgrade="; then	# Test d'upgrade
 				upgrade=$(echo "$LIGNE" | cut -d '=' -f2)
 				if [ "$upgrade" -eq 1 ]; then
 					all_test=$((all_test+1))
 				fi
 			fi
-			if echo "$LIGNE" | grep -q "backup_restore="; then	# Test de backup et restore
+			if echo "$LIGNE" | grep -q "^backup_restore="; then	# Test de backup et restore
 				backup_restore=$(echo "$LIGNE" | cut -d '=' -f2)
 				if [ "$backup_restore" -eq 1 ]; then
 					all_test=$((all_test+1))
 				fi
 			fi
-			if echo "$LIGNE" | grep -q "multi_instance="; then	# Test d'installation multiple
+			if echo "$LIGNE" | grep -q "^multi_instance="; then	# Test d'installation multiple
 				multi_instance=$(echo "$LIGNE" | cut -d '=' -f2)
 				if [ "$multi_instance" -eq 1 ]; then
 					all_test=$((all_test+1))
 				fi
 			fi
-			if echo "$LIGNE" | grep -q "wrong_user="; then	# Test d'erreur d'utilisateur
+			if echo "$LIGNE" | grep -q "^wrong_user="; then	# Test d'erreur d'utilisateur
 				wrong_user=$(echo "$LIGNE" | cut -d '=' -f2)
 				if [ "$wrong_user" -eq 1 ]; then
 					all_test=$((all_test+1))
 				fi
 			fi
-			if echo "$LIGNE" | grep -q "wrong_path="; then	# Test d'erreur de path ou de domaine
+			if echo "$LIGNE" | grep -q "^wrong_path="; then	# Test d'erreur de path ou de domaine
 				wrong_path=$(echo "$LIGNE" | cut -d '=' -f2)
 				if [ "$wrong_path" -eq 1 ]; then
 					all_test=$((all_test+1))
 				fi
 			fi
-			if echo "$LIGNE" | grep -q "incorrect_path="; then	# Test d'erreur de forme de path
+			if echo "$LIGNE" | grep -q "^incorrect_path="; then	# Test d'erreur de forme de path
 				incorrect_path=$(echo "$LIGNE" | cut -d '=' -f2)
 				if [ "$incorrect_path" -eq 1 ]; then
 					all_test=$((all_test+1))
 				fi
 			fi
-			if echo "$LIGNE" | grep -q "corrupt_source="; then	# Test d'erreur sur source corrompue
+			if echo "$LIGNE" | grep -q "^corrupt_source="; then	# Test d'erreur sur source corrompue
 				corrupt_source=$(echo "$LIGNE" | cut -d '=' -f2)
 				if [ "$corrupt_source" -eq 1 ]; then
 					all_test=$((all_test+1))
 				fi
 			fi
-			if echo "$LIGNE" | grep -q "fail_download_source="; then	# Test d'erreur de téléchargement de la source
+			if echo "$LIGNE" | grep -q "^fail_download_source="; then	# Test d'erreur de téléchargement de la source
 				fail_download_source=$(echo "$LIGNE" | cut -d '=' -f2)
 				if [ "$fail_download_source" -eq 1 ]; then
 					all_test=$((all_test+1))
 				fi
 			fi
-			if echo "$LIGNE" | grep -q "port_already_use="; then	# Test d'erreur de port
+			if echo "$LIGNE" | grep -q "^port_already_use="; then	# Test d'erreur de port
 				port_already_use=$(echo "$LIGNE" | cut -d '=' -f2)
 				if echo "$LIGNE" | grep -q "([0-9]*)"
 				then	# Le port est mentionné ici.
@@ -537,16 +549,16 @@ do
 					all_test=$((all_test+1))
 				fi
 			fi
-			if echo "$LIGNE" | grep -q "final_path_already_use="; then	# Test sur final path déjà utilisé.
+			if echo "$LIGNE" | grep -q "^final_path_already_use="; then	# Test sur final path déjà utilisé.
 				final_path_already_use=$(echo "$LIGNE" | cut -d '=' -f2)
 				if [ "$final_path_already_use" -eq 1 ]; then
 					all_test=$((all_test+1))
 				fi
 			fi
 		fi
-
 	fi
-done < "$APP_CHECK/check_process"
+done 4< "$APP_CHECK/check_process"	# Utilise le descripteur de fichier 4. Car le descripteur 1 est utilisé par d'autres boucles while read dans ces scripts.
+
 
 TESTING_PROCESS
 if [ "$no_lxc" -eq 0 ]; then

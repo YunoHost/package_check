@@ -36,9 +36,10 @@ Il est nécessaire de fournir, à la racine du package de l'app à tester, un fi
 > L'ordre des lignes n'a toutefois pas d'importance.
 
 ```
-## Nom du test
+;; Nom du test
 	auto_remove=1
-	# Manifest
+# Commentaire ignoré
+	; Manifest
 		domain="$DOMAIN"	(DOMAIN)
 		path="$PATH"	(PATH)
 		admin="$USER"	(USER)
@@ -46,7 +47,7 @@ Il est nécessaire de fournir, à la racine du package de l'app à tester, un fi
 		is_public="Yes"	(PUBLIC|public=Yes|private=No)
 		password="$PASSWORD"	(PASSWORD)
 		port="666"	(PORT)
-	# Checks
+	; Checks
 		setup_sub_dir=1
 		setup_root=1
 		setup_nourl=0
@@ -63,7 +64,7 @@ Il est nécessaire de fournir, à la racine du package de l'app à tester, un fi
 		port_already_use=1 (XXXX)
 		final_path_already_use=0
 ```
-### `## Nom du test`
+### `;; Nom du test`
 Nom du scénario de test qui sera effectué.  
 On peut créer autant de scénario de test que voulu, tous ayant la même syntaxe.  
 Les différents scénarios de test seront exécutés successivement.
@@ -72,7 +73,7 @@ Les différents scénarios de test seront exécutés successivement.
 Si `auto_remove` est à 0, le script marque une pause avant chaque suppression de l'app. Afin d'éffectuer des vérifications manuelles si nécessaire.  
 Sinon, l'app est supprimée automatiquement et les tests continuent.
 
-### `# Manifest`
+### `; Manifest`
 Ensemble des clés du manifest.  
 Toutes les clés du manifest doivent être renseignée afin de procéder à l'installation.
 > Les clés de manifest données ici ne le sont qu'à titre d'exemple. Voir le manifest de l'application.
@@ -80,7 +81,7 @@ Certaines clés de manifest sont indispensables au script pour effectuer certain
 `(DOMAIN)`, `(PATH)`, `(USER)`, `(PASSWORD)` et `(PORT)` doivent être mis en bout de ligne des clés correspondantes. Ces clés seront modifiées par le script.  
 `(PUBLIC|public=Yes|private=No)` doit, en plus de correspondre à la clé de visibilité public, indiquer les valeurs du manifest pour public et privé.
 
-### `# Checks`
+### `; Checks`
 Ensemble des tests à effectuer.  
 Chaque test marqué à 1 sera effectué par le script.  
 Si un test est absent de la liste, il sera ignoré. Cela revient à le noter à 0.
