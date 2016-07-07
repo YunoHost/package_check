@@ -1,17 +1,17 @@
 #!/bin/bash
 
-RESULT="Test_results.log"
+RESULT="$script_dir/Test_results.log"
 BACKUP_HOOKS="conf_ssowat data_home conf_ynh_firewall conf_cron"	# La liste des hooks disponible pour le backup se trouve dans /usr/share/yunohost/hooks/backup/
 
-echo -e "\nChargement des fonctions de testing_process.sh"
+echo -e "Chargement des fonctions de testing_process.sh"
 
-source $abs_path/sub_scripts/log_extractor.sh
+source "$script_dir/sub_scripts/log_extractor.sh"
 
 SETUP_APP () {
 # echo -e "MANIFEST_ARGS=$MANIFEST_ARGS"
 # echo -e "MANIFEST_ARGS_MOD=$MANIFEST_ARGS_MOD"
 	COPY_LOG 1
-	LXC_START "sudo yunohost --debug app install $APP_CHECK -a \"$MANIFEST_ARGS_MOD\""
+	LXC_START "sudo yunohost --debug app install \"$APP_PATH_YUNO\" -a \"$MANIFEST_ARGS_MOD\""
 	YUNOHOST_RESULT=$?
 	COPY_LOG 2
 	APPID=$(grep -o -m1 "YNH_APP_INSTANCE_NAME=[^ ]*" "$OUTPUTD" | cut -d '=' -f2)	# Récupère le nom de l'app au moment de l'install. Pour pouvoir le réutiliser dans les commandes yunohost. La regex matche tout ce qui suit le =, jusqu'à l'espace.
@@ -32,34 +32,46 @@ REMOVE_APP () {
 }
 
 CHECK_URL () {
-	ECHO_FORMAT "\nAccès par l'url...\n" "white" "bold"
-	rm -f url_output	# Supprime le précédent fichier html si il est encore présent
-	if [ "$no_lxc" -eq 0 ]; then
-		IP_CURL="$(cat sub_scripts/lxc_build.sh | grep PLAGE_IP= | cut -d '"' -f2).2"
+	if [ "$use_curl" -eq 1 ]
+	then
+		ECHO_FORMAT "\nAccès par l'url...\n" "white" "bold"
+		rm -f "$script_dir/url_output"	# Supprime le précédent fichier html si il est encore présent
+		if [ "$no_lxc" -eq 0 ]; then
+			IP_CURL="$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep PLAGE_IP= | cut -d '"' -f2).2"
+		else
+			IP_CURL="127.0.0.1"
+		fi
+		echo -e "$IP_CURL $DOMAIN #package_check\n$IP_CURL $SOUS_DOMAIN #package_check" | sudo tee -a /etc/hosts > /dev/null	# Renseigne le hosts pour le domain à tester, pour passer directement sur localhost
+		curl_error=0
+		curl -LksS -w "%{http_code};%{url_effective}\n" $SOUS_DOMAIN$CHECK_PATH -o "$script_dir/url_output" > "$script_dir/curl_print"
+		if [ "$?" -ne 0 ]; then
+			ECHO_FORMAT "Erreur de connexion...\n" "lred" "bold"
+		fi
+		ECHO_FORMAT "Adresse de la page: $(cat "$script_dir/curl_print" | cut -d ';' -f2)\n" "white"
+		ECHO_FORMAT "Code HTTP: $(cat "$script_dir/curl_print" | cut -d ';' -f1)\n" "white"
+		URL_TITLE=$(grep "<title>" "$script_dir/url_output" | cut -d '>' -f 2 | cut -d '<' -f1)
+		ECHO_FORMAT "Titre de la page: $URL_TITLE\n" "white"
+		if [ "$URL_TITLE" == "YunoHost Portal" ]; then
+			YUNO_PORTAL=1
+			# Il serait utile de réussir à s'authentifier sur le portail pour tester une app protégée par celui-ci. Mais j'y arrive pas...
+		else
+			YUNO_PORTAL=0
+			ECHO_FORMAT "Extrait du corps de la page:\n" "white"
+			echo -e "\e[37m"	# Écrit en light grey
+			grep "<body" -A 20 "$script_dir/url_output" | sed 1d | tee -a "$RESULT"
+			echo -e "\e[0m"
+		fi
+		sudo sed -i '/#package_check/d' /etc/hosts	# Supprime la ligne dans le hosts
 	else
-		IP_CURL="127.0.0.1"
+		ECHO_FORMAT "Test de connexion annulé.\n" "white"
 	fi
-	echo -e "$IP_CURL $DOMAIN #package_check\n$IP_CURL $SOUS_DOMAIN #package_check" | sudo tee -a /etc/hosts > /dev/null	# Renseigne le hosts pour le domain à tester, pour passer directement sur localhost
-	curl -LksS $SOUS_DOMAIN/$CHECK_PATH -o url_output
-	URL_TITLE=$(grep "<title>" url_output | cut -d '>' -f 2 | cut -d '<' -f1)
-	ECHO_FORMAT "Titre de la page: $URL_TITLE\n" "white"
-	if [ "$URL_TITLE" == "YunoHost Portal" ]; then
-		YUNO_PORTAL=1
-		# Il serait utile de réussir à s'authentifier sur le portail pour tester une app protégée par celui-ci. Mais j'y arrive pas...
-	else
-		YUNO_PORTAL=0
-		ECHO_FORMAT "Extrait du corps de la page:\n" "white"
-		echo -e "\e[37m"	# Écrit en light grey
-		grep "<body" -A 20 url_output | sed 1d | tee -a $RESULT
-		echo -e "\e[0m"
-	fi
-	sudo sed -i '/#package_check/d' /etc/hosts	# Supprime la ligne dans le hosts
 }
 
 CHECK_SETUP_SUBDIR () {
 	# Test d'installation en sous-dossier
 	ECHO_FORMAT "\n\n>> Installation en sous-dossier... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
+	use_curl=1
 	if [ -z "$MANIFEST_DOMAIN" ]; then
 		echo "Clé de manifest pour 'domain' introuvable dans le fichier check_process. Impossible de procéder à ce test"
 		return
@@ -120,12 +132,15 @@ CHECK_SETUP_SUBDIR () {
 			GLOBAL_CHECK_REMOVE_SUBDIR=-1	# Suppression en sous-dossier échouée
 		fi
 	fi
+	YUNOHOST_RESULT=-1
+	YUNOHOST_REMOVE=-1
 }
 
 CHECK_SETUP_ROOT () {
 	# Test d'installation à la racine
 	ECHO_FORMAT "\n\n>> Installation à la racine... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
+	use_curl=1
 	if [ -z "$MANIFEST_DOMAIN" ]; then
 		echo "Clé de manifest pour 'domain' introuvable dans le fichier check_process. Impossible de procéder à ce test"
 		return
@@ -202,10 +217,13 @@ CHECK_SETUP_ROOT () {
 			GLOBAL_CHECK_REMOVE_ROOT=-1	# Suppression à la racine échouée
 		fi
 	fi
+	YUNOHOST_RESULT=-1
+	YUNOHOST_REMOVE=-1
 }
 
 CHECK_SETUP_NO_URL () {
 	# Test d'installation sans accès par url
+	use_curl=0
 	ECHO_FORMAT "\n\n>> Installation sans accès par url... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
@@ -252,6 +270,8 @@ CHECK_SETUP_NO_URL () {
 			GLOBAL_CHECK_REMOVE_ROOT=-1	# Suppression échouée
 		fi
 	fi
+	YUNOHOST_RESULT=-1
+	YUNOHOST_REMOVE=-1
 }
 
 CHECK_UPGRADE () {
@@ -286,7 +306,7 @@ CHECK_UPGRADE () {
 	ECHO_FORMAT "\nUpgrade sur la même version du package...\n" "white" "bold"
 	# Upgrade de l'app
 	COPY_LOG 1
-	LXC_START "sudo yunohost --debug app upgrade $APPID -f $APP_CHECK"
+	LXC_START "sudo yunohost --debug app upgrade $APPID -f \"$APP_PATH_YUNO\""
 	YUNOHOST_RESULT=$?
 	COPY_LOG 2
 	LOG_EXTRACTOR
@@ -305,6 +325,7 @@ CHECK_UPGRADE () {
 		# Suppression de l'app si lxc n'est pas utilisé.
 		REMOVE_APP
 	fi
+	YUNOHOST_RESULT=-1
 }
 
 CHECK_BACKUP_RESTORE () {
@@ -377,6 +398,7 @@ CHECK_BACKUP_RESTORE () {
 		# Suppression de l'archive
 		sudo yunohost backup delete Backup_test > /dev/null
 	fi
+	YUNOHOST_RESULT=-1
 }
 
 CHECK_PUBLIC_PRIVATE () {
@@ -463,6 +485,7 @@ CHECK_PUBLIC_PRIVATE () {
 		# Suppression de l'app si lxc n'est pas utilisé.
 		REMOVE_APP
 	fi
+	YUNOHOST_RESULT=-1
 }
 
 CHECK_MULTI_INSTANCE () {
@@ -520,6 +543,7 @@ CHECK_MULTI_INSTANCE () {
 		APPID=$APPID_first
 		REMOVE_APP
 	fi
+	YUNOHOST_RESULT=-1
 }
 
 CHECK_COMMON_ERROR () {
@@ -558,7 +582,8 @@ CHECK_COMMON_ERROR () {
 	fi
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
 	if [ "$1" == "incorrect_path" ]; then	# Force un path mal formé: Ce sera path/ au lieu de /path
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=path/\&@")
+		WRONG_PATH=${PATH_TEST#/}/	# Transforme le path de /path à path/
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$WRONG_PATH\&@")
 	else
 		if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Utilise ce mode d'installation
 			MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
@@ -638,6 +663,38 @@ CHECK_COMMON_ERROR () {
 			sudo yunohost firewall disallow Both $check_port > /dev/null
 		fi
 	fi
+	YUNOHOST_RESULT=-1
+}
+
+PACKAGE_LINTER () {
+	# Package linter
+	ECHO_FORMAT "\n\n>> Package linter... [Test $cur_test/$all_test]\n" "white" "bold" clog
+	cur_test=$((cur_test+1))
+	"$script_dir/package_linter/package_linter.py" "$APP_CHECK" | tee "$script_dir/package_linter.log"	# Effectue un test du package avec package_linter
+# 	header_PL=""	# Finalement je vais garder la sortie dans on ensemble. J'aime pas l'idée de tronquer le boulot de Moul.
+	while read LIGNE
+	do
+		if echo "$LIGNE" | grep -q ">>>> ="; then	# Prend le header de la section
+# 			header=$(echo "$LIGNE" | cut -d '>' -f2-5 | cut -d '<' -f1-4)
+# 			prev_header_PL=$header_PL
+# 			header_PL="$LIGNE"
+			GLOBAL_LINTER=1	# Si au moins 1 header est trouvé, c'est que l'exécution s'est bien déroulée.
+		fi
+		if echo "$LIGNE" | grep -q -F "[91m"; then	# Si une erreur a été détectée par package_linter.
+# 			if [ "$prev_header_PL" != "$header_PL" ]; then
+# 				ECHO_FORMAT "$header_PL\n"
+# 			fi
+# 			ECHO_FORMAT "$LIGNE\n"
+			GLOBAL_LINTER=-1	# Au moins une erreur a été détectée par package_linter
+		fi
+	done < "$script_dir/package_linter.log"
+	tnote=$((tnote+1))
+	if [ "$GLOBAL_LINTER" -eq 1 ]; then
+		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
+		note=$((note+1))	# package_linter n'a détecté aucune erreur
+	else
+		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
+	fi
 }
 
 CHECK_CORRUPT () {
@@ -675,6 +732,9 @@ TESTING_PROCESS () {
 	# Lancement des tests
 	cur_test=1
 	ECHO_FORMAT "\nScénario de test: $PROCESS_NAME\n" "white" "underlined"
+	if [ "$pkg_linter" -eq 1 ]; then
+		PACKAGE_LINTER	# Vérification du package avec package linter
+	fi
 	if [ "$setup_sub_dir" -eq 1 ]; then
 		CHECK_SETUP_SUBDIR	# Test d'installation en sous-dossier
 		LXC_STOP

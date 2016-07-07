@@ -5,6 +5,56 @@
 # --no-lxc	N'utilise pas la virtualisation en conteneur lxc. La virtualisation est utilisée par défaut si disponible.
 # --build-lxc	Installe lxc et créer la machine si nécessaire. Incompatible avec -b en raison de la connexion ssh à valider lors du build.
 
+echo ""
+
+# Vérifie la connexion internet.
+ping -q -c 2 yunohost.org > /dev/null 2>&1
+if [ "$?" -ne 0 ]; then	# En cas d'échec de connexion, tente de pinger un autre domaine pour être sûr
+	ping -q -c 2 framasoft.org > /dev/null 2>&1
+	if [ "$?" -ne 0 ]; then	# En cas de nouvel échec de connexion. On considère que la connexion est down...
+		ECHO_FORMAT "Impossible d'établir une connexion à internet.\n" "red"
+		exit 1
+	fi
+fi
+
+# Récupère le dossier du script
+if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$PWD/$(dirname "$0" | cut -d '.' -f2)"; fi
+
+version_script="$(git ls-remote https://github.com/YunoHost/package_check | cut -f 1 | head -n1)"
+if [ -e "$script_dir/package_version" ]
+then
+	if [ "$version_script" != "$(cat "$script_dir/package_version")" ]; then	# Si le dernier commit sur github ne correspond pas au commit enregistré, il y a une mise à jour.
+		# Écrit le script de mise à jour, qui sera exécuté à la place de ce script, pour le remplacer et le relancer après.
+		echo "Mise à jour de Package check..."
+		echo -e "#!/bin/bash\n" > "$script_dir/upgrade_script.sh"
+		echo "git clone --quiet https://github.com/YunoHost/package_check \"$script_dir/upgrade\"" >> "$script_dir/upgrade_script.sh"
+		echo "sudo cp -a \"$script_dir/upgrade/.\" \"$script_dir/.\"" >> "$script_dir/upgrade_script.sh"
+		echo "sudo rm -r \"$script_dir/upgrade\"" >> "$script_dir/upgrade_script.sh"
+		echo "echo \"$version_script\" > \"$script_dir/package_version\"" >> "$script_dir/upgrade_script.sh"
+		echo "exec \"$script_dir/package_check.sh\" \"$*\"" >> "$script_dir/upgrade_script.sh"
+		chmod +x "$script_dir/upgrade_script.sh"
+		exec "$script_dir/upgrade_script.sh"	#Exécute le script de mise à jour.
+	fi
+else
+	echo "$version_script" > "$script_dir/package_version"
+fi
+
+version_plinter="$(git ls-remote https://github.com/YunoHost/package_linter | cut -f 1 | head -n1)"
+if [ -e "$script_dir/plinter_version" ]
+then
+	if [ "$version_plinter" != "$(cat "$script_dir/plinter_version")" ]; then	# Si le dernier commit sur github ne correspond pas au commit enregistré, il y a une mise à jour.
+		echo "Mise à jour de package_linter..."
+		git clone --quiet https://github.com/YunoHost/package_linter "$script_dir/package_linter_tmp"
+		sudo cp -a "$script_dir/package_linter_tmp/." "$script_dir/package_linter/."
+		sudo rm -r "$script_dir/package_linter_tmp"
+	fi
+else	# Si le fichier de version n'existe pas, il est créé.
+	echo "$version_plinter" > "$script_dir/plinter_version"
+	echo "Installation de package_linter."
+	git clone --quiet https://github.com/YunoHost/package_linter "$script_dir/package_linter"
+fi
+echo "$version_plinter" > "$script_dir/plinter_version"
+
 if [ "$#" -eq 0 ]
 then
 	echo "Le script prend en argument le package à tester."
@@ -24,7 +74,7 @@ arg_app=$(echo "$*" | sed 's/--bash-mode\|--no-lxc\|--build-lxc//g' | sed 's/^ *
 USER_TEST=package_checker
 PASSWORD_TEST=checker_pwd
 PATH_TEST=/check
-LXC_NAME=$(cat sub_scripts/lxc_build.sh | grep LXC_NAME= | cut -d '=' -f2)
+LXC_NAME=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep LXC_NAME= | cut -d '=' -f2)
 
 if [ "$no_lxc" -eq 0 ]
 then
@@ -34,21 +84,9 @@ else
 fi
 SOUS_DOMAIN="sous.$DOMAIN"
 
-abs_path=$(cd $(dirname $0); pwd)	# Récupère le chemin absolu du script.
-
-source $abs_path/sub_scripts/lxc_launcher.sh
-source $abs_path/sub_scripts/testing_process.sh
+source "$script_dir/sub_scripts/lxc_launcher.sh"
+source "$script_dir/sub_scripts/testing_process.sh"
 source /usr/share/yunohost/helpers
-
-# Vérifie la connexion internet.
-ping -q -c 2 yunohost.org > /dev/null 2>&1
-if [ "$?" -ne 0 ]; then	# En cas d'échec de connexion, tente de pinger un autre domaine pour être sûr
-	ping -q -c 2 framasoft.org > /dev/null 2>&1
-	if [ "$?" -ne 0 ]; then	# En cas de nouvel échec de connexion. On considère que la connexion est down...
-		ECHO_FORMAT "Impossible d'établir une connexion à internet.\n" "red"
-		exit 1
-	fi
-fi
 
 if [ "$no_lxc" -eq 0 ]
 then	# Si le conteneur lxc est utilisé
@@ -63,7 +101,7 @@ then	# Si le conteneur lxc est utilisé
 	then
 		if [ "$build_lxc" -eq 1 ]
 		then
-			./sub_scripts/lxc_build.sh	# Lance la construction de la machine virtualisée.
+			"$script_dir/sub_scripts/lxc_build.sh"	# Lance la construction de la machine virtualisée.
 		else
 			ECHO_FORMAT "Lxc n'est pas installé, ou la machine $LXC_NAME n'est pas créée.\n" "red"
 			ECHO_FORMAT "Utilisez le script 'lxc_build.sh' pour installer lxc et créer la machine.\n" "red"
@@ -99,24 +137,33 @@ else	# Vérifie l'utilisateur et le domain si lxc n'est pas utilisé.
 fi
 
 # Vérifie le type d'emplacement du package à tester
+echo "Récupération du package à tester."
+sudo rm -rf "$APP_CHECK"
 GIT_PACKAGE=0
 if echo "$arg_app" | grep -Eq "https?:\/\/"
 then
 	GIT_PACKAGE=1
-	git clone $arg_app "$(basename $arg_app)_check"
+	git clone $arg_app "$script_dir/$(basename "$arg_app")_check"
 else
 	# Si c'est un dossier local, il est copié dans le dossier du script.
-	sudo cp -a --remove-destination "$arg_app" "$(basename $arg_app)_check"
+	sudo cp -a --remove-destination "$arg_app" "$script_dir/$(basename "$arg_app")_check"
 fi
-APP_CHECK="$(basename $arg_app)_check"
+APP_CHECK="$script_dir/$(basename "$arg_app")_check"
+if [ "$no_lxc" -eq 0 ]
+then	# En cas d'exécution dans LXC, l'app sera dans le home de l'user LXC.
+	APP_PATH_YUNO="$(basename "$arg_app")_check"
+else
+	APP_PATH_YUNO="$APP_CHECK"
+fi
+
 if [ ! -d "$APP_CHECK" ]; then
 	ECHO_FORMAT "Le dossier de l'application a tester est introuvable...\n" "red"
 	exit 1
 fi
-sudo rm -rf $APP_CHECK/.git	# Purge des fichiers de git
+sudo rm -rf "$APP_CHECK/.git"	# Purge des fichiers de git
 
 # Vérifie l'existence du fichier check_process
-if [ ! -e $APP_CHECK/check_process ]; then
+if [ ! -e "$APP_CHECK/check_process" ]; then
 	ECHO_FORMAT "\nImpossible de trouver le fichier check_process pour procéder aux tests.\n" "red"
 	ECHO_FORMAT "Merci d'ajouter un fichier check_process à la racine de l'app à tester.\n" "red"
 	exit 1
@@ -125,7 +172,15 @@ fi
 
 
 TEST_RESULTS () {
-	ECHO_FORMAT "\n\nInstallation: "
+	ECHO_FORMAT "\n\nPackage linter: "
+	if [ "$GLOBAL_LINTER" -eq 1 ]; then
+		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
+	elif [ "$GLOBAL_LINTER" -eq -1 ]; then
+		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
+	fi
+	ECHO_FORMAT "Installation: "
 	if [ "$GLOBAL_CHECK_SETUP" -eq 1 ]; then
 		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_SETUP" -eq -1 ]; then
@@ -251,32 +306,32 @@ TEST_RESULTS () {
 		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
 	fi
 
-	ECHO_FORMAT "Source corrompue: "
-	if [ "$GLOBAL_CHECK_CORRUPT" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_CORRUPT" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-	fi
+# 	ECHO_FORMAT "Source corrompue: "
+# 	if [ "$GLOBAL_CHECK_CORRUPT" -eq 1 ]; then
+# 		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
+# 	elif [ "$GLOBAL_CHECK_CORRUPT" -eq -1 ]; then
+# 		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+# 	else
+# 		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
+# 	fi
 
-	ECHO_FORMAT "Erreur de téléchargement de la source: "
-	if [ "$GLOBAL_CHECK_DL" -eq 1 ]; then
-		ECHO_FORMAT "\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_DL" -eq -1 ]; then
-		ECHO_FORMAT "\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\tNot evaluated.\n" "white"
-	fi
+# 	ECHO_FORMAT "Erreur de téléchargement de la source: "
+# 	if [ "$GLOBAL_CHECK_DL" -eq 1 ]; then
+# 		ECHO_FORMAT "\tSUCCESS\n" "lgreen"
+# 	elif [ "$GLOBAL_CHECK_DL" -eq -1 ]; then
+# 		ECHO_FORMAT "\tFAIL\n" "lred"
+# 	else
+# 		ECHO_FORMAT "\tNot evaluated.\n" "white"
+# 	fi
 
-	ECHO_FORMAT "Dossier déjà utilisé: "
-	if [ "$GLOBAL_CHECK_FINALPATH" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_FINALPATH" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-	fi
+# 	ECHO_FORMAT "Dossier déjà utilisé: "
+# 	if [ "$GLOBAL_CHECK_FINALPATH" -eq 1 ]; then
+# 		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
+# 	elif [ "$GLOBAL_CHECK_FINALPATH" -eq -1 ]; then
+# 		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+# 	else
+# 		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
+# 	fi
 
 	ECHO_FORMAT "Backup: "
 	if [ "$GLOBAL_CHECK_BACKUP" -eq 1 ]; then
@@ -323,10 +378,11 @@ TEST_RESULTS () {
 			smiley="\o/"
 		fi
 	ECHO_FORMAT "$note/20 $smiley\n" "$color_note" "$typo_note"
-	ECHO_FORMAT "\t   Ensemble de tests effectués: $tnote/19\n\n" "white" "bold"
+	ECHO_FORMAT "\t   Ensemble de tests effectués: $tnote/17\n\n" "white" "bold"
 }
 
 INIT_VAR() {
+	GLOBAL_LINTER=0
 	GLOBAL_CHECK_SETUP=0
 	GLOBAL_CHECK_SUB_DIR=0
 	GLOBAL_CHECK_ROOT=0
@@ -364,6 +420,7 @@ INIT_VAR() {
 	MANIFEST_PASSWORD="null"
 	MANIFEST_PORT="null"
 
+	pkg_linter=0
 	setup_sub_dir=0
 	setup_root=0
 	setup_nourl=0
@@ -382,13 +439,14 @@ INIT_VAR() {
 }
 
 INIT_VAR
-echo -n "" > $COMPLETE_LOG	# Initialise le fichier de log
-echo -n "" > $RESULT	# Initialise le fichier des résulats d'analyse
+echo -n "" > "$COMPLETE_LOG"	# Initialise le fichier de log
+echo -n "" > "$RESULT"	# Initialise le fichier des résulats d'analyse
 if [ "$no_lxc" -eq 0 ]; then
 	LXC_INIT
 fi
 
 ## Parsing du fichier check_process de manière séquentielle.
+echo "Parsing du fichier check_process"
 while read <&4 LIGNE
 do
 	LIGNE=$(echo $LIGNE | sed 's/^ *"//g')	# Efface les espaces en début de ligne
@@ -460,6 +518,12 @@ do
 		fi
 		if [ "$CHECKS" -eq 1 ]
 		then	# Analyse des tests à effectuer sur ce scenario.
+			if echo "$LIGNE" | grep -q "^pkg_linter="; then	# Test d'installation en sous-dossier
+				pkg_linter=$(echo "$LIGNE" | cut -d '=' -f2)
+				if [ "$pkg_linter" -eq 1 ]; then
+					all_test=$((all_test+1))
+				fi
+			fi
 			if echo "$LIGNE" | grep -q "^setup_sub_dir="; then	# Test d'installation en sous-dossier
 				setup_sub_dir=$(echo "$LIGNE" | cut -d '=' -f2)
 				if [ "$setup_sub_dir" -eq 1 ]; then
@@ -568,6 +632,6 @@ TEST_RESULTS
 
 echo "Le log complet des installations et suppressions est disponible dans le fichier $COMPLETE_LOG"
 # Clean
-rm -f debug_output temp_Test_results.log url_output
+rm -f "$OUTPUTD" "$temp_RESULT" "$script_dir/url_output" "$script_dir/curl_print"
 
 sudo rm -rf "$APP_CHECK"

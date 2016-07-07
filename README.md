@@ -8,6 +8,7 @@ Le script `package_check.sh` effectue une succession de test sur un package afin
 Le résultats des tests est affiché directement et stocké dans le fichier Test_results.log
 
 Le script est capable d'effectuer les tests suivant:
+- Vérification du package avec [package linter](https://github.com/YunoHost/package_linter)
 - Installation en sous-dossier
 - Installation à la racine du domaine
 - Installation sans accès par url (Pour les applications n'ayant pas d'interface web)
@@ -48,6 +49,7 @@ Il est nécessaire de fournir, à la racine du package de l'app à tester, un fi
 		password="$PASSWORD"	(PASSWORD)
 		port="666"	(PORT)
 	; Checks
+		pkg_linter=1
 		setup_sub_dir=1
 		setup_root=1
 		setup_nourl=0
@@ -85,6 +87,7 @@ Certaines clés de manifest sont indispensables au script pour effectuer certain
 Ensemble des tests à effectuer.  
 Chaque test marqué à 1 sera effectué par le script.  
 Si un test est absent de la liste, il sera ignoré. Cela revient à le noter à 0.
+- `pkg_linter`: Vérification du package avec [package linter](https://github.com/YunoHost/package_linter)
 - `setup_sub_dir`: Installation dans le path /check.
 - `setup_root`: Installation à la racine du domaine.
 - `setup_nourl`: Installation sans accès http. Ce test ne devrait être choisi que pour les applications ne disposant pas d'une interface web.

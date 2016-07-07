@@ -10,6 +10,7 @@
 		password="pass"	(PASSWORD)
 		port="666"	(PORT)
 	; Checks
+		pkg_linter=1
 		setup_sub_dir=1
 		setup_root=1
 		setup_nourl=0
