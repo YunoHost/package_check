@@ -511,7 +511,6 @@ CHECK_MULTI_INSTANCE () {
 	fi
 	if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Utilise ce mode d'installation
 		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
-		CHECK_PATH="$PATH_TEST"
 	else
 		echo "L'installation en sous-dossier n'a pas fonctionné, impossible d'effectuer ce test..."
 		return;
@@ -520,23 +519,44 @@ CHECK_MULTI_INSTANCE () {
 	SETUP_APP
 	LOG_EXTRACTOR
 	APPID_first=$APPID	# Stocke le nom de la première instance
-	CHECK_PATH_first=$CHECK_PATH	# Stocke le path de la première instance
 	YUNOHOST_RESULT_first=$YUNOHOST_RESULT	# Stocke le résulat de l'installation de la première instance
-	# Installation de l'app une deuxième fois
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST-2\&@")
-	CHECK_PATH="$PATH_TEST-2"
+	# Installation de l'app une deuxième fois, en ajoutant un suffixe au path
+	ECHO_FORMAT "2e installation\n"
+	path2="$PATH_TEST-2"
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$path2\&@")
+	SETUP_APP
+	LOG_EXTRACTOR
+	APPID_second=$APPID	# Stocke le nom de la deuxième instance
+	YUNOHOST_RESULT_second=$YUNOHOST_RESULT	# Stocke le résulat de l'installation de la deuxième instance
+	ECHO_FORMAT "3e installation\n"
+	path3="/3-${PATH_TEST#/}"
+	# Installation de l'app une troisième fois, en ajoutant un préfixe au path
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=$path2\&@$MANIFEST_PATH=$path3\&@")
 	SETUP_APP
 	LOG_EXTRACTOR
 	# Test l'accès à la 1ère instance de l'app
-	CHECK_PATH=$CHECK_PATH_first
+	CHECK_PATH="$PATH_TEST"
 	CHECK_URL
 	if [ "$curl_error" -ne 0 ]; then
 		YUNOHOST_RESULT_first=$curl_error
 	fi
 	# Test l'accès à la 2e instance de l'app
-	CHECK_PATH="$PATH_TEST-2"
+	CHECK_PATH="$path2"
 	CHECK_URL
+	if [ "$curl_error" -ne 0 ]; then
+		YUNOHOST_RESULT_second=$curl_error
+	fi
+	# Test l'accès à la 3e instance de l'app
+	CHECK_PATH="$path3"
+	CHECK_URL
+	if [ "$curl_error" -ne 0 ]; then
+		YUNOHOST_RESULT=$curl_error
+	fi
 	tnote=$((tnote+1))
+	if [ "$YUNOHOST_RESULT" -eq 0 ] || [ "$YUNOHOST_RESULT_second" -eq 0 ]
+	then	# Si la 2e OU la 3e installation à fonctionné, le test est validé. Car le SSO peut bloquer des installations en suffixe sur la même racine.
+		YUNOHOST_RESULT=0
+	fi
 	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$YUNOHOST_RESULT_first" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		note=$((note+1))
