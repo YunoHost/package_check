@@ -46,9 +46,15 @@ CHECK_URL () {
 		curl -LksS -w "%{http_code};%{url_effective}\n" $SOUS_DOMAIN$CHECK_PATH -o "$script_dir/url_output" > "$script_dir/curl_print"
 		if [ "$?" -ne 0 ]; then
 			ECHO_FORMAT "Erreur de connexion...\n" "lred" "bold"
+			curl_error=1
 		fi
 		ECHO_FORMAT "Adresse de la page: $(cat "$script_dir/curl_print" | cut -d ';' -f2)\n" "white"
-		ECHO_FORMAT "Code HTTP: $(cat "$script_dir/curl_print" | cut -d ';' -f1)\n" "white"
+		HTTP_CODE=$(cat "$script_dir/curl_print" | cut -d ';' -f1)
+		ECHO_FORMAT "Code HTTP: $HTTP_CODE\n" "white"
+		if [ "${HTTP_CODE:0:1}" == "0" ] || [ "${HTTP_CODE:0:1}" == "4" ] || [ "${HTTP_CODE:0:1}" == "5" ]
+		then	# Si le code d'erreur http est du type 0xx 4xx ou 5xx, c'est un code d'erreur.
+			curl_error=1
+		fi
 		URL_TITLE=$(grep "<title>" "$script_dir/url_output" | cut -d '>' -f 2 | cut -d '<' -f1)
 		ECHO_FORMAT "Titre de la page: $URL_TITLE\n" "white"
 		if [ "$URL_TITLE" == "YunoHost Portal" ]; then
@@ -95,9 +101,12 @@ CHECK_SETUP_SUBDIR () {
 	# Installation de l'app
 	SETUP_APP
 	LOG_EXTRACTOR
+	# Test l'accès à l'app
+	CHECK_PATH=$PATH_TEST
+	CHECK_URL
 	tnote=$((tnote+2))
 	install_pass=1
-	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
+	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		note=$((note+2))
 		GLOBAL_CHECK_SETUP=1	# Installation réussie
@@ -109,9 +118,6 @@ CHECK_SETUP_SUBDIR () {
 		fi
 		GLOBAL_CHECK_SUB_DIR=-1	# Installation en sous-dossier échouée
 	fi
-	# Test l'accès à l'app
-	CHECK_PATH=$PATH_TEST
-	CHECK_URL
 	# Suppression de l'app
 	REMOVE_APP
 	if [ "$YUNOHOST_RESULT" -eq 0 ]	# Si l'installation a été un succès. On teste la suppression
@@ -164,13 +170,16 @@ CHECK_SETUP_ROOT () {
 	# Installation de l'app
 	SETUP_APP
 	LOG_EXTRACTOR
+	# Test l'accès à l'app
+	CHECK_PATH="/"
+	CHECK_URL
 	if [ "$install_pass" -gt 0 ]; then	# Si install_pass>0, une installation a déjà été faite.
 		tnote=$((tnote+1))
 	else
 		install_pass=1
 		tnote=$((tnote+2))
 	fi
-	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
+	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		if [ "$GLOBAL_CHECK_SETUP" -eq 1 ]; then
 			note=$((note+1))
@@ -186,9 +195,6 @@ CHECK_SETUP_ROOT () {
 		fi
 		GLOBAL_CHECK_ROOT=-1	# Installation à la racine échouée
 	fi
-	# Test l'accès à l'app
-	CHECK_PATH="/"
-	CHECK_URL
 	# Suppression de l'app
 	REMOVE_APP
 	if [ "$YUNOHOST_RESULT" -eq 0 ]	# Si l'installation a été un succès. On teste la suppression
@@ -310,8 +316,10 @@ CHECK_UPGRADE () {
 	YUNOHOST_RESULT=$?
 	COPY_LOG 2
 	LOG_EXTRACTOR
+	# Test l'accès à l'app
+	CHECK_URL
 	tnote=$((tnote+1))
-	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
+	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		note=$((note+1))
 		GLOBAL_CHECK_UPGRADE=1	# Upgrade réussie
@@ -319,8 +327,6 @@ CHECK_UPGRADE () {
 		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
 		GLOBAL_CHECK_UPGRADE=-1	# Upgrade échouée
 	fi
-	# Test l'accès à l'app
-	CHECK_URL
 	if [ "$no_lxc" -ne 0 ]; then
 		# Suppression de l'app si lxc n'est pas utilisé.
 		REMOVE_APP
@@ -381,8 +387,10 @@ CHECK_BACKUP_RESTORE () {
 	YUNOHOST_RESULT=$?
 	COPY_LOG 2
 	LOG_EXTRACTOR
+	# Test l'accès à l'app
+	CHECK_URL
 	tnote=$((tnote+1))
-	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
+	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		note=$((note+1))
 		GLOBAL_CHECK_RESTORE=1	# Restore réussi
@@ -390,8 +398,6 @@ CHECK_BACKUP_RESTORE () {
 		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
 		GLOBAL_CHECK_RESTORE=-1	# Restore échoué
 	fi
-	# Test l'accès à l'app
-	CHECK_URL
 	if [ "$no_lxc" -ne 0 ]; then
 		# Suppression de l'app si lxc n'est pas utilisé.
 		REMOVE_APP
@@ -463,7 +469,7 @@ CHECK_PUBLIC_PRIVATE () {
 	fi	
 	LOG_EXTRACTOR
 	tnote=$((tnote+1))
-	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
+	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		note=$((note+1))
 		if [ "$1" == "private" ]; then
@@ -521,8 +527,17 @@ CHECK_MULTI_INSTANCE () {
 	CHECK_PATH="$PATH_TEST-2"
 	SETUP_APP
 	LOG_EXTRACTOR
+	# Test l'accès à la 1ère instance de l'app
+	CHECK_PATH=$CHECK_PATH_first
+	CHECK_URL
+	if [ "$curl_error" -ne 0 ]; then
+		YUNOHOST_RESULT_first=$curl_error
+	fi
+	# Test l'accès à la 2e instance de l'app
+	CHECK_PATH="$PATH_TEST-2"
+	CHECK_URL
 	tnote=$((tnote+1))
-	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$YUNOHOST_RESULT_first" -eq 0 ]; then
+	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$YUNOHOST_RESULT_first" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		note=$((note+1))
 		GLOBAL_CHECK_MULTI_INSTANCE=1	# Installation multi-instance réussie
@@ -530,12 +545,6 @@ CHECK_MULTI_INSTANCE () {
 		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
 		GLOBAL_CHECK_MULTI_INSTANCE=-1	# Installation multi-instance échouée
 	fi
-	# Test l'accès à la 1ère instance de l'app
-	CHECK_PATH=$CHECK_PATH_first
-	CHECK_URL
-	# Test l'accès à la 2e instance de l'app
-	CHECK_PATH="$PATH_TEST-2"
-	CHECK_URL
 	if [ "$no_lxc" -ne 0 ]; then
 		# Suppression de la 2e app si lxc n'est pas utilisé.
 		REMOVE_APP
@@ -612,6 +621,13 @@ CHECK_COMMON_ERROR () {
 	# Installation de l'app
 	SETUP_APP
 	LOG_EXTRACTOR
+	if [ "$1" == "incorrect_path" ] || [ "$1" == "port_already_use" ]; then
+		# Test l'accès à l'app
+		CHECK_URL
+		if [ "$curl_error" -ne 0 ]; then
+			YUNOHOST_RESULT=$curl_error
+		fi
+	fi
 	tnote=$((tnote+1))
 	if [ "$YUNOHOST_RESULT" -eq 0 ]; then	# wrong_user et wrong_path doivent aboutir à échec de l'installation. C'est l'inverse pour incorrect_path et port_already_use.
 		if [ "$1" == "wrong_user" ]; then
@@ -625,12 +641,12 @@ CHECK_COMMON_ERROR () {
 		if [ "$1" == "incorrect_path" ]; then
 			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 			note=$((note+1))
-			GLOBAL_CHECK_PATH=1	# Installation privée réussie
+			GLOBAL_CHECK_PATH=1	# Correction de path réussie
 		fi
 		if [ "$1" == "port_already_use" ]; then
 			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 			note=$((note+1))
-			GLOBAL_CHECK_PORT=1	# Installation privée réussie
+			GLOBAL_CHECK_PORT=1	# Changement de port réussi
 		fi
 	else
 		if [ "$1" == "wrong_user" ]; then
@@ -651,10 +667,6 @@ CHECK_COMMON_ERROR () {
 			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
 			GLOBAL_CHECK_PORT=-1	# Installation privée échouée
 		fi
-	fi
-	if [ "$1" == "incorrect_path" ] || [ "$1" == "port_already_use" ]; then
-		# Test l'accès à l'app
-		CHECK_URL
 	fi
 	if [ "$no_lxc" -ne 0 ]; then
 		# Suppression de l'app si lxc n'est pas utilisé.

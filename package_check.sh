@@ -7,6 +7,13 @@
 
 echo ""
 
+# Récupère le dossier du script
+if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$PWD/$(dirname "$0" | cut -d '.' -f2)"; fi
+
+source "$script_dir/sub_scripts/lxc_launcher.sh"
+source "$script_dir/sub_scripts/testing_process.sh"
+source /usr/share/yunohost/helpers
+
 # Vérifie la connexion internet.
 ping -q -c 2 yunohost.org > /dev/null 2>&1
 if [ "$?" -ne 0 ]; then	# En cas d'échec de connexion, tente de pinger un autre domaine pour être sûr
@@ -17,15 +24,12 @@ if [ "$?" -ne 0 ]; then	# En cas d'échec de connexion, tente de pinger un autre
 	fi
 fi
 
-# Récupère le dossier du script
-if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$PWD/$(dirname "$0" | cut -d '.' -f2)"; fi
-
 version_script="$(git ls-remote https://github.com/YunoHost/package_check | cut -f 1 | head -n1)"
 if [ -e "$script_dir/package_version" ]
 then
 	if [ "$version_script" != "$(cat "$script_dir/package_version")" ]; then	# Si le dernier commit sur github ne correspond pas au commit enregistré, il y a une mise à jour.
 		# Écrit le script de mise à jour, qui sera exécuté à la place de ce script, pour le remplacer et le relancer après.
-		echo "Mise à jour de Package check..."
+		ECHO_FORMAT "Mise à jour de Package check...\n" "white" "bold"
 		echo -e "#!/bin/bash\n" > "$script_dir/upgrade_script.sh"
 		echo "git clone --quiet https://github.com/YunoHost/package_check \"$script_dir/upgrade\"" >> "$script_dir/upgrade_script.sh"
 		echo "sudo cp -a \"$script_dir/upgrade/.\" \"$script_dir/.\"" >> "$script_dir/upgrade_script.sh"
@@ -43,14 +47,14 @@ version_plinter="$(git ls-remote https://github.com/YunoHost/package_linter | cu
 if [ -e "$script_dir/plinter_version" ]
 then
 	if [ "$version_plinter" != "$(cat "$script_dir/plinter_version")" ]; then	# Si le dernier commit sur github ne correspond pas au commit enregistré, il y a une mise à jour.
-		echo "Mise à jour de package_linter..."
+		ECHO_FORMAT "Mise à jour de package_linter..." "white" "bold"
 		git clone --quiet https://github.com/YunoHost/package_linter "$script_dir/package_linter_tmp"
 		sudo cp -a "$script_dir/package_linter_tmp/." "$script_dir/package_linter/."
 		sudo rm -r "$script_dir/package_linter_tmp"
 	fi
 else	# Si le fichier de version n'existe pas, il est créé.
 	echo "$version_plinter" > "$script_dir/plinter_version"
-	echo "Installation de package_linter."
+	ECHO_FORMAT "Installation de package_linter." "white"
 	git clone --quiet https://github.com/YunoHost/package_linter "$script_dir/package_linter"
 fi
 echo "$version_plinter" > "$script_dir/plinter_version"
@@ -83,10 +87,6 @@ else
 	DOMAIN=$(sudo yunohost domain list -l 1 | cut -d" " -f 2)
 fi
 SOUS_DOMAIN="sous.$DOMAIN"
-
-source "$script_dir/sub_scripts/lxc_launcher.sh"
-source "$script_dir/sub_scripts/testing_process.sh"
-source /usr/share/yunohost/helpers
 
 if [ "$no_lxc" -eq 0 ]
 then	# Si le conteneur lxc est utilisé
