@@ -138,7 +138,7 @@ fi
 
 # Vérifie le type d'emplacement du package à tester
 echo "Récupération du package à tester."
-sudo rm -rf "$APP_CHECK"
+rm -rf "$script_dir"/*_check
 GIT_PACKAGE=0
 if echo "$arg_app" | grep -Eq "https?:\/\/"
 then

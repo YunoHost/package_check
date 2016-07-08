@@ -671,20 +671,12 @@ PACKAGE_LINTER () {
 	ECHO_FORMAT "\n\n>> Package linter... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
 	"$script_dir/package_linter/package_linter.py" "$APP_CHECK" | tee "$script_dir/package_linter.log"	# Effectue un test du package avec package_linter
-# 	header_PL=""	# Finalement je vais garder la sortie dans on ensemble. J'aime pas l'idée de tronquer le boulot de Moul.
 	while read LIGNE
 	do
-		if echo "$LIGNE" | grep -q ">>>> ="; then	# Prend le header de la section
-# 			header=$(echo "$LIGNE" | cut -d '>' -f2-5 | cut -d '<' -f1-4)
-# 			prev_header_PL=$header_PL
-# 			header_PL="$LIGNE"
+		if echo "$LIGNE" | grep -q ">>>> "; then	# Prend le header de la section
 			GLOBAL_LINTER=1	# Si au moins 1 header est trouvé, c'est que l'exécution s'est bien déroulée.
 		fi
 		if echo "$LIGNE" | grep -q -F "[91m"; then	# Si une erreur a été détectée par package_linter.
-# 			if [ "$prev_header_PL" != "$header_PL" ]; then
-# 				ECHO_FORMAT "$header_PL\n"
-# 			fi
-# 			ECHO_FORMAT "$LIGNE\n"
 			GLOBAL_LINTER=-1	# Au moins une erreur a été détectée par package_linter
 		fi
 	done < "$script_dir/package_linter.log"

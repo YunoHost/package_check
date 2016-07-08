@@ -66,7 +66,7 @@ PARSE_LOG () {
 
 CLEAR_LOG () {
 	# Élimine les warning parasites connus et identifiables facilement.
-	sed -i '/^>WARNING: yunohost\.hook <lambda> - \[[0-9.]*\] ?$/d' "$temp_RESULT"	# Ligne de warning vide précédant et suivant la progression d'un wget
+	sed -i '/^>WARNING: yunohost\.hook <lambda> - \[[0-9.]*\] *$/d' "$temp_RESULT"	# Ligne de warning vide précédant et suivant la progression d'un wget
 	sed -i '/^>WARNING: yunohost\.hook <lambda> - \[[0-9.]*\] *[0-9]*K \.* /d' "$temp_RESULT"	# Ligne de warning de progression d'un wget
 	sed -i '/% Total    % Received % Xferd/d' "$temp_RESULT"	# Ligne de warning des statistiques d'un wget
 	sed -i '/Dload  Upload   Total   Spent/d' "$temp_RESULT"	# 2e ligne de warning des statistiques d'un wget
