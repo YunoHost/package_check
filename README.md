@@ -29,7 +29,8 @@ Usage:
 Pour une app dans un dossier: `./package_check.sh APP_ynh`  
 Pour une app sur github: `./package_check.sh https://github.com/USER/APP_ynh`
 
-Il est nécessaire de fournir, à la racine du package de l'app à tester, un fichier `check_process` pour indiquer au script les arguments attendu et les tests à effectuer.
+Il est nécessaire de fournir, à la racine du package de l'app à tester, un fichier `check_process` pour indiquer au script les arguments attendu et les tests à effectuer.  
+Si ce fichier n'est pas présent, package_check sera utilisé en mode dégradé. Il va tenter de repérer les arguments domain, path et admin dans le manifest pour exécuter un nombre restreint de test, en fonction des arguments trouvés.
 
 ---
 ## Syntaxe du fichier `check_process`
