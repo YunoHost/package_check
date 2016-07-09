@@ -703,15 +703,12 @@ PACKAGE_LINTER () {
 	ECHO_FORMAT "\n\n>> Package linter... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
 	"$script_dir/package_linter/package_linter.py" "$APP_CHECK" | tee "$script_dir/package_linter.log"	# Effectue un test du package avec package_linter
-	while read LIGNE
-	do
-		if echo "$LIGNE" | grep -q ">>>> "; then	# Prend le header de la section
-			GLOBAL_LINTER=1	# Si au moins 1 header est trouvé, c'est que l'exécution s'est bien déroulée.
-		fi
-		if echo "$LIGNE" | grep -q -F "[91m"; then	# Si une erreur a été détectée par package_linter.
-			GLOBAL_LINTER=-1	# Au moins une erreur a été détectée par package_linter
-		fi
-	done < "$script_dir/package_linter.log"
+	if grep -q ">>>> " "$script_dir/package_linter.log"; then
+		GLOBAL_LINTER=1	# Si au moins 1 header est trouvé, c'est que l'exécution s'est bien déroulée.
+	fi
+	if grep -q -F "[91m" "$script_dir/package_linter.log"; then	# Si une erreur a été détectée par package_linter.
+		GLOBAL_LINTER=-1	# Au moins une erreur a été détectée par package_linter
+	fi
 	tnote=$((tnote+1))
 	if [ "$GLOBAL_LINTER" -eq 1 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
