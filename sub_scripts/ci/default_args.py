@@ -31,14 +31,14 @@ def argument_for_question(question, all_choices=False):
         if not all_choices:
             if isinstance(question["default"], bool):
                 if question["default"]:
-                    question["default"] = "Yes"
+                    question["default"] = "1"
                 else:
-                    question["default"] = "No"
+                    question["default"] = "0"
 
             return (question["name"], question["default"])
         else:
             if isinstance(question["default"], bool) :
-                return (question["name"], "Yes", "No")
+                return (question["name"], "1", "0")
 
             if question.get("choices"):
                 return (question["name"],) + tuple(question["choices"])

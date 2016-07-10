@@ -70,7 +70,7 @@ do
 	tasksell_exit=$?
 done
 echo "> Renseigne /etc/hosts sur l'invité" | tee -a "$LOG_BUILD_LXC"
-sudo lxc-attach -n $LXC_NAME -- echo "127.0.0.1 $LXC_NAME" | sudo tee -a /var/lib/lxc/$LXC_NAME/rootfs/etc/hosts >> "$LOG_BUILD_LXC" 2>&1
+echo "127.0.0.1 $LXC_NAME" | sudo tee -a /var/lib/lxc/$LXC_NAME/rootfs/etc/hosts >> "$LOG_BUILD_LXC" 2>&1
 
 echo "> Ajoute l'user pchecker" | tee -a "$LOG_BUILD_LXC"
 sudo lxc-attach -n $LXC_NAME -- useradd -m -p pchecker pchecker >> "$LOG_BUILD_LXC" 2>&1

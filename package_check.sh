@@ -179,7 +179,7 @@ TEST_RESULTS () {
 	elif [ "$GLOBAL_LINTER" -eq -1 ]; then
 		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
 	else
-		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
+		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
 	fi
 	ECHO_FORMAT "Installation: "
 	if [ "$GLOBAL_CHECK_SETUP" -eq 1 ]; then
@@ -655,13 +655,10 @@ else	# Si le fichier check_process n'a pas été trouvé, fonctionne en mode dé
 		ECHO_FORMAT "La clé de manifest du domaine n'a pas été trouvée.\n" "lyellow"
 		setup_sub_dir=0
 		setup_root=0
-		upgrade=0
-		backup_restore=0
 		multi_instance=0
 		wrong_user=0
-		wrong_path=0
 		incorrect_path=0
-		all_test=$((all_test-8))
+		all_test=$((all_test-5))
 	fi
 	if [ "$MANIFEST_PATH" == "null" ]
 	then
@@ -674,15 +671,8 @@ else	# Si le fichier check_process n'a pas été trouvé, fonctionne en mode dé
 	if [ "$MANIFEST_USER" == "null" ]
 	then
 		ECHO_FORMAT "La clé de manifest de l'user admin n'a pas été trouvée.\n" "lyellow"
-		setup_sub_dir=0
-		setup_root=0
-		upgrade=0
-		backup_restore=0
-		multi_instance=0
 		wrong_user=0
-		wrong_path=0
-		incorrect_path=0
-		all_test=$((all_test-8))
+		all_test=$((all_test-1))
 	fi
 fi
 
