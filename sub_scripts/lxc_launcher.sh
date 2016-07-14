@@ -43,8 +43,7 @@ LXC_START () {
 		sudo cat "/var/lib/lxc/$LXC_NAME/rootfs/home/pchecker/debug_output.log" >> "$OUTPUTD" # Récupère le contenu du OUTPUTD distant pour le réinjecter dans le local
 		return "$?"
 	else	# Sinon exécute la commande directement.
- 		command=$(echo "$1" | sed "s@\"@@g")	# Remplace les guillemets doubles par des simples 
-		$command > /dev/null 2>> "$OUTPUTD"
+		eval "$1" > /dev/null 2>> "$OUTPUTD"
 	fi
 }
 

@@ -53,7 +53,10 @@ CHECK_URL () {
 		ECHO_FORMAT "Code HTTP: $HTTP_CODE\n" "white"
 		if [ "${HTTP_CODE:0:1}" == "0" ] || [ "${HTTP_CODE:0:1}" == "4" ] || [ "${HTTP_CODE:0:1}" == "5" ]
 		then	# Si le code d'erreur http est du type 0xx 4xx ou 5xx, c'est un code d'erreur.
-			curl_error=1
+			if [ "${HTTP_CODE}" != "401" ]
+			then	# Le code d'erreur 401 fait exception, si il y a 401 c'est en général l'application qui le renvoi. Donc l'install est bonne.
+				curl_error=1
+			fi
 		fi
 		URL_TITLE=$(grep "<title>" "$script_dir/url_output" | cut -d '>' -f 2 | cut -d '<' -f1)
 		ECHO_FORMAT "Titre de la page: $URL_TITLE\n" "white"
@@ -70,6 +73,7 @@ CHECK_URL () {
 		sudo sed -i '/#package_check/d' /etc/hosts	# Supprime la ligne dans le hosts
 	else
 		ECHO_FORMAT "Test de connexion annulé.\n" "white"
+		curl_error=0
 	fi
 }
 
@@ -284,7 +288,7 @@ CHECK_UPGRADE () {
 	# Test d'upgrade
 	ECHO_FORMAT "\n\n>> Upgrade... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
+	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 		return;
 	fi
@@ -295,12 +299,12 @@ CHECK_UPGRADE () {
 	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
 		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
 	fi
-	if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Utilise ce mode d'installation
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
-		CHECK_PATH="$PATH_TEST"
-	elif [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then	# Sinon utilise une install root, si elle a fonctionné
+	if [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné
 		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
 		CHECK_PATH="/"
+	elif [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
+		CHECK_PATH="$PATH_TEST"
 	else
 		echo "Aucun mode d'installation n'a fonctionné, impossible d'effectuer ce test..."
 		return;
@@ -338,7 +342,7 @@ CHECK_BACKUP_RESTORE () {
 	# Test de backup
 	ECHO_FORMAT "\n\n>> Backup/Restore... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
+	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 	fi
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
@@ -348,12 +352,12 @@ CHECK_BACKUP_RESTORE () {
 	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
 		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
 	fi
-	if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Utilise ce mode d'installation
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
-		CHECK_PATH="$PATH_TEST"
-	elif [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then	# Sinon utilise une install root, si elle a fonctionné
+	if [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné
 		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
 		CHECK_PATH="/"
+	elif [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
+		CHECK_PATH="$PATH_TEST"
 	else
 		echo "Aucun mode d'installation n'a fonctionné, impossible d'effectuer ce test..."
 		return;
@@ -416,7 +420,7 @@ CHECK_PUBLIC_PRIVATE () {
 		ECHO_FORMAT "\n\n>> Installation publique... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	fi
 	cur_test=$((cur_test+1))
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
+	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 		return
 	fi
@@ -443,12 +447,12 @@ CHECK_PUBLIC_PRIVATE () {
 	if [ "$1" == "public" ]; then
 		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
 	fi
-	if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Utilise ce mode d'installation
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
-		CHECK_PATH="$PATH_TEST"
-	elif [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then	# Sinon utilise une install root, si elle a fonctionné
+	if [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné
 		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
 		CHECK_PATH="/"
+	elif [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
+		CHECK_PATH="$PATH_TEST"
 	else
 		echo "Aucun mode d'installation n'a fonctionné, impossible d'effectuer ce test..."
 		return;
@@ -498,7 +502,7 @@ CHECK_MULTI_INSTANCE () {
 	# Test d'installation en multi-instance
 	ECHO_FORMAT "\n\n>> Installation multi-instance... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
+	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 		return
 	fi
@@ -509,7 +513,7 @@ CHECK_MULTI_INSTANCE () {
 	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
 		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
 	fi
-	if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Utilise ce mode d'installation
+	if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
 		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
 	else
 		echo "L'installation en sous-dossier n'a pas fonctionné, impossible d'effectuer ce test..."
@@ -594,7 +598,7 @@ CHECK_COMMON_ERROR () {
 		fi
 	fi
 	cur_test=$((cur_test+1))
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
+	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 		return
 	fi
@@ -613,13 +617,13 @@ CHECK_COMMON_ERROR () {
 	if [ "$1" == "incorrect_path" ]; then	# Force un path mal formé: Ce sera path/ au lieu de /path
 		WRONG_PATH=${PATH_TEST#/}/	# Transforme le path de /path à path/
 		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$WRONG_PATH\&@")
+		CHECK_PATH="$PATH_TEST"
 	else
-		if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Utilise ce mode d'installation
-			MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
-			CHECK_PATH="$PATH_TEST"
-		elif [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then	# Sinon utilise une install root, si elle a fonctionné
+		if [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné
 			MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
 			CHECK_PATH="/"
+		elif [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
+			MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
 		else
 			echo "Aucun mode d'installation n'a fonctionné, impossible d'effectuer ce test..."
 			return;
@@ -722,7 +726,7 @@ CHECK_CORRUPT () {
 	# Test d'erreur sur source corrompue
 	ECHO_FORMAT "\n\n>> Source corrompue après téléchargement... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
+	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 	fi
 echo -n "Non implémenté"
@@ -732,7 +736,7 @@ CHECK_DL () {
 	# Test d'erreur de téléchargement de la source
 	ECHO_FORMAT "\n\n>> Erreur de téléchargement de la source... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
+	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 	fi
 echo -n "Non implémenté"
@@ -742,7 +746,7 @@ CHECK_FINALPATH () {
 	# Test sur final path déjà utilisé.
 	ECHO_FORMAT "\n\n>> Final path déjà utilisé... [Test $cur_test/$all_test]\n" "white" "bold" clog
 	cur_test=$((cur_test+1))
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
+	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 	fi
 echo -n "Non implémenté"

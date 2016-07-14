@@ -3,7 +3,9 @@
 # Arguments du script
 # --bash-mode	Mode bash, le script est autonome. Il ignore la valeur de $auto_remove
 # --no-lxc	N'utilise pas la virtualisation en conteneur lxc. La virtualisation est utilisée par défaut si disponible.
-# --build-lxc	Installe lxc et créer la machine si nécessaire. Incompatible avec -b en raison de la connexion ssh à valider lors du build.
+# --build-lxc	Installe lxc et créer la machine si nécessaire. Incompatible avec --bash-mode en raison de la connexion ssh à valider lors du build.
+# --force-install-ok	Force la réussite des installations, même si elles échouent. Permet d'effectuer les tests qui suivent même si l'installation a échouée.
+# --help	Affiche l'aide du script
 
 echo ""
 
@@ -59,10 +61,11 @@ else	# Si le fichier de version n'existe pas, il est créé.
 fi
 echo "$version_plinter" > "$script_dir/plinter_version"
 
+notice=0
 if [ "$#" -eq 0 ]
 then
 	echo "Le script prend en argument le package à tester."
-	exit 1
+	notice=1
 fi
 
 ## Récupère les arguments
@@ -72,8 +75,25 @@ bash_mode=$(echo "$*" | grep -c -e "--bash-mode")	# bash_mode vaut 1 si l'argume
 no_lxc=$(echo "$*" | grep -c -e "--no-lxc")	# no_lxc vaut 1 si l'argument est présent.
 # --build-lxc
 build_lxc=$(echo "$*" | grep -c -e "--build-lxc")	# build_lxc vaut 1 si l'argument est présent.
-arg_app=$(echo "$*" | sed 's/--bash-mode\|--no-lxc\|--build-lxc//g' | sed 's/^ *\| *$//g')	# Supprime les arguments déjà lu pour ne garder que l'app. Et supprime les espaces au début et à la fin
+# --force-install-ok
+force_install_ok=$(echo "$*" | grep -c -e "--force-install-ok")	# force-install-ok vaut 1 si l'argument est présent.
+# --help
+if [ "$notice" -eq 0 ]; then
+	notice=$(echo "$*" | grep -c -e "--help")	# notice vaut 1 si l'argument est présent. Il affichera alors l'aide.
+fi
+arg_app=$(echo "$*" | sed 's/--bash-mode\|--no-lxc\|--build-lxc\|--force-install-ok//g' | sed 's/^ *\| *$//g')	# Supprime les arguments déjà lu pour ne garder que l'app. Et supprime les espaces au début et à la fin
 # echo "arg_app=$arg_app."
+
+if [ "$notice" -eq 1 ]; then
+	echo -e "\nUsage:"
+	echo "package_check.sh [--bash-mode] [--no-lxc] [--build-lxc] [--force-install-ok] [--help] \"check package\""
+	echo -e "\n\t--bash-mode\t\tDo not ask for continue check. Ignore auto_remove."
+	echo -e "\t--no-lxc\t\tDo not use a LXC container. You should use this option only on a test environnement."
+	echo -e "\t--build-lxc\t\tInstall LXC and build the container if necessary."
+	echo -e "\t--force-install-ok\tForce following test even if all install are failed."
+	echo -e "\t--help\t\t\tDisplay this notice."
+	exit 0
+fi
 
 USER_TEST=package_checker
 PASSWORD_TEST=checker_pwd
@@ -411,6 +431,7 @@ INIT_VAR() {
 	note=0
 	tnote=0
 	all_test=0
+	use_curl=0
 
 	MANIFEST_DOMAIN="null"
 	MANIFEST_PATH="null"
