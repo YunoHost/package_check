@@ -19,9 +19,9 @@ SETUP_APP () {
 
 REMOVE_APP () {
 	if [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
-	if [ "$no_lxc" -eq 0 ]; then
-		echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
-	fi
+		if [ "$no_lxc" -eq 0 ]; then
+			echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+		fi
 		read -p "Appuyer sur une touche pour supprimer l'application et continuer les tests..." < /dev/tty
 	fi
 	ECHO_FORMAT "\nSuppression...\n" "white" "bold"
@@ -334,6 +334,11 @@ CHECK_UPGRADE () {
 	if [ "$no_lxc" -ne 0 ]; then
 		# Suppression de l'app si lxc n'est pas utilisé.
 		REMOVE_APP
+	elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
+		if [ "$no_lxc" -eq 0 ]; then
+			echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+		fi
+		read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
 	fi
 	YUNOHOST_RESULT=-1
 }
@@ -407,6 +412,11 @@ CHECK_BACKUP_RESTORE () {
 		REMOVE_APP
 		# Suppression de l'archive
 		sudo yunohost backup delete Backup_test > /dev/null
+	elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
+		if [ "$no_lxc" -eq 0 ]; then
+			echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+		fi
+		read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
 	fi
 	YUNOHOST_RESULT=-1
 }
@@ -494,6 +504,11 @@ CHECK_PUBLIC_PRIVATE () {
 	if [ "$no_lxc" -ne 0 ]; then
 		# Suppression de l'app si lxc n'est pas utilisé.
 		REMOVE_APP
+	elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
+		if [ "$no_lxc" -eq 0 ]; then
+			echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+		fi
+		read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
 	fi
 	YUNOHOST_RESULT=-1
 }
@@ -575,6 +590,11 @@ CHECK_MULTI_INSTANCE () {
 		# Suppression de la 1ère app
 		APPID=$APPID_first
 		REMOVE_APP
+	elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
+		if [ "$no_lxc" -eq 0 ]; then
+			echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+		fi
+		read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
 	fi
 	YUNOHOST_RESULT=-1
 }
@@ -698,6 +718,11 @@ CHECK_COMMON_ERROR () {
 		if [ "$1" == "port_already_use" ]; then	# Libère le port ouvert pour le test
 			sudo yunohost firewall disallow Both $check_port > /dev/null
 		fi
+	elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
+		if [ "$no_lxc" -eq 0 ]; then
+			echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+		fi
+		read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
 	fi
 	YUNOHOST_RESULT=-1
 }
