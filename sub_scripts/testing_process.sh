@@ -35,7 +35,6 @@ CHECK_URL () {
 	if [ "$use_curl" -eq 1 ]
 	then
 		ECHO_FORMAT "\nAccès par l'url...\n" "white" "bold"
-		rm -f "$script_dir/url_output"	# Supprime le précédent fichier html si il est encore présent
 		if [ "$no_lxc" -eq 0 ]; then
 			IP_CURL="$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep PLAGE_IP= | cut -d '"' -f2).2"
 		else
@@ -43,33 +42,54 @@ CHECK_URL () {
 		fi
 		echo -e "$IP_CURL $DOMAIN #package_check\n$IP_CURL $SOUS_DOMAIN #package_check" | sudo tee -a /etc/hosts > /dev/null	# Renseigne le hosts pour le domain à tester, pour passer directement sur localhost
 		curl_error=0
-		curl -LksS -w "%{http_code};%{url_effective}\n" $SOUS_DOMAIN$CHECK_PATH -o "$script_dir/url_output" > "$script_dir/curl_print"
-		if [ "$?" -ne 0 ]; then
-			ECHO_FORMAT "Erreur de connexion...\n" "lred" "bold"
-			curl_error=1
-		fi
-		ECHO_FORMAT "Adresse de la page: $(cat "$script_dir/curl_print" | cut -d ';' -f2)\n" "white"
-		HTTP_CODE=$(cat "$script_dir/curl_print" | cut -d ';' -f1)
-		ECHO_FORMAT "Code HTTP: $HTTP_CODE\n" "white"
-		if [ "${HTTP_CODE:0:1}" == "0" ] || [ "${HTTP_CODE:0:1}" == "4" ] || [ "${HTTP_CODE:0:1}" == "5" ]
-		then	# Si le code d'erreur http est du type 0xx 4xx ou 5xx, c'est un code d'erreur.
-			if [ "${HTTP_CODE}" != "401" ]
-			then	# Le code d'erreur 401 fait exception, si il y a 401 c'est en général l'application qui le renvoi. Donc l'install est bonne.
+		for i in 0 1
+		do	# 2 passes, pour effectuer un test avec le / final, et un autre sans.
+			if [ "$i" -eq 0 ]; then	# Test sans / final.
+				if [ "${CHECK_PATH:${#CHECK_PATH}-1}" == "/" ]	# Si le dernier caractère est un /
+				then
+					MOD_CHECK_PATH="${CHECK_PATH:0:${#CHECK_PATH}-1}"	# Supprime le /
+				else
+					MOD_CHECK_PATH=$CHECK_PATH
+				fi
+			fi
+			if [ "$i" -eq 1 ]; then	# Test avec / final.
+				if [ "${CHECK_PATH:${#CHECK_PATH}-1}" != "/" ]	# Si le dernier caractère n'est pas un /
+				then
+					MOD_CHECK_PATH="$CHECK_PATH/"	# Ajoute / à la fin du path
+				else
+					MOD_CHECK_PATH=$CHECK_PATH
+				fi
+			fi
+			rm -f "$script_dir/url_output"	# Supprime le précédent fichier html si il est encore présent
+			curl -LksS -w "%{http_code};%{url_effective}\n" $SOUS_DOMAIN$MOD_CHECK_PATH -o "$script_dir/url_output" > "$script_dir/curl_print"
+			if [ "$?" -ne 0 ]; then
+				ECHO_FORMAT "Erreur de connexion...\n" "lred" "bold"
 				curl_error=1
 			fi
-		fi
-		URL_TITLE=$(grep "<title>" "$script_dir/url_output" | cut -d '>' -f 2 | cut -d '<' -f1)
-		ECHO_FORMAT "Titre de la page: $URL_TITLE\n" "white"
-		if [ "$URL_TITLE" == "YunoHost Portal" ]; then
-			YUNO_PORTAL=1
-			# Il serait utile de réussir à s'authentifier sur le portail pour tester une app protégée par celui-ci. Mais j'y arrive pas...
-		else
-			YUNO_PORTAL=0
-			ECHO_FORMAT "Extrait du corps de la page:\n" "white"
-			echo -e "\e[37m"	# Écrit en light grey
-			grep "<body" -A 20 "$script_dir/url_output" | sed 1d | tee -a "$RESULT"
-			echo -e "\e[0m"
-		fi
+			ECHO_FORMAT "Adresse de test: $SOUS_DOMAIN$MOD_CHECK_PATH\n" "white"
+			ECHO_FORMAT "Adresse de la page: $(cat "$script_dir/curl_print" | cut -d ';' -f2)\n" "white"
+			HTTP_CODE=$(cat "$script_dir/curl_print" | cut -d ';' -f1)
+			ECHO_FORMAT "Code HTTP: $HTTP_CODE\n" "white"
+			if [ "${HTTP_CODE:0:1}" == "0" ] || [ "${HTTP_CODE:0:1}" == "4" ] || [ "${HTTP_CODE:0:1}" == "5" ]
+			then	# Si le code d'erreur http est du type 0xx 4xx ou 5xx, c'est un code d'erreur.
+				if [ "${HTTP_CODE}" != "401" ]
+				then	# Le code d'erreur 401 fait exception, si il y a 401 c'est en général l'application qui le renvoi. Donc l'install est bonne.
+					curl_error=1
+				fi
+			fi
+			URL_TITLE=$(grep "<title>" "$script_dir/url_output" | cut -d '>' -f 2 | cut -d '<' -f1)
+			ECHO_FORMAT "Titre de la page: $URL_TITLE\n" "white"
+			if [ "$URL_TITLE" == "YunoHost Portal" ]; then
+				YUNO_PORTAL=1
+				# Il serait utile de réussir à s'authentifier sur le portail pour tester une app protégée par celui-ci. Mais j'y arrive pas...
+			else
+				YUNO_PORTAL=0
+				ECHO_FORMAT "Extrait du corps de la page:\n" "white"
+				echo -e "\e[37m"	# Écrit en light grey
+				grep "<body" -A 20 "$script_dir/url_output" | sed 1d | tee -a "$RESULT"
+				echo -e "\e[0m"
+			fi
+		done
 		sudo sed -i '/#package_check/d' /etc/hosts	# Supprime la ligne dans le hosts
 	else
 		ECHO_FORMAT "Test de connexion annulé.\n" "white"
