@@ -8,7 +8,7 @@ echo -e "Chargement des fonctions de lxc_launcher.sh"
 LXC_INIT () {
 	# Activation du bridge réseau
 	echo "Initialisation du réseau pour le conteneur."
-	sudo ifup lxc-pchecker | tee -a "$RESULT" 2>&1
+	sudo ifup lxc-pchecker --interfaces=/etc/network/interfaces.d/lxc-pchecker | tee -a "$RESULT" 2>&1
 
 	# Activation des règles iptables
 	sudo iptables -A FORWARD -i lxc-pchecker -o eth0 -j ACCEPT | tee -a "$RESULT" 2>&1
@@ -79,6 +79,6 @@ LXC_TURNOFF () {
 	# Et arrêt du bridge
 	if sudo ifquery lxc-pchecker --state > /dev/null
 	then
-		sudo ifdown lxc-pchecker | tee -a "$RESULT" 2>&1
+		sudo ifdown --force lxc-pchecker | tee -a "$RESULT" 2>&1
 	fi
 }

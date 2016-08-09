@@ -33,6 +33,15 @@ Il est nécessaire de fournir, à la racine du package de l'app à tester, un fi
 Si ce fichier n'est pas présent, package_check sera utilisé en mode dégradé. Il va tenter de repérer les arguments domain, path et admin dans le manifest pour exécuter un nombre restreint de test, en fonction des arguments trouvés.
 
 ---
+## Déploiement du script de test
+
+```
+git clone https://github.com/YunoHost/package_check
+package_check/sub_scripts/lxc_build.sh
+package_check/package_check.sh APP_ynh
+```
+
+---
 ## Syntaxe du fichier `check_process`
 > A l'exception des espaces, la syntaxe du fichier doit être scrupuleusement respectée.
 
@@ -161,6 +170,15 @@ For an app on github: `./package_check.sh https://github.com/USER/APP_ynh`
 
 It's necessary to provide, at the root of package to be tested, a `check_process` file for inform the script of needed arguments and tests to perform.  
 If this file is not present, package_check will be used in downgraded mode. It try to retrieve domain, path and admin user arguments in the manifest for execute some tests, based on arguments found.
+
+---
+## Deploying test script
+
+```
+git clone https://github.com/YunoHost/package_check
+package_check/sub_scripts/lxc_build.sh
+package_check/package_check.sh APP_ynh
+```
 
 ---
 ## Syntax `check_process` file

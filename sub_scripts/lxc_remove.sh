@@ -19,7 +19,7 @@ sudo rm /etc/sysctl.d/lxc_pchecker.conf
 sudo sysctl -p
 
 echo "> Désactive le bridge réseau"
-sudo ifdown lxc-pchecker
+sudo ifdown --force lxc-pchecker
 
 echo "> Supprime le brige réseau"
 sudo rm /etc/network/interfaces.d/lxc-pchecker

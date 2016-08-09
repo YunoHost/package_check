@@ -9,7 +9,7 @@ LXC_NAME=$(cat "$script_dir/lxc_build.sh" | grep LXC_NAME= | cut -d '=' -f2)
 echo "> Active le bridge réseau"
 if ! sudo ifquery lxc-pchecker --state > /dev/null
 then
-	sudo ifup lxc-pchecker
+	sudo ifup lxc-pchecker --interfaces=/etc/network/interfaces.d/lxc-pchecker
 fi
 
 echo "> Configure le parefeu"
@@ -58,7 +58,7 @@ echo "> Suppression des règles de parefeu"
 sudo iptables -D FORWARD -i lxc-pchecker -o eth0 -j ACCEPT
 sudo iptables -D FORWARD -i eth0 -o lxc-pchecker -j ACCEPT
 sudo iptables -t nat -D POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE
-sudo ifdown lxc-pchecker
+sudo ifdown --force lxc-pchecker
 
 
 if [ "$update_apt" -eq 1 ]

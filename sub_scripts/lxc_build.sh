@@ -41,7 +41,7 @@ iface lxc-pchecker inet static
 EOF
 
 echo "> Active le bridge réseau" | tee -a "$LOG_BUILD_LXC"
-sudo ifup lxc-pchecker >> "$LOG_BUILD_LXC" 2>&1
+sudo ifup lxc-pchecker --interfaces=/etc/network/interfaces.d/lxc-pchecker >> "$LOG_BUILD_LXC" 2>&1
 
 echo "> Configuration réseau du conteneur" | tee -a "$LOG_BUILD_LXC"
 sudo sed -i 's/^lxc.network.type = empty$/lxc.network.type = veth\nlxc.network.flags = up\nlxc.network.link = lxc-pchecker\nlxc.network.name = eth0\nlxc.network.veth.pair = $LXC_NAME\nlxc.network.hwaddr = 00:FF:AA:00:00:01/' /var/lib/lxc/$LXC_NAME/config >> "$LOG_BUILD_LXC" 2>&1
@@ -128,7 +128,7 @@ echo "> Suppression des règles de parefeu" | tee -a "$LOG_BUILD_LXC"
 sudo iptables -D FORWARD -i lxc-pchecker -o eth0 -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
 sudo iptables -D FORWARD -i eth0 -o lxc-pchecker -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
 sudo iptables -t nat -D POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE >> "$LOG_BUILD_LXC" 2>&1
-sudo ifdown lxc-pchecker >> "$LOG_BUILD_LXC" 2>&1
+sudo ifdown --force lxc-pchecker >> "$LOG_BUILD_LXC" 2>&1
 
 echo "> Création d'un snapshot" | tee -a "$LOG_BUILD_LXC"
 sudo lxc-snapshot -n $LXC_NAME >> "$LOG_BUILD_LXC" 2>&1

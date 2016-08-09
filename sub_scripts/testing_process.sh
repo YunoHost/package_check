@@ -555,20 +555,21 @@ CHECK_MULTI_INSTANCE () {
 		return;
 	fi
 	# Installation de l'app une première fois
+	ECHO_FORMAT "1ère installation: path=$PATH_TEST\n"
 	SETUP_APP
 	LOG_EXTRACTOR
 	APPID_first=$APPID	# Stocke le nom de la première instance
 	YUNOHOST_RESULT_first=$YUNOHOST_RESULT	# Stocke le résulat de l'installation de la première instance
 	# Installation de l'app une deuxième fois, en ajoutant un suffixe au path
-	ECHO_FORMAT "2e installation\n"
 	path2="$PATH_TEST-2"
+	ECHO_FORMAT "2e installation: path=$path2\n"
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$path2\&@")
 	SETUP_APP
 	LOG_EXTRACTOR
 	APPID_second=$APPID	# Stocke le nom de la deuxième instance
 	YUNOHOST_RESULT_second=$YUNOHOST_RESULT	# Stocke le résulat de l'installation de la deuxième instance
-	ECHO_FORMAT "3e installation\n"
 	path3="/3-${PATH_TEST#/}"
+	ECHO_FORMAT "3e installation: path=$path3\n"
 	# Installation de l'app une troisième fois, en ajoutant un préfixe au path
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=$path2\&@$MANIFEST_PATH=$path3\&@")
 	SETUP_APP
