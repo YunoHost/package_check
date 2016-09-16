@@ -477,60 +477,70 @@ CHECK_PUBLIC_PRIVATE () {
 	if [ "$1" == "public" ]; then
 		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z0-9]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
 	fi
-	if [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
-		CHECK_PATH="/"
-	elif [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
-		CHECK_PATH="$PATH_TEST"
-	else
-		echo "Aucun mode d'installation n'a fonctionné, impossible d'effectuer ce test..."
-		return;
-	fi
-	# Installation de l'app
-	SETUP_APP
-	# Test l'accès à l'app
-	CHECK_URL
-	if [ "$1" == "private" ]; then
-		if [ "$YUNO_PORTAL" -eq 0 ]; then	# En privé, si l'accès url n'arrive pas sur le portail. C'est un échec.
-			YUNOHOST_RESULT=1
+	for i in 0 1
+	do	# 2 passes, pour effectuer un test en root et en sub_dir
+		if [ "$i" -eq 0 ]
+		then	# Commence par l'install root
+			if [ "$GLOBAL_CHECK_ROOT" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné. Ou si l'argument force_install_ok est présent.
+				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
+				CHECK_PATH="/"
+			else
+				echo "L'installation à la racine n'a pas fonctionnée, impossible d'effectuer ce test..."
+				continue;
+			fi
+		elif [ "$i" -eq 1 ]
+		then	# Puis teste l'install sub_dir
+			if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
+				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
+				CHECK_PATH="$PATH_TEST"
+			else
+				echo "L'installation en sous-dossier n'a pas fonctionnée, impossible d'effectuer ce test..."
+				return;
+			fi
 		fi
-	fi
-	if [ "$1" == "public" ]; then
-		if [ "$YUNO_PORTAL" -eq 1 ]; then	# En public, si l'accès url arrive sur le portail. C'est un échec.
-			YUNOHOST_RESULT=1
-		fi
-	fi	
-	LOG_EXTRACTOR
-	tnote=$((tnote+1))
-	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
-		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-		note=$((note+1))
+		# Installation de l'app
+		SETUP_APP
+		# Test l'accès à l'app
+		CHECK_URL
 		if [ "$1" == "private" ]; then
-			GLOBAL_CHECK_PRIVATE=1	# Installation privée réussie
+			if [ "$YUNO_PORTAL" -eq 0 ]; then	# En privé, si l'accès url n'arrive pas sur le portail. C'est un échec.
+				YUNOHOST_RESULT=1
+			fi
 		fi
 		if [ "$1" == "public" ]; then
-			GLOBAL_CHECK_PUBLIC=1	# Installation publique réussie
+			if [ "$YUNO_PORTAL" -eq 1 ]; then	# En public, si l'accès url arrive sur le portail. C'est un échec.
+				YUNOHOST_RESULT=1
+			fi
+		fi	
+		LOG_EXTRACTOR
+		tnote=$((tnote+1))
+		if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
+			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
+			note=$((note+1))
+			if [ "$1" == "private" ]; then
+				GLOBAL_CHECK_PRIVATE=1	# Installation privée réussie
+			fi
+			if [ "$1" == "public" ]; then
+				GLOBAL_CHECK_PUBLIC=1	# Installation publique réussie
+			fi
+		else
+			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
+			if [ "$1" == "private" ]; then
+				GLOBAL_CHECK_PRIVATE=-1	# Installation privée échouée
+			fi
+			if [ "$1" == "public" ]; then
+				GLOBAL_CHECK_PUBLIC=-1	# Installation publique échouée
+			fi
 		fi
-	else
-		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-		if [ "$1" == "private" ]; then
-			GLOBAL_CHECK_PRIVATE=-1	# Installation privée échouée
+		if [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
+			if [ "$no_lxc" -eq 0 ]; then
+				echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+			fi
+			read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
 		fi
-		if [ "$1" == "public" ]; then
-			GLOBAL_CHECK_PUBLIC=-1	# Installation publique échouée
-		fi
-	fi
-	if [ "$no_lxc" -ne 0 ]; then
-		# Suppression de l'app si lxc n'est pas utilisé.
 		REMOVE_APP
-	elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
-		if [ "$no_lxc" -eq 0 ]; then
-			echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
-		fi
-		read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
-	fi
-	YUNOHOST_RESULT=-1
+		YUNOHOST_RESULT=-1
+	done
 }
 
 CHECK_MULTI_INSTANCE () {

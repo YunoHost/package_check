@@ -5,13 +5,11 @@ if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$P
 
 LXC_NAME=$(cat "$script_dir/lxc_build.sh" | grep LXC_NAME= | cut -d '=' -f2)
 
-# Check root
-CHECK_ROOT=$EUID
-if [ -z "$CHECK_ROOT" ];then CHECK_ROOT=0;fi
-if [ $CHECK_ROOT -eq 0 ]
-then	# $EUID est vide sur une exécution avec sudo. Et vaut 0 pour root
-   echo "Le script ne doit pas être exécuté avec les droits root"
-   exit 1
+# Check user
+if [ "$USER" != "$(cat "$script_dir/sub_scripts/setup_user")" ]; then
+	echo -e "\e[91mCe script doit être exécuté avec l'utilisateur $(cat "$script_dir/sub_scripts/setup_user")"
+	echo -en "\e[0m"
+	exit 0
 fi
 
 echo "> Retire l'ip forwarding."

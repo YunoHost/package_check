@@ -6,6 +6,13 @@ if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$P
 PLAGE_IP=$(cat "$script_dir/lxc_build.sh" | grep PLAGE_IP= | cut -d '"' -f2)
 LXC_NAME=$(cat "$script_dir/lxc_build.sh" | grep LXC_NAME= | cut -d '=' -f2)
 
+# Check user
+if [ "$USER" != "$(cat "$script_dir/sub_scripts/setup_user")" ]; then
+	echo -e "\e[91mCe script doit être exécuté avec l'utilisateur $(cat "$script_dir/sub_scripts/setup_user")"
+	echo -en "\e[0m"
+	exit 0
+fi
+
 echo "> Active le bridge réseau"
 if ! sudo ifquery lxc-pchecker --state > /dev/null
 then
@@ -39,9 +46,9 @@ sleep 3
 sudo lxc-ls -f
 
 echo "> Update"
+update_apt=0
 sudo lxc-attach -n $LXC_NAME -- apt-get update
 sudo lxc-attach -n $LXC_NAME -- apt-get dist-upgrade --dry-run | grep -q "^Inst "	# Vérifie si il y aura des mises à jour.
-update_apt=0
 if [ "$?" -eq 0 ]; then
 	update_apt=1
 fi

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Récupère le dossier du script
-if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$PWD/$(dirname "$0" | cut -d '.' -f2)"; fi
+if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
 
 LOG_BUILD_LXC="$script_dir/Build_lxc.log"
 PLAGE_IP="10.1.4"
@@ -10,14 +10,8 @@ DOMAIN=domain.tld
 YUNO_PWD=admin
 LXC_NAME=pchecker_lxc
 
-# Check root
-CHECK_ROOT=$EUID
-if [ -z "$CHECK_ROOT" ];then CHECK_ROOT=0;fi
-if [ $CHECK_ROOT -eq 0 ]
-then	# $EUID est vide sur une exécution avec sudo. Et vaut 0 pour root
-   echo "Le script ne doit pas être exécuté avec les droits root"
-   exit 1
-fi
+# Check user
+echo $USER > "$script_dir/setup_user"
 
 echo "> Update et install lxc lxctl" | tee "$LOG_BUILD_LXC"
 sudo apt-get update >> "$LOG_BUILD_LXC" 2>&1

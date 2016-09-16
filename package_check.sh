@@ -12,6 +12,13 @@ echo ""
 # Récupère le dossier du script
 if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$PWD/$(dirname "$0" | cut -d '.' -f2)"; fi
 
+# Check user
+if [ "$USER" != "$(cat "$script_dir/sub_scripts/setup_user")" ]; then
+	echo -e "\e[91mCe script doit être exécuté avec l'utilisateur $(cat "$script_dir/sub_scripts/setup_user")"
+	echo -en "\e[0m"
+	exit 0
+fi
+
 source "$script_dir/sub_scripts/lxc_launcher.sh"
 source "$script_dir/sub_scripts/testing_process.sh"
 source /usr/share/yunohost/helpers
@@ -522,8 +529,8 @@ then # Si le fichier check_process est trouvé
 					fi
 					if echo "$LIGNE" | grep -q "(PUBLIC"; then	# Accès public/privé dans le manifest
 						MANIFEST_PUBLIC=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant à l'accès public ou privé
-						MANIFEST_PUBLIC_public=$(echo "$LIGNE" | grep -o "|public=[a-Z]*" | cut -d "=" -f2)	# Récupère la valeur pour un accès public.
-						MANIFEST_PUBLIC_private=$(echo "$LIGNE" | grep -o "|private=[a-Z]*" | cut -d "=" -f2)	# Récupère la valeur pour un accès privé.
+						MANIFEST_PUBLIC_public=$(echo "$LIGNE" | grep -o "|public=[a-Z0-9]*" | cut -d "=" -f2)	# Récupère la valeur pour un accès public.
+						MANIFEST_PUBLIC_private=$(echo "$LIGNE" | grep -o "|private=[a-Z0-9]*" | cut -d "=" -f2)	# Récupère la valeur pour un accès privé.
 						LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
 					fi
 					if echo "$LIGNE" | grep -q "(PASSWORD)"; then	# Password dans le manifest

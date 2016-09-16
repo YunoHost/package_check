@@ -64,7 +64,7 @@ LXC_STOP () {
 LXC_TURNOFF () {
 	echo "Arrêt du réseau pour le conteneur."
 	# Suppression des règles de parefeu
-	if sudo iptables -D FORWARD -i lxc-pchecker -o eth0 -j ACCEPT 2> /dev/null
+	if sudo iptables -C FORWARD -i lxc-pchecker -o eth0 -j ACCEPT 2> /dev/null
 	then
 		sudo iptables -D FORWARD -i lxc-pchecker -o eth0 -j ACCEPT >> "$RESULT" 2>&1
 	fi
