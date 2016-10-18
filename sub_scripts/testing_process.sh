@@ -377,68 +377,86 @@ CHECK_BACKUP_RESTORE () {
 	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
 		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
 	fi
-	if [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
-		CHECK_PATH="/"
-	elif [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
-		CHECK_PATH="$PATH_TEST"
-	else
-		echo "Aucun mode d'installation n'a fonctionné, impossible d'effectuer ce test..."
-		return;
-	fi
-	ECHO_FORMAT "\nInstallation préalable...\n" "white" "bold"
-	# Installation de l'app
-	SETUP_APP
-	LOG_EXTRACTOR
-	ECHO_FORMAT "\nBackup de l'application...\n" "white" "bold"
-	# Backup de l'app
-	COPY_LOG 1
-	LXC_START "sudo yunohost --debug backup create -n Backup_test --apps $APPID --hooks $BACKUP_HOOKS"
-	YUNOHOST_RESULT=$?
-	COPY_LOG 2
-	LOG_EXTRACTOR
-	tnote=$((tnote+1))
-	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
-		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-		note=$((note+1))
-		GLOBAL_CHECK_BACKUP=1	# Backup réussi
-	else
-		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-		GLOBAL_CHECK_BACKUP=-1	# Backup échoué
-	fi
-	# Suppression de l'app
-	REMOVE_APP
-	ECHO_FORMAT "\nRestauration de l'application...\n" "white" "bold"
-	# Restore de l'app
-	COPY_LOG 1
-	LXC_START "sudo yunohost --debug backup restore Backup_test --force --apps $APPID"
-	YUNOHOST_RESULT=$?
-	COPY_LOG 2
-	LOG_EXTRACTOR
-	# Test l'accès à l'app
-	CHECK_URL
-	tnote=$((tnote+1))
-	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
-		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-		note=$((note+1))
-		GLOBAL_CHECK_RESTORE=1	# Restore réussi
-	else
-		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-		GLOBAL_CHECK_RESTORE=-1	# Restore échoué
-	fi
-	if [ "$no_lxc" -ne 0 ]; then
-		# Suppression de l'app si lxc n'est pas utilisé.
-		REMOVE_APP
-		# Suppression de l'archive
-		sudo yunohost backup delete Backup_test > /dev/null
-	elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
-		if [ "$no_lxc" -eq 0 ]; then
-			echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+	for i in 0 1
+	do	# 2 passes, pour effectuer un test en root et en sub_dir
+		if [ "$i" -eq 0 ]
+		then	# Commence par l'install root
+			if [ "$GLOBAL_CHECK_ROOT" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné. Ou si l'argument force_install_ok est présent.
+				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
+				CHECK_PATH="/"
+				ECHO_FORMAT "\nInstallation préalable à la racine...\n" "white" "bold"
+			else
+				echo "L'installation à la racine n'a pas fonctionnée, impossible d'effectuer ce test..."
+				continue;
+			fi
+		elif [ "$i" -eq 1 ]
+		then	# Puis teste l'install sub_dir
+			if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
+				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
+				CHECK_PATH="$PATH_TEST"
+				ECHO_FORMAT "\nInstallation préalable en sous-dossier...\n" "white" "bold"
+			else
+				echo "L'installation en sous-dossier n'a pas fonctionnée, impossible d'effectuer ce test..."
+				return;
+			fi
 		fi
-		read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
-	fi
-	YUNOHOST_RESULT=-1
+		# Installation de l'app
+		SETUP_APP
+		LOG_EXTRACTOR
+		ECHO_FORMAT "\nBackup de l'application...\n" "white" "bold"
+		# Backup de l'app
+		COPY_LOG 1
+		LXC_START "sudo yunohost --debug backup create -n Backup_test --apps $APPID --hooks $BACKUP_HOOKS"
+		YUNOHOST_RESULT=$?
+		COPY_LOG 2
+		LOG_EXTRACTOR
+		tnote=$((tnote+1))
+		if [ "$YUNOHOST_RESULT" -eq 0 ]; then
+			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
+			note=$((note+1))
+			if [ $GLOBAL_CHECK_BACKUP -ne -1 ]; then	# Le backup ne peux pas être réussi si il a échoué précédemment...
+			    GLOBAL_CHECK_BACKUP=1	# Backup réussi
+			fi
+		else
+			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
+			GLOBAL_CHECK_BACKUP=-1	# Backup échoué
+		fi
+		# Suppression de l'app
+		REMOVE_APP
+		ECHO_FORMAT "\nRestauration de l'application...\n" "white" "bold"
+		# Restore de l'app
+		COPY_LOG 1
+		LXC_START "sudo yunohost --debug backup restore Backup_test --force --apps $APPID"
+		YUNOHOST_RESULT=$?
+		COPY_LOG 2
+		LOG_EXTRACTOR
+		# Test l'accès à l'app
+		CHECK_URL
+		tnote=$((tnote+1))
+		if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
+			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
+			note=$((note+1))
+			if [ $GLOBAL_CHECK_RESTORE -ne -1 ]; then	# La restauration ne peux pas être réussie si elle a échouée précédemment...
+			    GLOBAL_CHECK_RESTORE=1	# Restore réussi
+			fi
+		else
+			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
+			GLOBAL_CHECK_RESTORE=-1	# Restore échoué
+		fi
+		if [ "$no_lxc" -ne 0 ]; then
+			# Suppression de l'app si lxc n'est pas utilisé.
+			REMOVE_APP
+			# Suppression de l'archive
+			sudo yunohost backup delete Backup_test > /dev/null
+		elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
+			if [ "$no_lxc" -eq 0 ]; then
+				echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+			fi
+			read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
+		fi
+		YUNOHOST_RESULT=-1
+                LXC_STOP        # Restaure le snapshot du conteneur avant de recommencer le processus de backup
+	done
 }
 
 CHECK_PUBLIC_PRIVATE () {
@@ -518,10 +536,14 @@ CHECK_PUBLIC_PRIVATE () {
 			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 			note=$((note+1))
 			if [ "$1" == "private" ]; then
-				GLOBAL_CHECK_PRIVATE=1	# Installation privée réussie
+				if [ $GLOBAL_CHECK_PRIVATE -ne -1 ]; then	# L'installation ne peux pas être réussie si elle a échouée précédemment...
+				    GLOBAL_CHECK_PRIVATE=1	# Installation privée réussie
+				fi
 			fi
 			if [ "$1" == "public" ]; then
-				GLOBAL_CHECK_PUBLIC=1	# Installation publique réussie
+				if [ $GLOBAL_CHECK_PUBLIC -ne -1 ]; then	# L'installation ne peux pas être réussie si elle a échouée précédemment...
+				    GLOBAL_CHECK_PUBLIC=1	# Installation publique réussie
+				fi
 			fi
 		else
 			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
@@ -874,6 +896,5 @@ TESTING_PROCESS () {
 	fi
 	if [ "$backup_restore" -eq 1 ]; then
 		CHECK_BACKUP_RESTORE	# Test de backup puis de Restauration
-		LXC_STOP
 	fi
 }
