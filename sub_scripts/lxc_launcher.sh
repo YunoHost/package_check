@@ -35,7 +35,7 @@ LXC_START () {
 		done
 		sudo lxc-ls -f | grep $LXC_NAME | sed 's/-     NO//'
 		if [ $(sudo lxc-info --name $LXC_NAME | grep -c "STOPPED") -ne 0 ]; then
-			ECHO_FORMAT "Le conteneur n'a pas démarré correctement...\n" "lred" "bold"
+			ECHO_FORMAT "Le conteneur n'a pas démarré correctement...\nSi le problème persiste, utilisez le script lxc_check.sh pour vérifier et réparer le conteneur." "lred" "bold"
 			return 1
 		fi
 		scp -rq "$APP_CHECK" "$LXC_NAME": >> "$RESULT" 2>&1

@@ -3,13 +3,6 @@
 # Test différents aspect du conteneur pour chercher d'éventuelles erreurs.
 # Et tente de réparer si possible...
 
-# !!! ATTENTION, CE SCRIPT DOIT ENCORE ÊTRE TESTÉ SUR LES POINTS SUIVANTS:
-# ip forwarding pas activé
-# configuration réseau LXC du conteneur incorrecte
-# fichier network/interfaces du conteneur introuvable
-# fichier network/interfaces du conteneur présent.\nMais il va être réécrit par précaution
-# Yunohost semble mal installé
-
 # Récupère le dossier du script
 if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
 
@@ -115,6 +108,63 @@ RESTORE_CONTAINER () {
     fi
 }
 
+LXC_NETWORK_CONFIG () {
+    lxc_network=0
+    if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^lxc.network.type = veth"; then
+	lxc_network=1   # Si la ligne de la config réseau est absente, c'est une erreur.
+	if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*lxc.network.type"; then # Si la ligne est incorrecte, elle est corrigée.
+	    sudo sed -i "s/.*lxc.network.type.*/lxc.network.type = veth/g" /var/lib/lxc/$LXC_NAME/config
+	else    # Sinon elle est ajoutée.
+	    echo "lxc.network.type = veth" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
+	fi
+    fi
+    if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^lxc.network.flags = up"; then
+	lxc_network=1
+	if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*lxc.network.flags"; then
+	    sudo sed -i "s/.*lxc.network.flags.*/lxc.network.flags = up/g" /var/lib/lxc/$LXC_NAME/config
+	else
+	    echo "lxc.network.flags = up" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
+	fi
+    fi
+    if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^lxc.network.link = lxc-pchecker"; then
+	lxc_network=1
+	if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*lxc.network.link"; then
+	    sudo sed -i "s/.*lxc.network.link.*/lxc.network.link = lxc-pchecker/g" /var/lib/lxc/$LXC_NAME/config
+	else
+	    echo "lxc.network.link = lxc-pchecker" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
+	fi
+    fi
+    if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^lxc.network.name = eth0"; then
+	lxc_network=1
+	if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*lxc.network.name"; then
+	    sudo sed -i "s/.*lxc.network.name.*/lxc.network.name = eth0/g" /var/lib/lxc/$LXC_NAME/config
+	else
+	    echo "lxc.network.name = eth0" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
+	fi
+    fi
+    if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^lxc.network.veth.pair = $LXC_NAME"; then
+	lxc_network=1
+	if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*lxc.network.veth.pair"; then
+	    sudo sed -i "s/.*lxc.network.veth.pair.*/lxc.network.veth.pair = $LXC_NAME/g" /var/lib/lxc/$LXC_NAME/config
+	else
+	    echo "lxc.network.veth.pair = $LXC_NAME" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
+	fi
+    fi
+    if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^lxc.network.hwaddr = 00:FF:AA:00:00:01"; then
+	lxc_network=1
+	if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*lxc.network.hwaddr"; then
+	    sudo sed -i "s/.*lxc.network.hwaddr.*/lxc.network.hwaddr = 00:FF:AA:00:00:01/g" /var/lib/lxc/$LXC_NAME/config
+	else
+	    echo "lxc.network.hwaddr = 00:FF:AA:00:00:01" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
+	fi
+    fi
+    if [ "$lxc_network" -eq 1 ]; then
+	echo -e "\e[91mLa configuration réseau LXC du conteneur est incorrecte et a été corrigée.\e[0m"
+    else
+	echo -e "\e[92mLa configuration réseau LXC du conteneur est correcte.\e[0m"
+    fi
+}
+
 STOP_CONTAINER
 STOP_NETWORK
 check_repair=0
@@ -204,6 +254,7 @@ STOP_NETWORK
 ### Test du démarrage du conteneur.
 echo -e "\e[1m\n> Test le démarrage du conteneur:\e[0m"
 START_NETWORK
+LXC_NETWORK_CONFIG
 CHECK_CONTAINER
 START_STATUS=$?
 if [ "$START_STATUS" -eq 1 ]; then
@@ -286,60 +337,7 @@ do
         then
             # Vérifie la config réseau LXC du conteneur
             lxc_net_check=3
-            lxc_network=0
-            if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "lxc.network.type = veth"; then
-                lxc_network=1   # Si la ligne de la config réseau est absente, c'est une erreur.
-                if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "lxc.network.type"; then # Si la ligne est incorrecte, elle est corrigée.
-                    sudo sed -i "s/lxc.network.type.*/lxc.network.type = veth/g" /var/lib/lxc/$LXC_NAME/config
-                else    # Sinon elle est ajoutée.
-                    echo "lxc.network.type = veth" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
-                fi
-            fi
-            if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "lxc.network.flags = up"; then
-                lxc_network=1
-                if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "lxc.network.flags"; then
-                    sudo sed -i "s/lxc.network.flags.*/lxc.network.flags = up/g" /var/lib/lxc/$LXC_NAME/config
-                else
-                    echo "lxc.network.flags = up" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
-                fi
-            fi
-            if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "lxc.network.link = lxc-pchecker"; then
-                lxc_network=1
-                if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "lxc.network.link"; then
-                    sudo sed -i "s/lxc.network.link.*/lxc.network.link = lxc-pchecker/g" /var/lib/lxc/$LXC_NAME/config
-                else
-                    echo "lxc.network.link = lxc-pchecker" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
-                fi
-            fi
-            if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "lxc.network.name = eth0"; then
-                lxc_network=1
-                if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "lxc.network.name"; then
-                    sudo sed -i "s/lxc.network.name.*/lxc.network.name = eth0/g" /var/lib/lxc/$LXC_NAME/config
-                else
-                    echo "lxc.network.name = eth0" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
-                fi
-            fi
-            if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "lxc.network.veth.pair = $LXC_NAME"; then
-                lxc_network=1
-                if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "lxc.network.veth.pair"; then
-                    sudo sed -i "s/lxc.network.veth.pair.*/lxc.network.veth.pair = $LXC_NAME/g" /var/lib/lxc/$LXC_NAME/config
-                else
-                    echo "lxc.network.veth.pair = $LXC_NAME" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
-                fi
-            fi
-            if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "lxc.network.hwaddr = 00:FF:AA:00:00:01"; then
-                lxc_network=1
-                if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "lxc.network.hwaddr"; then
-                    sudo sed -i "s/lxc.network.hwaddr.*/lxc.network.hwaddr = 00:FF:AA:00:00:01/g" /var/lib/lxc/$LXC_NAME/config
-                else
-                    echo "lxc.network.hwaddr = 00:FF:AA:00:00:01" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
-                fi
-            fi
-            if [ "$lxc_network" -eq 1 ]; then
-                echo -e "\e[91mLa configuration réseau LXC du conteneur est incorrecte et a été corrigée.\e[0m"
-            else
-                echo -e "\e[92mLa configuration réseau LXC du conteneur est correcte.\e[0m"
-            fi
+	    LXC_NETWORK_CONFIG
         fi
         if [ "$lxc_net_check" -eq 3 ]
         then
@@ -398,7 +396,7 @@ else
     User pchecker
     IdentityFile $HOME/.ssh/$LXC_NAME
 EOF
-	ssh-keyscan -H 10.1.4.2 >> ~/.ssh/known_hosts	# Récupère la clé publique pour l'ajouter au known_hosts
+    ssh-keyscan -H 10.1.4.2 >> ~/.ssh/known_hosts	# Récupère la clé publique pour l'ajouter au known_hosts
     ssh $ARG_SSH $LXC_NAME -v "exit 0" > /dev/null	# Test à nouveau la connexion ssh
     if [ "$?" -eq 0 ]; then
         echo -e "\e[92mLa connexion ssh est retablie.\e[0m"

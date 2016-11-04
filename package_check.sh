@@ -3,7 +3,7 @@
 # Arguments du script
 # --bash-mode	Mode bash, le script est autonome. Il ignore la valeur de $auto_remove
 # --no-lxc	N'utilise pas la virtualisation en conteneur lxc. La virtualisation est utilisée par défaut si disponible.
-# --build-lxc	Installe lxc et créer la machine si nécessaire. Incompatible avec --bash-mode en raison de la connexion ssh à valider lors du build.
+# --build-lxc	Installe lxc et créer la machine si nécessaire.
 # --force-install-ok	Force la réussite des installations, même si elles échouent. Permet d'effectuer les tests qui suivent même si l'installation a échouée.
 # --help	Affiche l'aide du script
 

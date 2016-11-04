@@ -118,9 +118,9 @@ Si un test est absent de la liste, il sera ignoré. Cela revient à le noter à 
 ---
 Le script `package_check.sh` accepte 5 arguments en plus du package à tester.
 - `--bash-mode`: Rend le script autonome. Aucune intervention de l'utilisateur ne sera nécessaire.  
-	La valeur de auto_remove est ignorée. (Incompatible avec --build-lxc)
+	La valeur de auto_remove est ignorée.
 - `--no-lxc`: N'utilise pas la virtualisation en conteneur LXC. Les tests seront effectué directement sur la machine hôte.
-- `--build-lxc`: Installe LXC et créer le conteneur debian Yunohost si nécessaire. (Incompatible avec --bash-mode)
+- `--build-lxc`: Installe LXC et créer le conteneur debian Yunohost si nécessaire.
 - `--force-install-ok`: Force la réussite des installations, même si elles échouent. Permet d'effectuer les tests qui suivent même si l'installation a échouée.
 - `--help`: Affiche l'aide du script
 
@@ -132,12 +132,13 @@ L'usage de LXC apporte une meilleure stabilité au processus de test, un test de
 
 Il faut prévoir également un espace suffisant sur l'hôte, au minimum 4Go pour le conteneur, son snapshot et sa copie de sauvegarde.
 
-L'usage de LXC est facilité par 3 scripts, permettant de gérer la création, la mise à jour et la suppression.
+L'usage de LXC est facilité par 4 scripts, permettant de gérer la création, la mise à jour, la suppression et la réparation du conteneur.
 - `lxc_build.sh`: lxc_build installe LXC et ses dépendances, puis créer le conteneur debian.  
 	Il ajoute ensuite le support réseau, installe Yunohost et le configure. Et enfin configure un accès ssh.  
 	L'accès ssh par défaut est `ssh -t pchecker_lxc`
 - `lxc_upgrade.sh`: Effectue la mise à jour du conteneur à l'aide d'apt-get et recréer le snapshot.
 - `lxc_remove.sh`: Supprime le conteneur LXC, son snapshot et sa sauvegarde. Désinstalle LXC et déconfigure le réseau associé.
+- `lxc_check.sh`: Vérifie le conteneur LXC et tente de le réparer si nécessaire.
 
 ---
 ---
@@ -257,9 +258,9 @@ If a test is not in the list, it will be ignored. It's similar to marked at 0.
 ---
 The `package_check.sh` script accept 5 arguments in addition of package to be checked.
 - `--bash-mode`: The script will work without user intervention.  
-	auto_remove value is ignored (Not compatible with --build-lxc)
+	auto_remove value is ignored
 - `--no-lxc`: Not use virtualization with LXC container. All tests will perform directly on the hosts machine.
-- `--build-lxc`: Install  LXC and create the Debian Yunohost container if necessary. (Not compatible with --bash-mode)
+- `--build-lxc`: Install  LXC and create the Debian Yunohost container if necessary.
 - `--force-install-ok`: Force success of installation, even if they fail. Allow to perform following tests even if installation fail.
 - `--help`: Display help.
 
@@ -271,9 +272,10 @@ Using LXC provides better stability to test process, a failed remove test doesn'
 
 There must also be enough space on the host, at least 4GB for the container, its snapshot and backup.
 
-Using LXC is simplified by 3 scripts, allowing to manage the creation, updating and deleting.
+Using LXC is simplified by 4 scripts, allowing to manage the creation, updating, deleting and repairing of container.
 - `lxc_build.sh`: lxc_build install LXC and its dependencies, then create a Debian container.  
 	It add network support, install Yunohost and configure it. And then configure ssh.  
 	The default ssh access is `ssh -t pchecker_lxc`
 - `lxc_upgrade.sh`: Perform a upgrade of the container with apt-get and recreate the snapshot.
 - `lxc_remove.sh`: Delete the LXC container, its snapshot and backup. Uninstall LXC and deconfigures the associated network.
+- `lxc_check.sh`: Check the LXC container and try to fix it if necessary.

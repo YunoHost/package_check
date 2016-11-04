@@ -90,6 +90,7 @@ User pchecker
 IdentityFile $HOME/.ssh/$LXC_NAME
 EOF
 
+ssh-keyscan -H $PLAGE_IP.2 >> ~/.ssh/known_hosts
 ssh $ARG_SSH $LXC_NAME "exit 0"	# Initie une premier connexion SSH pour valider la clé.
 if [ "$?" -ne 0 ]; then	# Si l'utilisateur tarde trop, la connexion sera refusée... ???
 	ssh $ARG_SSH $LXC_NAME "exit 0"	# Initie une premier connexion SSH pour valider la clé.
