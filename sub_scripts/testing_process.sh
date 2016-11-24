@@ -421,41 +421,57 @@ CHECK_BACKUP_RESTORE () {
 			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
 			GLOBAL_CHECK_BACKUP=-1	# Backup échoué
 		fi
-		# Suppression de l'app
-		REMOVE_APP
-		ECHO_FORMAT "\nRestauration de l'application...\n" "white" "bold"
-		# Restore de l'app
-		COPY_LOG 1
-		LXC_START "sudo yunohost --debug backup restore Backup_test --force --apps $APPID"
-		YUNOHOST_RESULT=$?
-		COPY_LOG 2
-		LOG_EXTRACTOR
-		# Test l'accès à l'app
-		CHECK_URL
-		tnote=$((tnote+1))
-		if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
-			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-			note=$((note+1))
-			if [ $GLOBAL_CHECK_RESTORE -ne -1 ]; then	# La restauration ne peux pas être réussie si elle a échouée précédemment...
-			    GLOBAL_CHECK_RESTORE=1	# Restore réussi
+		sudo cp -a /var/lib/lxc/$LXC_NAME/rootfs/home/yunohost.backup/archives ./	# Récupère le backup sur le conteneur
+		for j in 0 1
+		do	# 2 passes, pour tester la restauration après suppression de l'app ET après restauration du conteneur.
+			if [ "$j" -eq 0 ]
+			then	# Commence par tester la restauration après suppression de l'application
+				REMOVE_APP	# Suppression de l'app
+				ECHO_FORMAT "\nRestauration de l'application après suppression de l'application...\n" "white" "bold"
+				if [ "$no_lxc" -ne 0 ]; then	# Si lxc n'est pas utilisé, impossible d'effectuer le 2e test
+					j=1	# Ignore le 2e test
+					echo "LXC n'est pas utilisé, impossible de tester la restauration sur un système vierge...\n"
+				fi
+			elif [ "$j" -eq 1 ]
+			then	# Puis la restauration après restauration du conteneur (si LXC est utilisé)
+				sudo cp -a /var/lib/lxc/$LXC_NAME/rootfs/home/yunohost.backup/archives ./	# Récupère le backup sur le conteneur
+				LXC_STOP	# Restaure le conteneur.
+				sudo mv -f ./archives /var/lib/lxc/$LXC_NAME/rootfs/home/yunohost.backup/	# Replace le backup sur le conteneur
+				ECHO_FORMAT "\nRestauration de l'application sur un système vierge...\n" "white" "bold"
 			fi
-		else
-			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-			GLOBAL_CHECK_RESTORE=-1	# Restore échoué
-		fi
-		if [ "$no_lxc" -ne 0 ]; then
-			# Suppression de l'app si lxc n'est pas utilisé.
-			REMOVE_APP
-			# Suppression de l'archive
-			sudo yunohost backup delete Backup_test > /dev/null
-		elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
-			if [ "$no_lxc" -eq 0 ]; then
-				echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+			# Restore de l'app
+			COPY_LOG 1
+			LXC_START "sudo yunohost --debug backup restore Backup_test --force --apps $APPID"
+			YUNOHOST_RESULT=$?
+			COPY_LOG 2
+			LOG_EXTRACTOR
+			# Test l'accès à l'app
+			CHECK_URL
+			tnote=$((tnote+1))
+			if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
+				ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
+				note=$((note+1))
+				if [ $GLOBAL_CHECK_RESTORE -ne -1 ]; then	# La restauration ne peux pas être réussie si elle a échouée précédemment...
+					GLOBAL_CHECK_RESTORE=1	# Restore réussi
+				fi
+			else
+				ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
+				GLOBAL_CHECK_RESTORE=-1	# Restore échoué
 			fi
-			read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
-		fi
-		YUNOHOST_RESULT=-1
-                LXC_STOP        # Restaure le snapshot du conteneur avant de recommencer le processus de backup
+			if [ "$no_lxc" -ne 0 ]; then
+				# Suppression de l'app si lxc n'est pas utilisé.
+				REMOVE_APP
+				# Suppression de l'archive
+				sudo yunohost backup delete Backup_test > /dev/null
+			elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
+				if [ "$no_lxc" -eq 0 ]; then
+					echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+				fi
+				read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
+			fi
+			YUNOHOST_RESULT=-1
+			LXC_STOP        # Restaure le snapshot du conteneur avant de recommencer le processus de backup
+		done
 	done
 }
 

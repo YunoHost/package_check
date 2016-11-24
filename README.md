@@ -15,7 +15,9 @@ Le script est capable d'effectuer les tests suivant:
 - Installation en privé
 - Installation en public
 - Upgrade sur la même version du package
-- Backup puis restore
+- Backup
+- Restore après suppression de l'application
+- Restore sans installation préalable
 - Installation multi-instance
 - Test d'utilisateur incorrect
 - Test de domaine incorrect
@@ -155,7 +157,9 @@ The script is able to perform following tests:
 - Private installation.
 - Public installation
 - Upgrade on same package version
-- Backup then restore
+- Backup
+- Restore after application uninstall
+- Restore without installation before
 - Multi-instances installation
 - Test with wrong user
 - Test with wrong domain
