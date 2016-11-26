@@ -56,7 +56,7 @@ package_check/package_check.sh APP_ynh
 		path="$PATH"	(PATH)
 		admin="$USER"	(USER)
 		language="fr"
-		is_public="Yes"	(PUBLIC|public=Yes|private=No)
+		is_public=1	(PUBLIC|public=1|private=0)
 		password="$PASSWORD"	(PASSWORD)
 		port="666"	(PORT)
 	; Checks
@@ -92,7 +92,7 @@ Toutes les clés du manifest doivent être renseignée afin de procéder à l'in
 > Les clés de manifest données ici ne le sont qu'à titre d'exemple. Voir le manifest de l'application.
 Certaines clés de manifest sont indispensables au script pour effectuer certains test. Ces clés doivent être mises en évidence afin que le script soit capable de les retrouver et de changer leur valeur.  
 `(DOMAIN)`, `(PATH)`, `(USER)`, `(PASSWORD)` et `(PORT)` doivent être mis en bout de ligne des clés correspondantes. Ces clés seront modifiées par le script.  
-`(PUBLIC|public=Yes|private=No)` doit, en plus de correspondre à la clé de visibilité public, indiquer les valeurs du manifest pour public et privé.
+`(PUBLIC|public=1|private=0)` doit, en plus de correspondre à la clé de visibilité public, indiquer les valeurs du manifest pour public et privé.
 
 ### `; Checks`
 Ensemble des tests à effectuer.  
@@ -198,7 +198,7 @@ package_check/package_check.sh APP_ynh
 		path="$PATH"	(PATH)
 		admin="$USER"	(USER)
 		language="en"
-		is_public="Yes"	(PUBLIC|public=Yes|private=No)
+		is_public=1	(PUBLIC|public=1|private=0)
 		password="$PASSWORD"	(PASSWORD)
 		port="666"	(PORT)
 	; Checks
@@ -234,7 +234,7 @@ All manifest keys need to be filled to perform installation.
 > The manifest keys filled here are simply an exemple. Check the app's manifest.
 Some manifest keys are necessary for the script to performs some tests. This keys must be highlighted for the script is able to find them and modify their values.  
 `(DOMAIN)`, `(PATH)`, `(USER)`, `(PASSWORD)` and `(PORT)` must be placed at the end of corresponding key. This key will be changed by the script.  
-`(PUBLIC|public=Yes|private=No)` must, in addition to match the public key, indicate the values for public and private.
+`(PUBLIC|public=1|private=0)` must, in addition to match the public key, indicate the values for public and private.
 
 ### `; Checks`
 Set of tests to perform.  
