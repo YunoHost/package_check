@@ -421,6 +421,7 @@ CHECK_BACKUP_RESTORE () {
 			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
 			GLOBAL_CHECK_BACKUP=-1	# Backup échoué
 		fi
+		sudo cp -a /var/lib/lxc/$LXC_NAME/rootfs/home/yunohost.backup/archives ./	# Récupère le backup sur le conteneur
 		for j in 0 1
 		do	# 2 passes, pour tester la restauration après suppression de l'app ET après restauration du conteneur.
 			if [ "$j" -eq 0 ]
@@ -433,7 +434,6 @@ CHECK_BACKUP_RESTORE () {
 				fi
 			elif [ "$j" -eq 1 ]
 			then	# Puis la restauration après restauration du conteneur (si LXC est utilisé)
-				sudo cp -a /var/lib/lxc/$LXC_NAME/rootfs/home/yunohost.backup/archives ./	# Récupère le backup sur le conteneur
 				LXC_STOP	# Restaure le conteneur.
 				sudo mv -f ./archives /var/lib/lxc/$LXC_NAME/rootfs/home/yunohost.backup/	# Replace le backup sur le conteneur
 				ECHO_FORMAT "\nRestauration de l'application sur un système vierge...\n" "white" "bold"
