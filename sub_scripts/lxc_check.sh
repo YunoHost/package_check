@@ -366,8 +366,8 @@ done
 ### Test l'accès ssh sur le conteneur
 echo -e "\e[1m\n> Test de l'accès ssh:\e[0m"
 # Check user
-if [ "$USER" != "$(cat "$script_dir/../setup_user")" ] && test -e "$script_dir/../setup_user"; then
-	echo -e "\e[91mPour tester l'accès ssh, le script doit être exécuté avec l'utilisateur $(cat "$script_dir/../sub_scripts/setup_user")\e[0m"
+if [ "$USER" != "$(cat "$script_dir/setup_user")" ] && test -e "$script_dir/setup_user"; then
+	echo -e "\e[91mPour tester l'accès ssh, le script doit être exécuté avec l'utilisateur $(cat "$script_dir/setup_user")\e[0m"
 	exit 1
 fi
 
