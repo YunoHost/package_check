@@ -3,6 +3,13 @@
 # Récupère le dossier du script
 if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
 
+if test -e "$script_dir/../pcheck.lock"
+then	# L'upgrade est annulé
+	echo "Le fichier $script_dir/../pcheck.lock est présent. Package check est déjà utilisé. Exécution annulée..."
+	exit 0
+fi
+touch "$script_dir/../pcheck.lock" # Met en place le lock de Package check
+
 PLAGE_IP=$(cat "$script_dir/lxc_build.sh" | grep PLAGE_IP= | cut -d '"' -f2)
 LXC_NAME=$(cat "$script_dir/lxc_build.sh" | grep LXC_NAME= | cut -d '=' -f2)
 
@@ -10,6 +17,7 @@ LXC_NAME=$(cat "$script_dir/lxc_build.sh" | grep LXC_NAME= | cut -d '=' -f2)
 if [ "$USER" != "$(cat "$script_dir/setup_user")" ] && test -e "$script_dir/setup_user"; then
 	echo -e "\e[91mCe script doit être exécuté avec l'utilisateur $(cat "$script_dir/setup_user")"
 	echo -en "\e[0m"
+	rm "$script_dir/../pcheck.lock" # Retire le lock
 	exit 0
 fi
 
@@ -53,9 +61,9 @@ if [ "$?" -eq 0 ]; then
 	update_apt=1
 fi
 echo "> Upgrade"
-sudo lxc-attach -n $LXC_NAME -- apt-get dist-upgrade
+sudo lxc-attach -n $LXC_NAME -- apt-get dist-upgrade -y
 echo "> Clean"
-sudo lxc-attach -n $LXC_NAME -- apt-get autoremove
+sudo lxc-attach -n $LXC_NAME -- apt-get autoremove -y
 sudo lxc-attach -n $LXC_NAME -- apt-get autoclean
 
 echo "> Arrêt de la machine virtualisée"
@@ -76,3 +84,5 @@ then
 	sudo lxc-snapshot -n $LXC_NAME -d snap0
 	sudo lxc-snapshot -n $LXC_NAME
 fi
+
+sudo rm "$script_dir/../pcheck.lock" # Retire le lock

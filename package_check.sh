@@ -9,6 +9,33 @@
 
 echo ""
 
+## Récupère les arguments
+# --bash-mode
+bash_mode=$(echo "$*" | grep -c -e "--bash-mode")	# bash_mode vaut 1 si l'argument est présent.
+# --no-lxc
+no_lxc=$(echo "$*" | grep -c -e "--no-lxc")	# no_lxc vaut 1 si l'argument est présent.
+# --build-lxc
+build_lxc=$(echo "$*" | grep -c -e "--build-lxc")	# build_lxc vaut 1 si l'argument est présent.
+# --force-install-ok
+force_install_ok=$(echo "$*" | grep -c -e "--force-install-ok")	# force-install-ok vaut 1 si l'argument est présent.
+# --help
+if [ "$notice" -eq 0 ]; then
+	notice=$(echo "$*" | grep -c -e "--help")	# notice vaut 1 si l'argument est présent. Il affichera alors l'aide.
+fi
+arg_app=$(echo "$*" | sed 's/--bash-mode\|--no-lxc\|--build-lxc\|--force-install-ok//g' | sed 's/^ *\| *$//g')	# Supprime les arguments déjà lu pour ne garder que l'app. Et supprime les espaces au début et à la fin
+# echo "arg_app=$arg_app."
+
+if [ "$notice" -eq 1 ]; then
+	echo -e "\nUsage:"
+	echo "package_check.sh [--bash-mode] [--no-lxc] [--build-lxc] [--force-install-ok] [--help] \"check package\""
+	echo -e "\n\t--bash-mode\t\tDo not ask for continue check. Ignore auto_remove."
+	echo -e "\t--no-lxc\t\tDo not use a LXC container. You should use this option only on a test environnement."
+	echo -e "\t--build-lxc\t\tInstall LXC and build the container if necessary."
+	echo -e "\t--force-install-ok\tForce following test even if all install are failed."
+	echo -e "\t--help\t\t\tDisplay this notice."
+	exit 0
+fi
+
 # Récupère le dossier du script
 if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
 
@@ -32,6 +59,22 @@ if [ "$?" -ne 0 ]; then	# En cas d'échec de connexion, tente de pinger un autre
 		exit 1
 	fi
 fi
+
+if test -e "$script_dir/pcheck.lock"
+then	# Présence du lock, Package check ne peut pas continuer.
+	echo "Le fichier $script_dir/pcheck.lock est présent. Package check est déjà utilisé."
+	rep="N"
+	if [ "$bash_mode" -ne 1 ]; then
+		echo -n "Souhaitez-vous continuer quand même et ignorer le lock ? (Y/N) :"
+		read rep
+	fi
+	if [ "${rep:0:1}" != "Y" ] && [ "${rep:0:1}" != "y" ] && [ "${rep:0:1}" != "O" ] && [ "${rep:0:1}" != "o" ]
+	then	# Teste uniquement le premier caractère de la réponse pour continuer malgré le lock.
+		echo "L'exécution de Package check est annulée"
+		exit 0
+	fi
+fi
+touch "$script_dir/pcheck.lock" # Met en place le lock de Package check
 
 version_script="$(git ls-remote https://github.com/YunoHost/package_check | cut -f 1 | head -n1)"
 if [ -e "$script_dir/package_version" ]
@@ -75,33 +118,6 @@ then
 	notice=1
 fi
 
-## Récupère les arguments
-# --bash-mode
-bash_mode=$(echo "$*" | grep -c -e "--bash-mode")	# bash_mode vaut 1 si l'argument est présent.
-# --no-lxc
-no_lxc=$(echo "$*" | grep -c -e "--no-lxc")	# no_lxc vaut 1 si l'argument est présent.
-# --build-lxc
-build_lxc=$(echo "$*" | grep -c -e "--build-lxc")	# build_lxc vaut 1 si l'argument est présent.
-# --force-install-ok
-force_install_ok=$(echo "$*" | grep -c -e "--force-install-ok")	# force-install-ok vaut 1 si l'argument est présent.
-# --help
-if [ "$notice" -eq 0 ]; then
-	notice=$(echo "$*" | grep -c -e "--help")	# notice vaut 1 si l'argument est présent. Il affichera alors l'aide.
-fi
-arg_app=$(echo "$*" | sed 's/--bash-mode\|--no-lxc\|--build-lxc\|--force-install-ok//g' | sed 's/^ *\| *$//g')	# Supprime les arguments déjà lu pour ne garder que l'app. Et supprime les espaces au début et à la fin
-# echo "arg_app=$arg_app."
-
-if [ "$notice" -eq 1 ]; then
-	echo -e "\nUsage:"
-	echo "package_check.sh [--bash-mode] [--no-lxc] [--build-lxc] [--force-install-ok] [--help] \"check package\""
-	echo -e "\n\t--bash-mode\t\tDo not ask for continue check. Ignore auto_remove."
-	echo -e "\t--no-lxc\t\tDo not use a LXC container. You should use this option only on a test environnement."
-	echo -e "\t--build-lxc\t\tInstall LXC and build the container if necessary."
-	echo -e "\t--force-install-ok\tForce following test even if all install are failed."
-	echo -e "\t--help\t\t\tDisplay this notice."
-	exit 0
-fi
-
 USER_TEST=package_checker
 PASSWORD_TEST=checker_pwd
 PATH_TEST=/check
@@ -133,6 +149,7 @@ then	# Si le conteneur lxc est utilisé
 			ECHO_FORMAT "Lxc n'est pas installé, ou la machine $LXC_NAME n'est pas créée.\n" "red"
 			ECHO_FORMAT "Utilisez le script 'lxc_build.sh' pour installer lxc et créer la machine.\n" "red"
 			ECHO_FORMAT "Ou utilisez l'argument --no-lxc\n" "red"
+			sudo rm "$script_dir/pcheck.lock" # Retire le lock
 			exit 1
 		fi
 	fi
@@ -148,6 +165,7 @@ else	# Vérifie l'utilisateur et le domain si lxc n'est pas utilisé.
 		sudo yunohost user create --firstname "$USER_TEST_CLEAN" --mail "$USER_TEST_CLEAN@$DOMAIN" --lastname "$USER_TEST_CLEAN" --password "$PASSWORD_TEST" "$USER_TEST"
 		if [ "$?" -ne 0 ]; then
 			ECHO_FORMAT "La création de l'utilisateur de test a échoué. Impossible de continuer.\n" "red"
+			sudo rm "$script_dir/pcheck.lock" # Retire le lock
 			exit 1
 		fi
 	fi
@@ -158,6 +176,7 @@ else	# Vérifie l'utilisateur et le domain si lxc n'est pas utilisé.
 		sudo yunohost domain add "$SOUS_DOMAIN"
 		if [ "$?" -ne 0 ]; then
 			ECHO_FORMAT "La création du sous-domain de test a échoué. Impossible de continuer.\n" "red"
+			sudo rm "$script_dir/pcheck.lock" # Retire le lock
 			exit 1
 		fi
 	fi
@@ -185,6 +204,7 @@ fi
 
 if [ ! -d "$APP_CHECK" ]; then
 	ECHO_FORMAT "Le dossier de l'application a tester est introuvable...\n" "red"
+	sudo rm "$script_dir/pcheck.lock" # Retire le lock
 	exit 1
 fi
 sudo rm -rf "$APP_CHECK/.git"	# Purge des fichiers de git

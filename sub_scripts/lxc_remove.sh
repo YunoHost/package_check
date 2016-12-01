@@ -12,6 +12,8 @@ if [ "$USER" != "$(cat "$script_dir/setup_user")" ] && test -e "$script_dir/setu
 	exit 0
 fi
 
+sudo rm "$script_dir/../pcheck.lock" # Retire le lock
+
 echo "> Retire l'ip forwarding."
 sudo rm /etc/sysctl.d/lxc_pchecker.conf
 sudo sysctl -p
