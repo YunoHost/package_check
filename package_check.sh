@@ -9,6 +9,13 @@
 
 echo ""
 
+notice=0
+if [ "$#" -eq 0 ]
+then
+	echo "Le script prend en argument le package à tester."
+	notice=1
+fi
+
 ## Récupère les arguments
 # --bash-mode
 bash_mode=$(echo "$*" | grep -c -e "--bash-mode")	# bash_mode vaut 1 si l'argument est présent.
@@ -40,8 +47,8 @@ fi
 if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
 
 # Check user
-if [ "$USER" != "$(cat "$script_dir/sub_scripts/setup_user")" ] && test -e "$script_dir/sub_scripts/setup_user"; then
-	echo -e "\e[91mCe script doit être exécuté avec l'utilisateur $(cat "$script_dir/sub_scripts/setup_user")"
+if [ "$(whoami)" != "$(cat "$script_dir/sub_scripts/setup_user")" ] && test -e "$script_dir/sub_scripts/setup_user"; then
+	echo -e "\e[91mCe script doit être exécuté avec l'utilisateur $(cat "$script_dir/sub_scripts/setup_user") !\nL'utilisateur actuel est $(whoami)."
 	echo -en "\e[0m"
 	exit 0
 fi
@@ -110,13 +117,6 @@ else	# Si le fichier de version n'existe pas, il est créé.
 	git clone --quiet https://github.com/YunoHost/package_linter "$script_dir/package_linter"
 fi
 echo "$version_plinter" > "$script_dir/plinter_version"
-
-notice=0
-if [ "$#" -eq 0 ]
-then
-	echo "Le script prend en argument le package à tester."
-	notice=1
-fi
 
 USER_TEST=package_checker
 PASSWORD_TEST=checker_pwd
@@ -735,3 +735,4 @@ echo "Le log complet des installations et suppressions est disponible dans le fi
 rm -f "$OUTPUTD" "$temp_RESULT" "$script_dir/url_output" "$script_dir/curl_print" "$script_dir/manifest_extract"
 
 sudo rm -rf "$APP_CHECK"
+sudo rm "$script_dir/pcheck.lock" # Retire le lock

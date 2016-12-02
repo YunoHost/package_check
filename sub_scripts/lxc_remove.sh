@@ -6,8 +6,8 @@ if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(
 LXC_NAME=$(cat "$script_dir/lxc_build.sh" | grep LXC_NAME= | cut -d '=' -f2)
 
 # Check user
-if [ "$USER" != "$(cat "$script_dir/setup_user")" ] && test -e "$script_dir/setup_user"; then
-	echo -e "\e[91mCe script doit être exécuté avec l'utilisateur $(cat "$script_dir/setup_user")"
+if [ "$(whoami)" != "$(cat "$script_dir/setup_user")" ] && test -e "$script_dir/setup_user"; then
+	echo -e "\e[91mCe script doit être exécuté avec l'utilisateur $(cat "$script_dir/setup_user") !\nL'utilisateur actuel est $(whoami)."
 	echo -en "\e[0m"
 	exit 0
 fi

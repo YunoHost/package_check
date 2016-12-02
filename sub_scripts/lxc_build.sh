@@ -11,7 +11,7 @@ YUNO_PWD=admin
 LXC_NAME=pchecker_lxc
 
 # Check user
-echo $USER > "$script_dir/setup_user"
+echo $(whoami) > "$script_dir/setup_user"
 
 echo "> Update et install lxc lxctl" | tee "$LOG_BUILD_LXC"
 sudo apt-get update >> "$LOG_BUILD_LXC" 2>&1
