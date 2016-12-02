@@ -94,6 +94,7 @@ then
 		echo "sudo cp -a \"$script_dir/upgrade/.\" \"$script_dir/.\"" >> "$script_dir/upgrade_script.sh"
 		echo "sudo rm -r \"$script_dir/upgrade\"" >> "$script_dir/upgrade_script.sh"
 		echo "echo \"$version_script\" > \"$script_dir/package_version\"" >> "$script_dir/upgrade_script.sh"
+		echo "sudo rm \"$script_dir/pcheck.lock\"" >> "$script_dir/upgrade_script.sh"
 		echo "exec \"$script_dir/package_check.sh\" \"$*\"" >> "$script_dir/upgrade_script.sh"
 		chmod +x "$script_dir/upgrade_script.sh"
 		exec "$script_dir/upgrade_script.sh"	#Exécute le script de mise à jour.
