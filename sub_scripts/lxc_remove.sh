@@ -12,7 +12,7 @@ if [ "$(whoami)" != "$(cat "$script_dir/setup_user")" ] && test -e "$script_dir/
 	exit 0
 fi
 
-sudo rm "$script_dir/../pcheck.lock" # Retire le lock
+touch "$script_dir/../pcheck.lock" # Met en place le lock de Package check
 
 echo "> Retire l'ip forwarding."
 sudo rm /etc/sysctl.d/lxc_pchecker.conf

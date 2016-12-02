@@ -10,6 +10,8 @@ DOMAIN=domain.tld
 YUNO_PWD=admin
 LXC_NAME=pchecker_lxc
 
+touch "$script_dir/../pcheck.lock" # Met en place le lock de Package check, le temps de l'installation
+
 # Check user
 echo $(whoami) > "$script_dir/setup_user"
 
@@ -128,3 +130,5 @@ sudo ifdown --force lxc-pchecker >> "$LOG_BUILD_LXC" 2>&1
 echo "> Création d'un snapshot" | tee -a "$LOG_BUILD_LXC"
 sudo lxc-snapshot -n $LXC_NAME >> "$LOG_BUILD_LXC" 2>&1
 # Il sera nommé snap0 et stocké dans /var/lib/lxcsnaps/$LXC_NAME/snap0/
+
+sudo rm "$script_dir/../pcheck.lock" # Retire le lock

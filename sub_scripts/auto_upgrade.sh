@@ -8,7 +8,7 @@ if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(
 echo ""
 date
 # Vérifie que Package check n'est pas déjà utilisé.
-timeout=7300	# Durée d'attente maximale
+timeout=7200	# Durée d'attente maximale
 inittime=$(date +%s)	# Enregistre l'heure de début d'attente
 while test -e "$script_dir/../pcheck.lock"; do	# Vérifie la présence du lock de Package check
 	sleep 60	# Attend la fin de l'exécution de Package check.
