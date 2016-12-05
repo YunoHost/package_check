@@ -429,8 +429,8 @@ CHECK_BACKUP_RESTORE () {
 				REMOVE_APP	# Suppression de l'app
 				ECHO_FORMAT "\nRestauration de l'application après suppression de l'application...\n" "white" "bold"
 				if [ "$no_lxc" -ne 0 ]; then	# Si lxc n'est pas utilisé, impossible d'effectuer le 2e test
-					j=1	# Ignore le 2e test
-					echo "LXC n'est pas utilisé, impossible de tester la restauration sur un système vierge...\n"
+					j=2	# Ignore le 2e test
+					echo -e "LXC n'est pas utilisé, impossible de tester la restauration sur un système vierge...\n"
 				fi
 			elif [ "$j" -eq 1 ]
 			then	# Puis la restauration après restauration du conteneur (si LXC est utilisé)
@@ -846,7 +846,26 @@ echo -n "Non implémenté"
 # GLOBAL_CHECK_FINALPATH=0
 }
 
+TEST_LAUNCHER () {
+	# $1 prend le nom de la fonction à démarrer.
+	# $2 prend l'argument de la fonction, le cas échéant
+	# Ce launcher permet de factoriser le code autour du lancement des fonctions de test
+	BUG654=1	# Patch #654
+	while [ "$BUG654" -eq "1" ]; do	# Patch #654
+		$1 $2	# Exécute le test demandé, avec son éventuel argument
+		LXC_STOP	# Arrête le conteneur LXC
+		PATCH_654	# Patch #654
+		BUG654=$?	# Patch #654
+		if [ "$BUG654" -eq "1" ]; then	# Patch #654
+			ECHO_FORMAT "\n!! Bug 654 détecté !!\n" "red" clog	# Patch #654
+			echo -e "date\nBug 654 sur $1 $2\n\n" >> "$script_dir/patch_#654.log"	# Patch #654
+			cur_test=$((cur_test-1))
+		fi	# Patch #654
+	done	# Patch #654
+}
+
 TESTING_PROCESS () {
+source "$script_dir/sub_scripts/patch_#654.sh"	# Patch #654
 	# Lancement des tests
 	cur_test=1
 	ECHO_FORMAT "\nScénario de test: $PROCESS_NAME\n" "white" "underlined"
@@ -854,62 +873,48 @@ TESTING_PROCESS () {
 		PACKAGE_LINTER	# Vérification du package avec package linter
 	fi
 	if [ "$setup_sub_dir" -eq 1 ]; then
-		CHECK_SETUP_SUBDIR	# Test d'installation en sous-dossier
-		LXC_STOP
+		TEST_LAUNCHER CHECK_SETUP_SUBDIR	# Test d'installation en sous-dossier
 	fi
 	if [ "$setup_root" -eq 1 ]; then
-		CHECK_SETUP_ROOT	# Test d'installation à la racine du domaine
-		LXC_STOP
+		TEST_LAUNCHER CHECK_SETUP_ROOT	# Test d'installation à la racine du domaine
 	fi
 	if [ "$setup_nourl" -eq 1 ]; then
-		CHECK_SETUP_NO_URL	# Test d'installation sans accès par url
-		LXC_STOP
+		TEST_LAUNCHER CHECK_SETUP_NO_URL	# Test d'installation sans accès par url
 	fi
 	if [ "$upgrade" -eq 1 ]; then
-		CHECK_UPGRADE	# Test d'upgrade
-		LXC_STOP
+		TEST_LAUNCHER CHECK_UPGRADE	# Test d'upgrade
 	fi
 	if [ "$setup_private" -eq 1 ]; then
-		CHECK_PUBLIC_PRIVATE private	# Test d'installation en privé
-		LXC_STOP
+		TEST_LAUNCHER CHECK_PUBLIC_PRIVATE private	# Test d'installation en privé
 	fi
 	if [ "$setup_public" -eq 1 ]; then
-		CHECK_PUBLIC_PRIVATE public	# Test d'installation en public
-		LXC_STOP
+		TEST_LAUNCHER CHECK_PUBLIC_PRIVATE public	# Test d'installation en public
 	fi
 	if [ "$multi_instance" -eq 1 ]; then
-		CHECK_MULTI_INSTANCE	# Test d'installation multiple
-		LXC_STOP
+		TEST_LAUNCHER CHECK_MULTI_INSTANCE	# Test d'installation multiple
 	fi
 	if [ "$wrong_user" -eq 1 ]; then
-		CHECK_COMMON_ERROR wrong_user	# Test d'erreur d'utilisateur
-		LXC_STOP
+		TEST_LAUNCHER CHECK_COMMON_ERROR wrong_user	# Test d'erreur d'utilisateur
 	fi
 	if [ "$wrong_path" -eq 1 ]; then
-		CHECK_COMMON_ERROR wrong_path	# Test d'erreur de path ou de domaine
-		LXC_STOP
+		TEST_LAUNCHER CHECK_COMMON_ERROR wrong_path	# Test d'erreur de path ou de domaine
 	fi
 	if [ "$incorrect_path" -eq 1 ]; then
-		CHECK_COMMON_ERROR incorrect_path	# Test d'erreur de forme de path
-		LXC_STOP
+		TEST_LAUNCHER CHECK_COMMON_ERROR incorrect_path	# Test d'erreur de forme de path
 	fi
 	if [ "$port_already_use" -eq 1 ]; then
-		CHECK_COMMON_ERROR port_already_use	# Test d'erreur de port
-		LXC_STOP
+		TEST_LAUNCHER CHECK_COMMON_ERROR port_already_use	# Test d'erreur de port
 	fi
 	if [ "$corrupt_source" -eq 1 ]; then
-		CHECK_CORRUPT	# Test d'erreur sur source corrompue -> Comment je vais provoquer ça!?
-		LXC_STOP
+		TEST_LAUNCHER CHECK_CORRUPT	# Test d'erreur sur source corrompue -> Comment je vais provoquer ça!?
 	fi
 	if [ "$fail_download_source" -eq 1 ]; then
-		CHECK_DL	# Test d'erreur de téléchargement de la source -> Comment!?
-		LXC_STOP
+		TEST_LAUNCHER CHECK_DL	# Test d'erreur de téléchargement de la source -> Comment!?
 	fi
 	if [ "$final_path_already_use" -eq 1 ]; then
-		CHECK_FINALPATH	# Test sur final path déjà utilisé.
-		LXC_STOP
+		TEST_LAUNCHER CHECK_FINALPATH	# Test sur final path déjà utilisé.
 	fi
 	if [ "$backup_restore" -eq 1 ]; then
-		CHECK_BACKUP_RESTORE	# Test de backup puis de Restauration
+		TEST_LAUNCHER CHECK_BACKUP_RESTORE	# Test de backup puis de Restauration
 	fi
 }
