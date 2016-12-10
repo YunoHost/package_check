@@ -42,23 +42,27 @@ CHECK_URL () {
 		fi
 		echo -e "$IP_CURL $DOMAIN #package_check\n$IP_CURL $SOUS_DOMAIN #package_check" | sudo tee -a /etc/hosts > /dev/null	# Renseigne le hosts pour le domain à tester, pour passer directement sur localhost
 		curl_error=0
-		for i in 0 1
+		http503=0
+		i=1
+		while [ "$i" -ne 3 ]	# Tant que i vaut 1 ou 2, les tests continuent.
 		do	# 2 passes, pour effectuer un test avec le / final, et un autre sans.
-			if [ "$i" -eq 0 ]; then	# Test sans / final.
+			if [ "$i" -eq 1 ]; then	# Test sans / final.
 				if [ "${CHECK_PATH:${#CHECK_PATH}-1}" == "/" ]	# Si le dernier caractère est un /
 				then
 					MOD_CHECK_PATH="${CHECK_PATH:0:${#CHECK_PATH}-1}"	# Supprime le /
 				else
 					MOD_CHECK_PATH=$CHECK_PATH
 				fi
+				i=2	# La prochaine boucle passera au 2e test
 			fi
-			if [ "$i" -eq 1 ]; then	# Test avec / final.
+			if [ "$i" -eq 2 ]; then	# Test avec / final.
 				if [ "${CHECK_PATH:${#CHECK_PATH}-1}" != "/" ]	# Si le dernier caractère n'est pas un /
 				then
 					MOD_CHECK_PATH="$CHECK_PATH/"	# Ajoute / à la fin du path
 				else
 					MOD_CHECK_PATH=$CHECK_PATH
 				fi
+				i=3	# La prochaine boucle terminera les tests
 			fi
 			rm -f "$script_dir/url_output"	# Supprime le précédent fichier html si il est encore présent
 			curl -LksS -w "%{http_code};%{url_effective}\n" $SOUS_DOMAIN$MOD_CHECK_PATH -o "$script_dir/url_output" > "$script_dir/curl_print"
@@ -75,6 +79,19 @@ CHECK_URL () {
 				if [ "${HTTP_CODE}" != "401" ]
 				then	# Le code d'erreur 401 fait exception, si il y a 401 c'est en général l'application qui le renvoi. Donc l'install est bonne.
 					curl_error=1
+				fi
+				if [ "${HTTP_CODE}" = "503" ]
+				then	# Le code d'erreur 503 indique que la ressource est temporairement indisponible. On va le croire pour cette fois et lui donner une autre chance.
+					curl_error=0
+					ECHO_FORMAT "Service temporairement indisponible...\n" "lyellow" "bold"
+					http503=$(( $http503 + 1 ))
+					if [ $http503 -eq 3 ]; then
+						curl_error=1	# Après 3 erreurs 503, le code est considéré définitivement comme une erreur
+					else
+						i=$(( $i - 1 ))	# La boucle est décrémenté de 1 pour refaire le même test.
+						sleep 1 # Attend 1 seconde pour laisser le temps au service de se mettre en place.
+						continue	# Retourne en début de boucle pour recommencer le test
+					fi
 				fi
 			fi
 			URL_TITLE=$(grep "<title>" "$script_dir/url_output" | cut -d '>' -f 2 | cut -d '<' -f1)
@@ -333,16 +350,20 @@ CHECK_UPGRADE () {
 	# Installation de l'app
 	SETUP_APP
 	LOG_EXTRACTOR
-	ECHO_FORMAT "\nUpgrade sur la même version du package...\n" "white" "bold"
-	# Upgrade de l'app
-	COPY_LOG 1
-	LXC_START "sudo yunohost --debug app upgrade $APPID -f \"$APP_PATH_YUNO\""
-	YUNOHOST_RESULT=$?
-	COPY_LOG 2
-	LOG_EXTRACTOR
-	# Test l'accès à l'app
-	CHECK_URL
-	tnote=$((tnote+1))
+	if [ "$YUNOHOST_RESULT" -ne 0 ]; then
+		ECHO_FORMAT "\nInstallation échouée...\n" "lred" "bold"
+	else
+		ECHO_FORMAT "\nUpgrade sur la même version du package...\n" "white" "bold"
+		# Upgrade de l'app
+		COPY_LOG 1
+		LXC_START "sudo yunohost --debug app upgrade $APPID -f \"$APP_PATH_YUNO\""
+		YUNOHOST_RESULT=$?
+		COPY_LOG 2
+		LOG_EXTRACTOR
+		# Test l'accès à l'app
+		CHECK_URL
+		tnote=$((tnote+1))
+	fi
 	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		note=$((note+1))
@@ -403,14 +424,18 @@ CHECK_BACKUP_RESTORE () {
 		# Installation de l'app
 		SETUP_APP
 		LOG_EXTRACTOR
-		ECHO_FORMAT "\nBackup de l'application...\n" "white" "bold"
-		# Backup de l'app
-		COPY_LOG 1
-		LXC_START "sudo yunohost --debug backup create -n Backup_test --apps $APPID --hooks $BACKUP_HOOKS"
-		YUNOHOST_RESULT=$?
-		COPY_LOG 2
-		LOG_EXTRACTOR
-		tnote=$((tnote+1))
+		if [ "$YUNOHOST_RESULT" -ne 0 ]; then
+			ECHO_FORMAT "\nInstallation échouée...\n" "lred" "bold"
+		else
+			ECHO_FORMAT "\nBackup de l'application...\n" "white" "bold"
+			# Backup de l'app
+			COPY_LOG 1
+			LXC_START "sudo yunohost --debug backup create -n Backup_test --apps $APPID --hooks $BACKUP_HOOKS"
+			YUNOHOST_RESULT=$?
+			COPY_LOG 2
+			LOG_EXTRACTOR
+			tnote=$((tnote+1))
+		fi
 		if [ "$YUNOHOST_RESULT" -eq 0 ]; then
 			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 			note=$((note+1))
@@ -735,9 +760,11 @@ CHECK_COMMON_ERROR () {
 	LOG_EXTRACTOR
 	if [ "$1" == "incorrect_path" ] || [ "$1" == "port_already_use" ]; then
 		# Test l'accès à l'app
-		CHECK_URL
-		if [ "$curl_error" -ne 0 ]; then
-			YUNOHOST_RESULT=$curl_error
+		if [ "$YUNOHOST_RESULT" -eq 0 ]; then	# Test l'url si l'installation à réussie.
+			CHECK_URL
+			if [ "$curl_error" -ne 0 ]; then
+				YUNOHOST_RESULT=$curl_error
+			fi
 		fi
 	fi
 	tnote=$((tnote+1))
