@@ -723,6 +723,10 @@ else	# Si le fichier check_process n'a pas été trouvé, fonctionne en mode dé
 		wrong_user=0
 		all_test=$((all_test-1))
 	fi
+	if grep multi_instance "$APP_CHECK/manifest.json" | grep -q false
+	then	# Retire le test multi instance si la clé du manifest est à false
+		multi_instance=0
+	fi
 fi
 
 TESTING_PROCESS
