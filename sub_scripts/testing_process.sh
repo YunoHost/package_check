@@ -13,6 +13,11 @@ SETUP_APP () {
 	COPY_LOG 1
 	LXC_START "sudo yunohost --debug app install \"$APP_PATH_YUNO\" -a \"$MANIFEST_ARGS_MOD\""
 	YUNOHOST_RESULT=$?
+	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
+		ECHO_FORMAT "Installation terminée avec succès. ($YUNOHOST_RESULT)\n" "white" clog
+	else
+		ECHO_FORMAT "Installation échouée. ($YUNOHOST_RESULT)\n" "white" clog
+	fi
 	COPY_LOG 2
 	APPID=$(grep -o -m1 "YNH_APP_INSTANCE_NAME=[^ ]*" "$OUTPUTD" | cut -d '=' -f2)	# Récupère le nom de l'app au moment de l'install. Pour pouvoir le réutiliser dans les commandes yunohost. La regex matche tout ce qui suit le =, jusqu'à l'espace.
 }
@@ -24,10 +29,15 @@ REMOVE_APP () {
 		fi
 		read -p "Appuyer sur une touche pour supprimer l'application et continuer les tests..." < /dev/tty
 	fi
-	ECHO_FORMAT "\nSuppression...\n" "white" "bold"
+	ECHO_FORMAT "\nSuppression...\n" "white" "bold" clog
 	COPY_LOG 1
 	LXC_START "sudo yunohost --debug app remove \"$APPID\""
 	YUNOHOST_REMOVE=$?
+	if [ "$YUNOHOST_REMOVE" -eq 0 ]; then
+		ECHO_FORMAT "Suppression terminée avec succès. ($YUNOHOST_REMOVE)\n" "white" clog
+	else
+		ECHO_FORMAT "Suppression échouée. ($YUNOHOST_REMOVE)\n" "white" clog
+	fi
 	COPY_LOG 2
 }
 
@@ -92,6 +102,9 @@ CHECK_URL () {
 						sleep 1 # Attend 1 seconde pour laisser le temps au service de se mettre en place.
 						continue	# Retourne en début de boucle pour recommencer le test
 					fi
+				fi
+				if [ "$curl_error" -eq 1 ]; then
+					ECHO_FORMAT "Le code HTTP indique une erreur.\n" "white" clog
 				fi
 			fi
 			URL_TITLE=$(grep "<title>" "$script_dir/url_output" | cut -d '>' -f 2 | cut -d '<' -f1)
@@ -346,18 +359,23 @@ CHECK_UPGRADE () {
 		echo "Aucun mode d'installation n'a fonctionné, impossible d'effectuer ce test..."
 		return;
 	fi
-	ECHO_FORMAT "\nInstallation préalable...\n" "white" "bold"
+	ECHO_FORMAT "\nInstallation préalable...\n" "white" "bold" clog
 	# Installation de l'app
 	SETUP_APP
 	LOG_EXTRACTOR
 	if [ "$YUNOHOST_RESULT" -ne 0 ]; then
 		ECHO_FORMAT "\nInstallation échouée...\n" "lred" "bold"
 	else
-		ECHO_FORMAT "\nUpgrade sur la même version du package...\n" "white" "bold"
+		ECHO_FORMAT "\nUpgrade sur la même version du package...\n" "white" "bold" clog
 		# Upgrade de l'app
 		COPY_LOG 1
 		LXC_START "sudo yunohost --debug app upgrade $APPID -f \"$APP_PATH_YUNO\""
 		YUNOHOST_RESULT=$?
+		if [ "$YUNOHOST_RESULT" -eq 0 ]; then
+			ECHO_FORMAT "Upgrade terminée avec succès. ($YUNOHOST_RESULT)\n" "white" clog
+		else
+			ECHO_FORMAT "Upgrade échoué. ($YUNOHOST_RESULT)\n" "white" clog
+		fi
 		COPY_LOG 2
 		LOG_EXTRACTOR
 		# Test l'accès à l'app
@@ -405,7 +423,7 @@ CHECK_BACKUP_RESTORE () {
 			if [ "$GLOBAL_CHECK_ROOT" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné. Ou si l'argument force_install_ok est présent.
 				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
 				CHECK_PATH="/"
-				ECHO_FORMAT "\nInstallation préalable à la racine...\n" "white" "bold"
+				ECHO_FORMAT "\nInstallation préalable à la racine...\n" "white" "bold" clog
 			else
 				echo "L'installation à la racine n'a pas fonctionnée, impossible d'effectuer ce test..."
 				continue;
@@ -415,7 +433,7 @@ CHECK_BACKUP_RESTORE () {
 			if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
 				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
 				CHECK_PATH="$PATH_TEST"
-				ECHO_FORMAT "\nInstallation préalable en sous-dossier...\n" "white" "bold"
+				ECHO_FORMAT "\nInstallation préalable en sous-dossier...\n" "white" "bold" clog
 			else
 				echo "L'installation en sous-dossier n'a pas fonctionnée, impossible d'effectuer ce test..."
 				return;
@@ -427,11 +445,16 @@ CHECK_BACKUP_RESTORE () {
 		if [ "$YUNOHOST_RESULT" -ne 0 ]; then
 			ECHO_FORMAT "\nInstallation échouée...\n" "lred" "bold"
 		else
-			ECHO_FORMAT "\nBackup de l'application...\n" "white" "bold"
+			ECHO_FORMAT "\nBackup de l'application...\n" "white" "bold" clog
 			# Backup de l'app
 			COPY_LOG 1
 			LXC_START "sudo yunohost --debug backup create -n Backup_test --apps $APPID --hooks $BACKUP_HOOKS"
 			YUNOHOST_RESULT=$?
+			if [ "$YUNOHOST_RESULT" -eq 0 ]; then
+				ECHO_FORMAT "Backup terminé avec succès. ($YUNOHOST_RESULT)\n" "white" clog
+			else
+				ECHO_FORMAT "Backup échoué. ($YUNOHOST_RESULT)\n" "white" clog
+			fi
 			COPY_LOG 2
 			LOG_EXTRACTOR
 			tnote=$((tnote+1))
@@ -452,7 +475,7 @@ CHECK_BACKUP_RESTORE () {
 			if [ "$j" -eq 0 ]
 			then	# Commence par tester la restauration après suppression de l'application
 				REMOVE_APP	# Suppression de l'app
-				ECHO_FORMAT "\nRestauration de l'application après suppression de l'application...\n" "white" "bold"
+				ECHO_FORMAT "\nRestauration de l'application après suppression de l'application...\n" "white" "bold" clog
 				if [ "$no_lxc" -ne 0 ]; then	# Si lxc n'est pas utilisé, impossible d'effectuer le 2e test
 					j=2	# Ignore le 2e test
 					echo -e "LXC n'est pas utilisé, impossible de tester la restauration sur un système vierge...\n"
@@ -461,12 +484,17 @@ CHECK_BACKUP_RESTORE () {
 			then	# Puis la restauration après restauration du conteneur (si LXC est utilisé)
 				LXC_STOP	# Restaure le conteneur.
 				sudo mv -f ./archives /var/lib/lxc/$LXC_NAME/rootfs/home/yunohost.backup/	# Replace le backup sur le conteneur
-				ECHO_FORMAT "\nRestauration de l'application sur un système vierge...\n" "white" "bold"
+				ECHO_FORMAT "\nRestauration de l'application sur un système vierge...\n" "white" "bold" clog
 			fi
 			# Restore de l'app
 			COPY_LOG 1
 			LXC_START "sudo yunohost --debug backup restore Backup_test --force --apps $APPID"
 			YUNOHOST_RESULT=$?
+			if [ "$YUNOHOST_RESULT" -eq 0 ]; then
+				ECHO_FORMAT "Restauration terminée avec succès. ($YUNOHOST_RESULT)\n" "white" clog
+			else
+				ECHO_FORMAT "Restauration échouée. ($YUNOHOST_RESULT)\n" "white" clog
+			fi
 			COPY_LOG 2
 			LOG_EXTRACTOR
 			# Test l'accès à l'app
@@ -627,21 +655,21 @@ CHECK_MULTI_INSTANCE () {
 		return;
 	fi
 	# Installation de l'app une première fois
-	ECHO_FORMAT "1ère installation: path=$PATH_TEST\n"
+	ECHO_FORMAT "1ère installation: path=$PATH_TEST\n" clog
 	SETUP_APP
 	LOG_EXTRACTOR
 	APPID_first=$APPID	# Stocke le nom de la première instance
 	YUNOHOST_RESULT_first=$YUNOHOST_RESULT	# Stocke le résulat de l'installation de la première instance
 	# Installation de l'app une deuxième fois, en ajoutant un suffixe au path
 	path2="$PATH_TEST-2"
-	ECHO_FORMAT "2e installation: path=$path2\n"
+	ECHO_FORMAT "2e installation: path=$path2\n" clog
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$path2\&@")
 	SETUP_APP
 	LOG_EXTRACTOR
 	APPID_second=$APPID	# Stocke le nom de la deuxième instance
 	YUNOHOST_RESULT_second=$YUNOHOST_RESULT	# Stocke le résulat de l'installation de la deuxième instance
 	path3="/3-${PATH_TEST#/}"
-	ECHO_FORMAT "3e installation: path=$path3\n"
+	ECHO_FORMAT "3e installation: path=$path3\n" clog
 	# Installation de l'app une troisième fois, en ajoutant un préfixe au path
 	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=$path2\&@$MANIFEST_PATH=$path3\&@")
 	SETUP_APP
@@ -895,7 +923,7 @@ TESTING_PROCESS () {
 source "$script_dir/sub_scripts/patch_#654.sh"	# Patch #654
 	# Lancement des tests
 	cur_test=1
-	ECHO_FORMAT "\nScénario de test: $PROCESS_NAME\n" "white" "underlined"
+	ECHO_FORMAT "\nScénario de test: $PROCESS_NAME\n" "white" "underlined" clog
 	if [ "$pkg_linter" -eq 1 ]; then
 		PACKAGE_LINTER	# Vérification du package avec package linter
 	fi

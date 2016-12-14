@@ -30,7 +30,7 @@ ECHO_FORMAT () {
 		echo -en "\e[4m"
 	fi
 	copy_log=--
-	if [ "$4" == "clog" ]; then
+	if [ "$2" == "clog" ] || [ "$3" == "clog" ] || [ "$4" == "clog" ]; then
  		copy_log="$COMPLETE_LOG"
 	fi
 	echo -en "$1" | tee -a "$RESULT" "$copy_log"
