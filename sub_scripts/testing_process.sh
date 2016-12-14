@@ -45,6 +45,12 @@ CHECK_URL () {
 	if [ "$use_curl" -eq 1 ]
 	then
 		ECHO_FORMAT "\nAccès par l'url...\n" "white" "bold"
+		if [ "$MANIFEST_PUBLIC" == "null" ]
+		then	# Si la clé du manifest pour l'accès public n'a pas été trouvé, on suppose une app sans accès public
+			LXC_START "sudo yunohost app setting \"$APPID\" skipped_uris -v \"/\""	# Force un skipped_uris à la racine pour forcer un accès public.
+			LXC_START "sudo yunohost app ssowatconf"
+			ECHO_FORMAT "Accès public forcé pour le test d'accès par url.\n" "lyellow" "bold"
+		fi
 		if [ "$no_lxc" -eq 0 ]; then
 			IP_CURL="$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep PLAGE_IP= | cut -d '"' -f2).2"
 		else
