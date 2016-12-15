@@ -422,6 +422,8 @@ CHECK_BACKUP_RESTORE () {
 	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
 		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
 	fi
+	GLOBAL_CHECK_BACKUP=0	# Remet à 0 le résultat du test. En cas de reboucle
+	GLOBAL_CHECK_RESTORE=0
 	for i in 0 1
 	do	# 2 passes, pour effectuer un test en root et en sub_dir
 		if [ "$i" -eq 0 ]
@@ -537,9 +539,11 @@ CHECK_PUBLIC_PRIVATE () {
 	# Test d'installation en public/privé
 	if [ "$1" == "private" ]; then
 		ECHO_FORMAT "\n\n>> Installation privée... [Test $cur_test/$all_test]\n" "white" "bold" clog
+		GLOBAL_CHECK_PRIVATE=0	# Remet à 0 le résultat du test. En cas de reboucle
 	fi
 	if [ "$1" == "public" ]; then
 		ECHO_FORMAT "\n\n>> Installation publique... [Test $cur_test/$all_test]\n" "white" "bold" clog
+		GLOBAL_CHECK_PUBLIC=0	# Remet à 0 le résultat du test. En cas de reboucle
 	fi
 	cur_test=$((cur_test+1))
 	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
