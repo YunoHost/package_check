@@ -925,6 +925,7 @@ TEST_LAUNCHER () {
 			ECHO_FORMAT "\n!! Bug 654 détecté !!\n" "red" clog	# Patch #654
 			echo -e "date\nBug 654 sur $1 $2\n\n" >> "$script_dir/patch_#654.log"	# Patch #654
 			cur_test=$((cur_test-1))
+			tnote=$((tnote-1))
 		fi	# Patch #654
 	done	# Patch #654
 }
