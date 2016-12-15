@@ -5,6 +5,7 @@
 # --no-lxc	N'utilise pas la virtualisation en conteneur lxc. La virtualisation est utilisée par défaut si disponible.
 # --build-lxc	Installe lxc et créer la machine si nécessaire.
 # --force-install-ok	Force la réussite des installations, même si elles échouent. Permet d'effectuer les tests qui suivent même si l'installation a échouée.
+# --branch=nom-de-la-branche	Teste une branche du dépôt, plutôt que tester master
 # --help	Affiche l'aide du script
 
 echo ""
@@ -25,20 +26,30 @@ no_lxc=$(echo "$*" | grep -c -e "--no-lxc")	# no_lxc vaut 1 si l'argument est pr
 build_lxc=$(echo "$*" | grep -c -e "--build-lxc")	# build_lxc vaut 1 si l'argument est présent.
 # --force-install-ok
 force_install_ok=$(echo "$*" | grep -c -e "--force-install-ok")	# force-install-ok vaut 1 si l'argument est présent.
+# --branch=
+gitbranch=$(echo "$*" | grep -e "--branch")	# gitbranch prend l'ensemble des arguments à partir de --branch
+if test -n "$gitbranch"; then
+	if ! echo "$gitbranch" | grep -q "branch=[[:alnum:]]"; then
+		notice=1	# Renvoi vers l'aide si la syntaxe est incorrecte
+	else
+		gitbranch="--branch $(echo "$gitbranch" | cut -d'=' -f2 | cut -d' ' -f1)"	# Isole le nom de la branche entre le = et l'espace. Et ajoute l'argument de git clone
+	fi
+fi
 # --help
 if [ "$notice" -eq 0 ]; then
 	notice=$(echo "$*" | grep -c -e "--help")	# notice vaut 1 si l'argument est présent. Il affichera alors l'aide.
 fi
-arg_app=$(echo "$*" | sed 's/--bash-mode\|--no-lxc\|--build-lxc\|--force-install-ok//g' | sed 's/^ *\| *$//g')	# Supprime les arguments déjà lu pour ne garder que l'app. Et supprime les espaces au début et à la fin
+arg_app=$(echo "$*" | sed 's/--bash-mode\|--no-lxc\|--build-lxc\|--force-install-ok\|--branch=[[:alnum:]-]*//g' | sed 's/^ *\| *$//g')	# Supprime les arguments déjà lu pour ne garder que l'app. Et supprime les espaces au début et à la fin
 # echo "arg_app=$arg_app."
 
 if [ "$notice" -eq 1 ]; then
 	echo -e "\nUsage:"
-	echo "package_check.sh [--bash-mode] [--no-lxc] [--build-lxc] [--force-install-ok] [--help] \"check package\""
+	echo "package_check.sh [--bash-mode] [--no-lxc] [--build-lxc] [--force-install-ok] [--help] [--branch=] \"package to check\""
 	echo -e "\n\t--bash-mode\t\tDo not ask for continue check. Ignore auto_remove."
 	echo -e "\t--no-lxc\t\tDo not use a LXC container. You should use this option only on a test environnement."
 	echo -e "\t--build-lxc\t\tInstall LXC and build the container if necessary."
 	echo -e "\t--force-install-ok\tForce following test even if all install are failed."
+	echo -e "\t--branch=branch-name\tSpecify a branch to check."
 	echo -e "\t--help\t\t\tDisplay this notice."
 	exit 0
 fi
@@ -190,7 +201,7 @@ GIT_PACKAGE=0
 if echo "$arg_app" | grep -Eq "https?:\/\/"
 then
 	GIT_PACKAGE=1
-	git clone $arg_app "$script_dir/$(basename "$arg_app")_check"
+	git clone $arg_app $gitbranch "$script_dir/$(basename "$arg_app")_check"
 else
 	# Si c'est un dossier local, il est copié dans le dossier du script.
 	sudo cp -a --remove-destination "$arg_app" "$script_dir/$(basename "$arg_app")_check"

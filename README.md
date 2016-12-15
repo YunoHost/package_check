@@ -118,12 +118,13 @@ Si un test est absent de la liste, il sera ignoré. Cela revient à le noter à 
 - `final_path_already_use`: *Non implémenté pour le moment...*
 
 ---
-Le script `package_check.sh` accepte 5 arguments en plus du package à tester.
+Le script `package_check.sh` accepte 6 arguments en plus du package à tester.
 - `--bash-mode`: Rend le script autonome. Aucune intervention de l'utilisateur ne sera nécessaire.  
 	La valeur de auto_remove est ignorée.
 - `--no-lxc`: N'utilise pas la virtualisation en conteneur LXC. Les tests seront effectué directement sur la machine hôte.
 - `--build-lxc`: Installe LXC et créer le conteneur debian Yunohost si nécessaire.
 - `--force-install-ok`: Force la réussite des installations, même si elles échouent. Permet d'effectuer les tests qui suivent même si l'installation a échouée.
+- `--branch=nom-de-branche`: Teste une branche du dépôt plutôt que de tester master. Permet de tester les pull request.
 - `--help`: Affiche l'aide du script
 
 ---
@@ -260,12 +261,13 @@ If a test is not in the list, it will be ignored. It's similar to marked at 0.
 - `final_path_already_use`: *Not implemented yet...*
 
 ---
-The `package_check.sh` script accept 5 arguments in addition of package to be checked.
+The `package_check.sh` script accept 6 arguments in addition of package to be checked.
 - `--bash-mode`: The script will work without user intervention.  
 	auto_remove value is ignored
 - `--no-lxc`: Not use virtualization with LXC container. All tests will perform directly on the hosts machine.
 - `--build-lxc`: Install  LXC and create the Debian Yunohost container if necessary.
 - `--force-install-ok`: Force success of installation, even if they fail. Allow to perform following tests even if installation fail.
+- `--branch=branch-name`: Check a branch of the repository instead of master. Allow to check a pull request.
 - `--help`: Display help.
 
 ---
