@@ -438,7 +438,7 @@ TEST_RESULTS () {
 			smiley="\o/"
 		fi
 	ECHO_FORMAT "$note/20 $smiley\n" "$color_note" "$typo_note"
-	ECHO_FORMAT "\t   Ensemble de tests effectués: $tnote/17\n\n" "white" "bold"
+	ECHO_FORMAT "\t   Ensemble de tests effectués: $tnote/21\n\n" "white" "bold"
 }
 
 INIT_VAR() {

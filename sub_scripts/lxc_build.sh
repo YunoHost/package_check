@@ -55,16 +55,12 @@ sudo lxc-start -n $LXC_NAME -d >> "$LOG_BUILD_LXC" 2>&1
 sleep 3
 sudo lxc-ls -f >> "$LOG_BUILD_LXC" 2>&1
 
-echo "> Update et install tasksel sudo git" | tee -a "$LOG_BUILD_LXC"
+echo "> Update et install aptitude sudo git" | tee -a "$LOG_BUILD_LXC"
 sudo lxc-attach -n $LXC_NAME -- apt-get update
-sudo lxc-attach -n $LXC_NAME -- apt-get install -y tasksel sudo git
+sudo lxc-attach -n $LXC_NAME -- apt-get install -y aptitude sudo git
 echo "> Installation des paquets standard et ssh-server" | tee -a "$LOG_BUILD_LXC"
-tasksell_exit=1
-while [ "$tasksell_exit" -ne 0 ]
-do
-	sudo lxc-attach -n $LXC_NAME -- tasksel install standard ssh-server
-	tasksell_exit=$?
-done
+sudo lxc-attach -n $LXC_NAME -- aptitude install -y ~pstandard ~prequired ~pimportant task-ssh-server
+
 echo "> Renseigne /etc/hosts sur l'invité" | tee -a "$LOG_BUILD_LXC"
 echo "127.0.0.1 $LXC_NAME" | sudo tee -a /var/lib/lxc/$LXC_NAME/rootfs/etc/hosts >> "$LOG_BUILD_LXC" 2>&1
 
