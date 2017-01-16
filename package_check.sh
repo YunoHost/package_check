@@ -231,7 +231,68 @@ fi
 
 
 
+# Cette fonctionne détermine le niveau final de l'application, en prenant en compte d'éventuels forçages
+APP_LEVEL () {
+	level=0 	# Initialise le niveau final à 0
+	# Niveau 1: L'application ne s'installe pas ou ne fonctionne pas après installation.
+	if [ "${level[1]}" == "auto" ] || [ "${level[1]}" -eq 2 ]; then
+		if [ "$GLOBAL_CHECK_SETUP" -eq 1 ] && [ "$GLOBAL_CHECK_REMOVE" -eq 1 ]
+		then level[1]=2 ; else level[1]=0 ; fi
+	fi
+
+	# Niveau 2: L'application s'installe et se désinstalle dans toutes les configurations communes.
+	if [ "${level[2]}" == "auto" ] || [ "${level[2]}" -eq 2 ]; then
+		if 	[ "$GLOBAL_CHECK_SUB_DIR" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_REMOVE_SUBDIR" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_ROOT" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_REMOVE_ROOT" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_PRIVATE" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_PUBLIC" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_MULTI_INSTANCE" -ne -1 ]
+		then level[2]=2 ; else level[2]=0 ; fi
+	fi
+
+	# Niveau 3: L'application supporte l'upgrade depuis une ancienne version du package.
+	if [ "${level[3]}" == "auto" ] || [ "${level[3]}" == "2" ]; then
+		if [ "$GLOBAL_CHECK_UPGRADE" -eq 1 ] || ( [ "${level[3]}" == "2" ] && [ "$GLOBAL_CHECK_UPGRADE" -ne -1 ] )
+		then level[3]=2 ; else level[3]=0 ; fi
+	fi
+
+	# Niveau 4: L'application prend en charge de LDAP et/ou HTTP Auth. -- Doit être vérifié manuellement
+
+	# Niveau 5: Aucune erreur dans package_linter.
+	if [ "${level[5]}" == "auto" ] || [ "${level[5]}" == "2" ]; then
+		if [ "$GLOBAL_LINTER" -eq 1 ] || ( [ "${level[5]}" == "2" ] && [ "$GLOBAL_LINTER" -ne -1 ] )
+		then level[5]=2 ; else level[5]=0 ; fi
+	fi
+
+	# Niveau 6: L'application peut-être sauvegardée et restaurée sans erreurs sur la même machine ou une autre.
+	if [ "${level[6]}" == "auto" ] || [ "${level[6]}" == "2" ]; then
+		if [ "$GLOBAL_CHECK_BACKUP" -eq 1 ] && [ "$GLOBAL_CHECK_RESTORE" -eq 1 ] || ( [ "${level[6]}" == "2" ] && [ "$GLOBAL_CHECK_BACKUP" -ne -1 ] && [ "$GLOBAL_CHECK_RESTORE" -ne -1 ] )
+		then level[6]=2 ; else level[6]=0 ; fi
+	fi
+
+	# Niveau 7: Aucune erreur dans package check.
+	if [ "${level[7]}" == "auto" ] || [ "${level[7]}" == "2" ]; then
+		if [ "$note" -ge 20 ]
+		then level[7]=2 ; else level[7]=0 ; fi
+	fi
+
+	# Niveau 8: L'application respecte toutes les YEP recommandées. -- Doit être vérifié manuellement
+
+	# Niveau 9: L'application respecte toutes les YEP optionnelles. -- Doit être vérifié manuellement
+
+	# Niveau 10: L'application est jugée parfaite. -- Doit être vérifié manuellement
+
+	# Calcule le niveau final
+	for i in {1..10}; do
+		if [ "${level[i]}" -ge 1 ]; then level=$i
+		else break;	fi
+	done
+}
+
 TEST_RESULTS () {
+	APP_LEVEL
 	ECHO_FORMAT "\n\nPackage linter: "
 	if [ "$GLOBAL_LINTER" -eq 1 ]; then
 		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
@@ -441,72 +502,16 @@ TEST_RESULTS () {
 	ECHO_FORMAT "\t   Ensemble de tests effectués: $tnote/21\n\n" "white" "bold"
 
 	# Affiche le niveau final
-	ECHO_FORMAT "Niveau de l'application: $level\n"
-	for i in {1..10}; do
-		ECHO_FORMAT "\t   Niveau $i: ${level[i]}\n"
+	ECHO_FORMAT "Niveau de l'application: $level\n" "white" "bold"
+	for i in {1..10}
+	do
+		ECHO_FORMAT "\t   Niveau $i: "
+		if [ "${level[i]}" -ge 1 ]; then
+			ECHO_FORMAT "1\n" "white" "bold"
+		else
+			ECHO_FORMAT "0\n"
+		fi
 	done
-}
-
-# Cette fonctionne détermine le niveau final de l'application, en prenant en compte d'éventuels forçages
-APP_LEVEL () {
-	level=0 	# Initialise le niveau final à 0
-
-	# Niveau 1: L'application ne s'installe pas ou ne fonctionne pas après installation.
-	if [ "${level[1]}" == "auto" ]; then
-		if [ "$GLOBAL_CHECK_SETUP" -eq 1 ] && [ "$GLOBAL_CHECK_REMOVE" -eq 1 ]
-		then level[1]=1 ; else level[1]=0 ; fi
-	fi
-
-	# Niveau 2: L'application s'installe et se désinstalle dans toutes les configurations communes.
-	if [ "${level[2]}" == "auto" ]; then
-		if 	[ "$GLOBAL_CHECK_SUB_DIR" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_REMOVE_SUBDIR" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_ROOT" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_REMOVE_ROOT" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_PRIVATE" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_PUBLIC" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_MULTI_INSTANCE" -ne -1 ]
-		then level[2]=1 ; else level[2]=0 ; fi
-	fi
-
-	# Niveau 3: L'application supporte l'upgrade depuis une ancienne version du package.
-	if [ "${level[3]}" == "auto" ]; then
-		if [ "$GLOBAL_CHECK_UPGRADE" -eq 1 ]
-		then level[3]=1 ; else level[3]=0 ; fi
-	fi
-
-	# Niveau 4: L'application prend en charge de LDAP et/ou HTTP Auth. -- Doit être vérifié manuellement
-
-	# Niveau 5: Aucune erreur dans package_linter.
-	if [ "${level[5]}" == "auto" ]; then
-		if [ "$GLOBAL_LINTER" -eq 1 ]
-		then level[5]=1 ; else level[5]=0 ; fi
-	fi
-
-	# Niveau 6: L'application peut-être sauvegardée et restaurée sans erreurs sur la même machine ou une autre.
-	if [ "${level[6]}" == "auto" ]; then
-		if [ "$GLOBAL_CHECK_BACKUP" -eq 1 ] && [ "$GLOBAL_CHECK_RESTORE" -eq 1 ]
-		then level[6]=1 ; else level[6]=0 ; fi
-	fi
-
-	# Niveau 7: Aucune erreur dans package check.
-	if [ "${level[7]}" == "auto" ]; then
-		if [ "$note" -ge 20 ]
-		then level[7]=1 ; else level[7]=0 ; fi
-	fi
-
-	# Niveau 8: L'application respecte toutes les YEP recommandées. -- Doit être vérifié manuellement
-
-	# Niveau 9: L'application respecte toutes les YEP optionnelles. -- Doit être vérifié manuellement
-
-	# Niveau 10: L'application est jugée parfaite. -- Doit être vérifié manuellement
-
-	# Calcule le niveau final
-	for i in {1..10}; do
-		if [ "${level[i]}" -eq 1 ]; then level=$i
-		else break;	fi
-	done
-	
 }
 
 INIT_VAR() {
@@ -823,7 +828,6 @@ TESTING_PROCESS
 if [ "$no_lxc" -eq 0 ]; then
 	LXC_TURNOFF
 fi
-APP_LEVEL
 TEST_RESULTS
 
 echo "Le log complet des installations et suppressions est disponible dans le fichier $COMPLETE_LOG"
