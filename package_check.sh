@@ -570,7 +570,9 @@ INIT_VAR() {
 	fail_download_source=0
 	port_already_use=0
 	final_path_already_use=0
+}
 
+INIT_LEVEL() {
 	level[1]="auto"		# L'application s'installe et se désinstalle correctement. -- Peut être vérifié par package_check
 	level[2]="auto"		# L'application s'installe et se désinstalle dans toutes les configurations communes. -- Peut être vérifié par package_check
 	level[3]="auto"		# L'application supporte l'upgrade depuis une ancienne version du package. -- Peut être vérifié par package_check
@@ -584,6 +586,7 @@ INIT_VAR() {
 }
 
 INIT_VAR
+INIT_LEVEL
 echo -n "" > "$COMPLETE_LOG"	# Initialise le fichier de log
 echo -n "" > "$RESULT"	# Initialise le fichier des résulats d'analyse
 if [ "$no_lxc" -eq 0 ]; then
