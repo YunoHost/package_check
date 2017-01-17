@@ -538,7 +538,6 @@ INIT_VAR() {
 	IN_PROCESS=0
 	MANIFEST=0
 	CHECKS=0
-	IN_LEVELS=1
 	auto_remove=1
 	install_pass=0
 	note=0
@@ -598,6 +597,23 @@ if [ "$check_file" -eq 1 ]
 then # Si le fichier check_process est trouvé
 	## Parsing du fichier check_process de manière séquentielle.
 	echo "Parsing du fichier check_process"
+	IN_LEVELS=0
+	while read <&4 LIGNE
+	do	# Parse les indications de niveaux d'app avant de parser les tests
+		LIGNE=$(echo $LIGNE | sed 's/^ *"//g')	# Efface les espaces en début de ligne
+		if [ "${LIGNE:0:1}" == "#" ]; then
+			continue	# Ligne de commentaire, ignorée.
+		fi
+		if echo "$LIGNE" | grep -q "^;;; Levels"; then	# Définition des variables de niveaux
+			IN_LEVELS=1
+		fi
+		if [ "$IN_LEVELS" -eq 1 ]
+		then
+			if echo "$LIGNE" | grep -q "Level "; then	# Définition d'un niveau
+				level[$(echo "$LIGNE" | cut -d '=' -f1 | cut -d ' ' -f2)]=$(echo "$LIGNE" | cut -d '=' -f2)
+			fi
+		fi
+	done 4< "$APP_CHECK/check_process"
 	while read <&4 LIGNE
 	do
 		LIGNE=$(echo $LIGNE | sed 's/^ *"//g')	# Efface les espaces en début de ligne
@@ -608,12 +624,7 @@ then # Si le fichier check_process est trouvé
 		if echo "$LIGNE" | grep -q "^auto_remove="; then	# Indication d'auto remove
 			auto_remove=$(echo "$LIGNE" | cut -d '=' -f2)
 		fi
-		if echo "$LIGNE" | grep -q "^;;; Levels"; then	# Définition des variables de niveaux
-			IN_PROCESS=0
-			MANIFEST=0
-			CHECKS=0
-			IN_LEVELS=1
-		elif echo "$LIGNE" | grep -q "^;;"; then	# Début d'un scénario de test
+		if echo "$LIGNE" | grep -q "^;;" && ! echo "$LIGNE" | grep -q "^;;;"; then	# Début d'un scénario de test
 			if [ "$IN_PROCESS" -eq 1 ]; then	# Un scénario est déjà en cours. Donc on a atteind la fin du scénario.
 				TESTING_PROCESS
 				TEST_RESULTS
@@ -628,12 +639,7 @@ then # Si le fichier check_process est trouvé
 			CHECKS=0
 			IN_LEVELS=0
 		fi
-		if [ "$IN_LEVELS" -eq 1 ]
-		then
-			if echo "$LIGNE" | grep -q "Level "; then	# Définition d'un niveau
-				level[$(echo "$LIGNE" | cut -d '=' -f1 | cut -d ' ' -f2)]=$(echo "$LIGNE" | cut -d '=' -f2)
-			fi
-		elif [ "$IN_PROCESS" -eq 1 ]
+		if [ "$IN_PROCESS" -eq 1 ]
 		then	# Analyse des arguments du scenario de test
 			if echo "$LIGNE" | grep -q "^; Manifest"; then	# Arguments du manifest
 				MANIFEST=1
