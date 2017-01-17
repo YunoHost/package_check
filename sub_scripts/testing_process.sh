@@ -306,7 +306,7 @@ CHECK_SETUP_NO_URL () {
 			note=$((note+1))
 		fi
 		GLOBAL_CHECK_SETUP=1	# Installation réussie
-		GLOBAL_CHECK_SUB_DIR=1
+		GLOBAL_CHECK_ROOT=1
 	else
 		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
 		if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
@@ -327,7 +327,8 @@ CHECK_SETUP_NO_URL () {
 			if [ "$GLOBAL_CHECK_REMOVE_ROOT" -eq 0 ]; then
 				note=$((note+1))
 			fi
-			GLOBAL_CHECK_REMOVE_ROOT=1	# Suppression réussie
+			GLOBAL_CHECK_REMOVE=1	# Suppression réussie
+			GLOBAL_CHECK_REMOVE_ROOT=1
 		else
 			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
 			if [ "$GLOBAL_CHECK_REMOVE" -ne 1 ]; then
