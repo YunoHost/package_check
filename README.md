@@ -76,6 +76,17 @@ package_check/package_check.sh APP_ynh
 		fail_download_source=0
 		port_already_use=1 (XXXX)
 		final_path_already_use=0
+;;; Levels
+	Level 1=auto
+	Level 2=auto
+	Level 3=auto
+	Level 4=0
+	Level 5=auto
+	Level 6=auto
+	Level 7=auto
+	Level 8=0
+	Level 9=0
+	Level 10=0
 ```
 ### `;; Nom du test`
 Nom du scénario de test qui sera effectué.  
@@ -116,6 +127,21 @@ Si un test est absent de la liste, il sera ignoré. Cela revient à le noter à 
 	Le test` port_already_use` peut éventuellement prendre en argument un numéro de port. Si celui-ci n'est pas dans le manifest.  
 	Le numéro de port doit alors être noté entre parenthèse, il servira au test de port.  
 - `final_path_already_use`: *Non implémenté pour le moment...*
+
+### `;;; Levels`
+Permet de choisir comment [chaque niveau](https://forum.yunohost.org/t/redaction-de-regles-pour-passer-une-app-en-officielle/2256/26) est déterminé.
+Chaque niveau fixé à auto sera déterminé par le script. Il est également possible de fixer le niveau à 1 ou à 0 pour respectivement le valider ou l'invalider.
+Il est à noter que les niveaux 4, 8, 9 et 10 ne peuvent être fixés à "auto" car ils ne peuvent être testés par le script et nécessitent une vérification manuelle.
+- Niveau 1 : L'application s'installe et se désinstalle correctement. -- Peut être vérifié par package_check
+- Niveau 2 : L'application s'installe et se désinstalle dans toutes les configurations communes. -- Peut être vérifié par package_check
+- Niveau 3 : L'application supporte l'upgrade depuis une ancienne version du package. -- Peut être vérifié par package_check
+- Niveau 4 : L'application prend en charge de LDAP et/ou HTTP Auth. -- Doit être vérifié manuellement
+- Niveau 5 : Aucune erreur dans package_linter. -- Peut être vérifié par package_check
+- Niveau 6 : L'application peut-être sauvegardée et restaurée sans erreurs sur la même machine ou une autre. -- Peut être vérifié par package_check
+- Niveau 7 : Aucune erreur dans package check. -- Peut être vérifié par package_check
+- Niveau 8 : L'application respecte toutes les YEP recommandées. -- Doit être vérifié manuellement
+- Niveau 9 : L'application respecte toutes les YEP optionnelles. -- Doit être vérifié manuellement
+- Niveau 10 : L'application est jugée parfaite. -- Doit être vérifié manuellement
 
 ---
 Le script `package_check.sh` accepte 6 arguments en plus du package à tester.
