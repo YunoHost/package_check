@@ -287,10 +287,13 @@ APP_LEVEL () {
 	# Calcule le niveau final
 	for i in {1..10}; do
 		if [ "${level[i]}" == "auto" ]; then
-			level[i]=0	# Si des levels sont encore à auto, c'est une erreur de syntaxe dans le check_process, ils sont fixé à 0.
+			level[i]=0	# Si des niveaux sont encore à auto, c'est une erreur de syntaxe dans le check_process, ils sont fixé à 0.
+		elif [ "${level[i]}" -ge 1 ]; then
+			level=$i	# Si le niveau est validé, il est pris en compte dans le niveau final
+		elif [ "${level[i]}" != "na" ]; then
+			break		# Enfin, si le niveau n'est ni validé, ni "non applicable" (na), il stoppe la boucle. Le niveau final est donc le niveau précédemment validé
 		fi
-		if [ "${level[i]}" -ge 1 ]; then level=$i
-		elif [ $i -ne 4 ]; then break; fi
+		# Dans les autres cas, il s'agit d'un niveau défini en "non applicable" (na), qui est donc ignoré dans le niveau final
 	done
 }
 
