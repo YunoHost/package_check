@@ -287,7 +287,7 @@ APP_LEVEL () {
 	# Calcule le niveau final
 	for i in {1..10}; do
 		if [ "${level[i]}" -ge 1 ]; then level=$i
-		else break;	fi
+		elif [ $i -ne 4 ]; then break; fi
 	done
 }
 
