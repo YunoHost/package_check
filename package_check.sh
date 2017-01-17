@@ -600,6 +600,10 @@ then # Si le fichier check_process est trouvé
 	IN_LEVELS=0
 	while read <&4 LIGNE
 	do	# Parse les indications de niveaux d'app avant de parser les tests
+		LIGNE=$(echo $LIGNE | sed 's/^ *"//g')	# Efface les espaces en début de ligne
+		if [ "${LIGNE:0:1}" == "#" ]; then
+			continue	# Ligne de commentaire, ignorée.
+		fi
 		if echo "$LIGNE" | grep -q "^;;; Levels"; then	# Définition des variables de niveaux
 			IN_LEVELS=1
 		fi
