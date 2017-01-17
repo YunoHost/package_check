@@ -288,12 +288,13 @@ APP_LEVEL () {
 	for i in {1..10}; do
 		if [ "${level[i]}" == "auto" ]; then
 			level[i]=0	# Si des niveaux sont encore à auto, c'est une erreur de syntaxe dans le check_process, ils sont fixé à 0.
+		elif [ "${level[i]}" == "na" ]; then
+			continue	# Si le niveau est "non applicable" (na), il est ignoré dans le niveau final
 		elif [ "${level[i]}" -ge 1 ]; then
 			level=$i	# Si le niveau est validé, il est pris en compte dans le niveau final
-		elif [ "${level[i]}" != "na" ]; then
-			break		# Enfin, si le niveau n'est ni validé, ni "non applicable" (na), il stoppe la boucle. Le niveau final est donc le niveau précédemment validé
+		else
+			break		# Dans les autres cas (niveau ni validé, ni ignoré), la boucle est stoppée. Le niveau final est donc le niveau précédemment validé
 		fi
-		# Dans les autres cas, il s'agit d'un niveau défini en "non applicable" (na), qui est donc ignoré dans le niveau final
 	done
 }
 
@@ -512,7 +513,9 @@ TEST_RESULTS () {
 	for i in {1..10}
 	do
 		ECHO_FORMAT "\t   Niveau $i: "
-		if [ "${level[i]}" -ge 1 ]; then
+		if [ "${level[i]}" == "na" ]; then
+			ECHO_FORMAT "N/A\n"
+		elif [ "${level[i]}" -ge 1 ]; then
 			ECHO_FORMAT "1\n" "white" "bold"
 		else
 			ECHO_FORMAT "0\n"
