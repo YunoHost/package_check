@@ -274,7 +274,21 @@ APP_LEVEL () {
 
 	# Niveau 7: Aucune erreur dans package check.
 	if [ "${level[7]}" == "auto" ] || [ "${level[7]}" == "2" ]; then
-		if [ "$note" -ge 20 ]
+		if 	[ "$GLOBAL_CHECK_SETUP" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_REMOVE" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_SUB_DIR" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_REMOVE_SUBDIR" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_REMOVE_ROOT" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_UPGRADE" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_PRIVATE" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_PUBLIC" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_MULTI_INSTANCE" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_ADMIN" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_DOMAIN" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_PATH" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_PORT" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_BACKUP" -ne -1 ] && \
+			[ "$GLOBAL_CHECK_RESTORE" -ne -1 ]
 		then level[7]=2 ; else level[7]=0 ; fi
 	fi
 
