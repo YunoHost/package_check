@@ -1,0 +1,17 @@
+Pseudo-terminal will not be allocated because stdin is not a terminal.
+ssh: connect to host 10.1.4.2 port 22: Connection timed out
+[1m> Installation de Yunohost...[0m
+[1m> Post install Yunohost[0m
+[1m> Ajout du sous domaine de test[0m
+[1m> Ajout de l'utilisateur de test[0m
+[1m
+> Vérification de l'état de Yunohost[0m
+[1m> Arrêt de la machine virtualisée[0m
+sudo: pas de tty présent et pas de programme askpass spécifié
+[1m> Suppression des règles de parefeu[0m
+sudo: pas de tty présent et pas de programme askpass spécifié
+sudo: pas de tty présent et pas de programme askpass spécifié
+sudo: pas de tty présent et pas de programme askpass spécifié
+sudo: pas de tty présent et pas de programme askpass spécifié
+[1m> Création d'un snapshot[0m
+sudo: pas de tty présent et pas de programme askpass spécifié
