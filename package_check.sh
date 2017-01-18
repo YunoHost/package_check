@@ -288,7 +288,8 @@ APP_LEVEL () {
 			[ "$GLOBAL_CHECK_PATH" -ne -1 ] && \
 			[ "$GLOBAL_CHECK_PORT" -ne -1 ] && \
 			[ "$GLOBAL_CHECK_BACKUP" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_RESTORE" -ne -1 ]
+			[ "$GLOBAL_CHECK_RESTORE" -ne -1 ] && \
+			[ "${level[5]}" -ge -1 ]	# Si tout les tests sont validés. Et si le level 5 est validé ou forcé.
 		then level[7]=2 ; else level[7]=0 ; fi
 	fi
 
