@@ -48,7 +48,7 @@ echo -e "\e[1m> Active le bridge réseau\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo ifup lxc-pchecker --interfaces=/etc/network/interfaces.d/lxc-pchecker >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Configuration réseau du conteneur\e[0m" | tee -a "$LOG_BUILD_LXC"
-sudo sed -i 's/^lxc.network.type = empty$/lxc.network.type = veth\nlxc.network.flags = up\nlxc.network.link = lxc-pchecker\nlxc.network.name = eth0\nlxc.network.veth.pair = $LXC_NAME\nlxc.network.hwaddr = 00:FF:AA:00:00:01/' /var/lib/lxc/$LXC_NAME/config >> "$LOG_BUILD_LXC" 2>&1
+sudo sed -i 's/^lxc.network.type = empty$/lxc.network.type = veth\nlxc.network.flags = up\nlxc.network.link = lxc-pchecker\nlxc.network.name = eth0\nlxc.network.hwaddr = 00:FF:AA:00:00:01/' /var/lib/lxc/$LXC_NAME/config >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Configuration réseau de la machine virtualisée\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo sed -i "s@iface eth0 inet dhcp@iface eth0 inet static\n\taddress $PLAGE_IP.2/24\n\tgateway $PLAGE_IP.1@" /var/lib/lxc/$LXC_NAME/rootfs/etc/network/interfaces >> "$LOG_BUILD_LXC" 2>&1
