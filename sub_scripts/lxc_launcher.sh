@@ -44,7 +44,7 @@ LXC_START () {
 					echo "Redémarrage du conteneur..."
 				fi
 				LXC_STOP
-			elif ssh $ARG_SSH $LXC_NAME "ping -q -c 2 security.debian.org > /dev/null 2>&1; exit \$?"; then	# Si le conteneur a démarré, test sa connectivité.
+			elif ! ssh $ARG_SSH $LXC_NAME "sudo ping -q -c 2 security.debian.org > /dev/null 2>&1; exit \$?"; then	# Si le conteneur a démarré, test sa connectivité.
 				ECHO_FORMAT "Le conteneur ne parvient pas à accéder à internet...\n" "lred" "bold"
 				failstart=1
 				if [ "$i" -ne 3 ]; then
