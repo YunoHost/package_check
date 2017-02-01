@@ -59,7 +59,7 @@ sudo iptables -A FORWARD -i eth0 -o lxc-pchecker -j ACCEPT >> "$LOG_BUILD_LXC" 2
 sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Démarrage de la machine\e[0m" | tee -a "$LOG_BUILD_LXC"
-sudo lxc-start -n $LXC_NAME -d >> "$LOG_BUILD_LXC" 2>&1
+sudo lxc-start -n $LXC_NAME -d --logfile "$script_dir/lxc_boot.log" >> "$LOG_BUILD_LXC" 2>&1
 sleep 3
 sudo lxc-ls -f >> "$LOG_BUILD_LXC" 2>&1
 

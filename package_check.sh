@@ -613,7 +613,7 @@ INIT_VAR
 INIT_LEVEL
 echo -n "" > "$COMPLETE_LOG"	# Initialise le fichier de log
 echo -n "" > "$RESULT"	# Initialise le fichier des résulats d'analyse
-> "$script_dir/lxc_boot.log"	# Initialise le fichier de log du boot du conteneur
+echo -n "" | sudo tee "$script_dir/lxc_boot.log"	# Initialise le fichier de log du boot du conteneur
 if [ "$no_lxc" -eq 0 ]; then
 	LXC_INIT
 fi

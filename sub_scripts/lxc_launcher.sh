@@ -26,7 +26,9 @@ LXC_START () {
 		for i in `seq 1 3`
 		do	# Tente jusqu'à 3 fois de démarrer le conteneur
 			# Démarrage de la machine
-			sudo lxc-start -n $LXC_NAME -d --logfile "$script_dir/lxc_boot.log" | tee -a "$RESULT" 2>&1
+			if sudo lxc-info --name $LXC_NAME | grep -q "STOPPED"; then
+				sudo lxc-start -n $LXC_NAME -d --logfile "$script_dir/lxc_boot.log" | tee -a "$RESULT" 2>&1
+			fi
 			for j in `seq 1 10`
 			do	# Vérifie que la machine est accessible en ssh avant de commencer. Il lui faut le temps de démarrer.
 				echo -n .
