@@ -26,7 +26,7 @@ LXC_START () {
 		for i in `seq 1 3`
 		do	# Tente jusqu'à 3 fois de démarrer le conteneur
 			# Démarrage de la machine
-			sudo lxc-start -n $LXC_NAME -d | tee -a "$RESULT" 2>&1
+			sudo lxc-start -n $LXC_NAME -d --logfile "$script_dir/lxc_boot.log" | tee -a "$RESULT" 2>&1
 			for j in `seq 1 10`
 			do	# Vérifie que la machine est accessible en ssh avant de commencer. Il lui faut le temps de démarrer.
 				echo -n .
@@ -56,6 +56,8 @@ LXC_START () {
 			fi
 			if [ "$i" -eq 3 ] && [ "$failstart" -eq 1 ]; then	# Si le dernier démarrage est encore en erreur, stoppe le test
 				ECHO_FORMAT "Le conteneur a rencontré des erreurs 3 fois de suite...\nSi le problème persiste, utilisez le script lxc_check.sh pour vérifier et réparer le conteneur." "lred" "bold"
+				echo "Log de démarrage:"
+				cat "$script_dir/lxc_boot.log"
 				return 1
 			fi
 		done
