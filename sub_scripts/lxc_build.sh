@@ -19,6 +19,8 @@ echo -e "\e[1m> Update et install lxc lxctl\e[0m" | tee "$LOG_BUILD_LXC"
 sudo apt-get update >> "$LOG_BUILD_LXC" 2>&1
 sudo apt-get install -y lxc lxctl >> "$LOG_BUILD_LXC" 2>&1
 
+sudo mkdir -p /var/lib/lxcsnaps	# Créer le dossier lxcsnaps, pour s'assurer que lxc utilisera ce dossier, même avec lxc 2.
+
 if sudo lxc-info -n $LXC_NAME > /dev/null 2>&1
 then	# Si le conteneur existe déjà
 	echo -e "\e[1m> Suppression du conteneur existant.\e[0m" | tee -a "$LOG_BUILD_LXC"
