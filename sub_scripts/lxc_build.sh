@@ -10,10 +10,20 @@ DOMAIN=domain.tld
 YUNO_PWD=admin
 LXC_NAME=pchecker_lxc
 
+# Tente de définir l'interface réseau principale
+main_iface=$(sudo route | grep default | awk '{print $8;}')	# Prend l'interface réseau défini par default
+if [ -z $main_iface ]; then
+	echo -e "\e[91mImpossible de déterminer le nom de l'interface réseau de l'hôte.\e[0m"
+	exit 1
+fi
+
 touch "$script_dir/../pcheck.lock" # Met en place le lock de Package check, le temps de l'installation
 
 # Check user
 echo $(whoami) > "$script_dir/setup_user"
+
+# Enregistre le nom de l'interface réseau de l'hôte dans un fichier de config
+echo -e "# interface réseau principale de l'hôte\niface=$main_iface\n" > "$script_dir/../config"
 
 echo -e "\e[1m> Update et install lxc lxctl\e[0m" | tee "$LOG_BUILD_LXC"
 sudo apt-get update >> "$LOG_BUILD_LXC" 2>&1
@@ -56,8 +66,8 @@ echo -e "\e[1m> Configuration réseau de la machine virtualisée\e[0m" | tee -a 
 sudo sed -i "s@iface eth0 inet dhcp@iface eth0 inet static\n\taddress $PLAGE_IP.2/24\n\tgateway $PLAGE_IP.1@" /var/lib/lxc/$LXC_NAME/rootfs/etc/network/interfaces >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Configure le parefeu\e[0m" | tee -a "$LOG_BUILD_LXC"
-sudo iptables -A FORWARD -i lxc-pchecker -o eth0 -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
-sudo iptables -A FORWARD -i eth0 -o lxc-pchecker -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
+sudo iptables -A FORWARD -i lxc-pchecker -o $main_iface -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
+sudo iptables -A FORWARD -i $main_iface -o lxc-pchecker -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
 sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Démarrage de la machine\e[0m" | tee -a "$LOG_BUILD_LXC"
@@ -128,8 +138,8 @@ echo -e "\e[1m> Arrêt de la machine virtualisée\e[0m" | tee -a "$LOG_BUILD_LXC
 sudo lxc-stop -n $LXC_NAME >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Suppression des règles de parefeu\e[0m" | tee -a "$LOG_BUILD_LXC"
-sudo iptables -D FORWARD -i lxc-pchecker -o eth0 -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
-sudo iptables -D FORWARD -i eth0 -o lxc-pchecker -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
+sudo iptables -D FORWARD -i lxc-pchecker -o $main_iface -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
+sudo iptables -D FORWARD -i $main_iface -o lxc-pchecker -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
 sudo iptables -t nat -D POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE >> "$LOG_BUILD_LXC" 2>&1
 sudo ifdown --force lxc-pchecker >> "$LOG_BUILD_LXC" 2>&1
 

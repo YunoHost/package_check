@@ -9,6 +9,18 @@ if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(
 PLAGE_IP=$(cat "$script_dir/lxc_build.sh" | grep PLAGE_IP= | cut -d '"' -f2)
 ARG_SSH="-t"
 LXC_NAME=$(cat "$script_dir/lxc_build.sh" | grep LXC_NAME= | cut -d '=' -f2)
+if [ -e "$script_dir/../config" ]; then
+	main_iface=$(cat "$script_dir/../config" | grep iface= | cut -d '=' -f2)
+else	# Si le fichier de config n'existe pas
+	# Tente de définir l'interface réseau principale
+	main_iface=$(sudo route | grep default | awk '{print $8;}')	# Prend l'interface réseau défini par default
+	if [ -z $main_iface ]; then
+		echo -e "\e[91mImpossible de déterminer le nom de l'interface réseau de l'hôte.\e[0m"
+		exit 1
+	fi
+	# Enregistre le nom de l'interface réseau de l'hôte dans un fichier de config
+	echo -e "# interface réseau principale de l'hôte\niface=$main_iface\n" > "$script_dir/../config"
+fi
 
 STOP_CONTAINER () {
         echo "Arrêt du conteneur $LXC_NAME"
@@ -19,15 +31,15 @@ START_NETWORK () {
 	echo "Initialisation du réseau pour le conteneur."
 	sudo ifup lxc-pchecker --interfaces=/etc/network/interfaces.d/lxc-pchecker
 	# Activation des règles iptables
-	sudo iptables -A FORWARD -i lxc-pchecker -o eth0 -j ACCEPT
-	sudo iptables -A FORWARD -i eth0 -o lxc-pchecker -j ACCEPT
+	sudo iptables -A FORWARD -i lxc-pchecker -o $main_iface -j ACCEPT
+	sudo iptables -A FORWARD -i $main_iface -o lxc-pchecker -j ACCEPT
 	sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE
 }
 
 STOP_NETWORK () {
 	echo "Arrêt du réseau pour le conteneur."
-        sudo iptables -D FORWARD -i lxc-pchecker -o eth0 -j ACCEPT > /dev/null 2>&1
-        sudo iptables -D FORWARD -i eth0 -o lxc-pchecker -j ACCEPT > /dev/null 2>&1
+        sudo iptables -D FORWARD -i lxc-pchecker -o $main_iface -j ACCEPT > /dev/null 2>&1
+        sudo iptables -D FORWARD -i $main_iface -o lxc-pchecker -j ACCEPT > /dev/null 2>&1
 	sudo iptables -t nat -D POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE > /dev/null 2>&1
 	sudo ifdown --force lxc-pchecker > /dev/null 2>&1
 }
@@ -245,11 +257,11 @@ do
 done
 
 # Test l'application des règles iptables
-sudo iptables -A FORWARD -i lxc-pchecker -o eth0 -j ACCEPT
-sudo iptables -A FORWARD -i eth0 -o lxc-pchecker -j ACCEPT
+sudo iptables -A FORWARD -i lxc-pchecker -o $main_iface -j ACCEPT
+sudo iptables -A FORWARD -i $main_iface -o lxc-pchecker -j ACCEPT
 sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE
 
-if sudo iptables -C FORWARD -i lxc-pchecker -o eth0 -j ACCEPT && sudo iptables -C FORWARD -i eth0 -o lxc-pchecker -j ACCEPT && sudo iptables -t nat -C POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE
+if sudo iptables -C FORWARD -i lxc-pchecker -o $main_iface -j ACCEPT && sudo iptables -C FORWARD -i $main_iface -o lxc-pchecker -j ACCEPT && sudo iptables -t nat -C POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE
 then
     echo -e "\e[92mLes règles iptables sont appliquées correctement.\e[0m"
 else
