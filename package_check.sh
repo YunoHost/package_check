@@ -548,6 +548,14 @@ TEST_RESULTS () {
 			ECHO_FORMAT "0\n"
 		fi
 	done
+	if [ "$level" -eq 0 ]
+	then	# Si l'app est au niveau 0, et que le test tourne en CI, envoi un mail d'avertissement.
+		if [ -e "$script_dir/../config" ]
+		then	# Test l'existence du fichier de config de CI_package_check, pour déterminer le type d'exécution du test
+			dest=$(grep "dest=" "$script_dir/../config" | cut -d= -f2)	# Récupère le destinataire du mail de CI
+			mail -s "Échec d'installation d'une application dans le CI" "$dest" <<< "L'application $(basename "$arg_app") vient d'échouer aux tests d'intégration continue !"	# Envoi un avertissement par mail.
+		fi
+	fi
 }
 
 INIT_VAR() {
