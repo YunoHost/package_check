@@ -9,6 +9,7 @@ ARG_SSH="-t"
 DOMAIN=domain.tld
 YUNO_PWD=admin
 LXC_NAME=pchecker_lxc
+LXC_BRIDGE=lxc-pchecker
 
 # Tente de définir l'interface réseau principale
 main_iface=$(sudo route | grep default | awk '{print $8;}')	# Prend l'interface réseau défini par default
@@ -47,9 +48,9 @@ echo "net.ipv4.ip_forward=1" | sudo tee /etc/sysctl.d/lxc_pchecker.conf >> "$LOG
 sudo sysctl -p /etc/sysctl.d/lxc_pchecker.conf >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Ajoute un brige réseau pour la machine virtualisée\e[0m" | tee -a "$LOG_BUILD_LXC"
-echo | sudo tee /etc/network/interfaces.d/lxc-pchecker <<EOF >> "$LOG_BUILD_LXC" 2>&1
-auto lxc-pchecker
-iface lxc-pchecker inet static
+echo | sudo tee /etc/network/interfaces.d/$LXC_BRIDGE <<EOF >> "$LOG_BUILD_LXC" 2>&1
+auto $LXC_BRIDGE
+iface $LXC_BRIDGE inet static
         address $PLAGE_IP.1/24
         bridge_ports none
         bridge_fd 0
@@ -57,17 +58,17 @@ iface lxc-pchecker inet static
 EOF
 
 echo -e "\e[1m> Active le bridge réseau\e[0m" | tee -a "$LOG_BUILD_LXC"
-sudo ifup lxc-pchecker --interfaces=/etc/network/interfaces.d/lxc-pchecker >> "$LOG_BUILD_LXC" 2>&1
+sudo ifup $LXC_BRIDGE --interfaces=/etc/network/interfaces.d/$LXC_BRIDGE >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Configuration réseau du conteneur\e[0m" | tee -a "$LOG_BUILD_LXC"
-sudo sed -i 's/^lxc.network.type = empty$/lxc.network.type = veth\nlxc.network.flags = up\nlxc.network.link = lxc-pchecker\nlxc.network.name = eth0\nlxc.network.hwaddr = 00:FF:AA:00:00:01/' /var/lib/lxc/$LXC_NAME/config >> "$LOG_BUILD_LXC" 2>&1
+sudo sed -i "s/^lxc.network.type = empty$/lxc.network.type = veth\nlxc.network.flags = up\nlxc.network.link = $LXC_BRIDGE\nlxc.network.name = eth0\nlxc.network.hwaddr = 00:FF:AA:00:00:01/" /var/lib/lxc/$LXC_NAME/config >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Configuration réseau de la machine virtualisée\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo sed -i "s@iface eth0 inet dhcp@iface eth0 inet static\n\taddress $PLAGE_IP.2/24\n\tgateway $PLAGE_IP.1@" /var/lib/lxc/$LXC_NAME/rootfs/etc/network/interfaces >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Configure le parefeu\e[0m" | tee -a "$LOG_BUILD_LXC"
-sudo iptables -A FORWARD -i lxc-pchecker -o $main_iface -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
-sudo iptables -A FORWARD -i $main_iface -o lxc-pchecker -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
+sudo iptables -A FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
+sudo iptables -A FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
 sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Démarrage de la machine\e[0m" | tee -a "$LOG_BUILD_LXC"
@@ -138,10 +139,10 @@ echo -e "\e[1m> Arrêt de la machine virtualisée\e[0m" | tee -a "$LOG_BUILD_LXC
 sudo lxc-stop -n $LXC_NAME >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Suppression des règles de parefeu\e[0m" | tee -a "$LOG_BUILD_LXC"
-sudo iptables -D FORWARD -i lxc-pchecker -o $main_iface -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
-sudo iptables -D FORWARD -i $main_iface -o lxc-pchecker -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
+sudo iptables -D FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
+sudo iptables -D FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
 sudo iptables -t nat -D POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE >> "$LOG_BUILD_LXC" 2>&1
-sudo ifdown --force lxc-pchecker >> "$LOG_BUILD_LXC" 2>&1
+sudo ifdown --force $LXC_BRIDGE >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Création d'un snapshot\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo lxc-snapshot -n $LXC_NAME >> "$LOG_BUILD_LXC" 2>&1

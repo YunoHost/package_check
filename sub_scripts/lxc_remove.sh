@@ -4,6 +4,7 @@
 if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
 
 LXC_NAME=$(cat "$script_dir/lxc_build.sh" | grep LXC_NAME= | cut -d '=' -f2)
+LXC_BRIDGE=$(cat "$script_dir/lxc_build.sh" | grep LXC_BRIDGE= | cut -d '=' -f2)
 
 # Check user
 if [ "$(whoami)" != "$(cat "$script_dir/setup_user")" ] && test -e "$script_dir/setup_user"; then
@@ -19,10 +20,10 @@ sudo rm /etc/sysctl.d/lxc_pchecker.conf
 sudo sysctl -p
 
 echo -e "\e[1m> Désactive le bridge réseau\e[0m"
-sudo ifdown --force lxc-pchecker
+sudo ifdown --force $LXC_BRIDGE
 
 echo -e "\e[1m> Supprime le brige réseau\e[0m"
-sudo rm /etc/network/interfaces.d/lxc-pchecker
+sudo rm /etc/network/interfaces.d/$LXC_BRIDGE
 
 echo -e "\e[1m> Suppression de la machine et de son snapshots\e[0m"
 sudo lxc-snapshot -n $LXC_NAME -d snap0

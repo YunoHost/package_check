@@ -9,6 +9,7 @@ if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(
 PLAGE_IP=$(cat "$script_dir/lxc_build.sh" | grep PLAGE_IP= | cut -d '"' -f2)
 ARG_SSH="-t"
 LXC_NAME=$(cat "$script_dir/lxc_build.sh" | grep LXC_NAME= | cut -d '=' -f2)
+LXC_BRIDGE=$(cat "$script_dir/lxc_build.sh" | grep LXC_BRIDGE= | cut -d '=' -f2)
 if [ -e "$script_dir/../config" ]; then
 	main_iface=$(cat "$script_dir/../config" | grep iface= | cut -d '=' -f2)
 else	# Si le fichier de config n'existe pas
@@ -29,19 +30,19 @@ STOP_CONTAINER () {
 
 START_NETWORK () {
 	echo "Initialisation du réseau pour le conteneur."
-	sudo ifup lxc-pchecker --interfaces=/etc/network/interfaces.d/lxc-pchecker
+	sudo ifup $LXC_BRIDGE --interfaces=/etc/network/interfaces.d/$LXC_BRIDGE
 	# Activation des règles iptables
-	sudo iptables -A FORWARD -i lxc-pchecker -o $main_iface -j ACCEPT
-	sudo iptables -A FORWARD -i $main_iface -o lxc-pchecker -j ACCEPT
+	sudo iptables -A FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT
+	sudo iptables -A FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT
 	sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE
 }
 
 STOP_NETWORK () {
 	echo "Arrêt du réseau pour le conteneur."
-        sudo iptables -D FORWARD -i lxc-pchecker -o $main_iface -j ACCEPT > /dev/null 2>&1
-        sudo iptables -D FORWARD -i $main_iface -o lxc-pchecker -j ACCEPT > /dev/null 2>&1
+        sudo iptables -D FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT > /dev/null 2>&1
+        sudo iptables -D FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT > /dev/null 2>&1
 	sudo iptables -t nat -D POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE > /dev/null 2>&1
-	sudo ifdown --force lxc-pchecker > /dev/null 2>&1
+	sudo ifdown --force $LXC_BRIDGE > /dev/null 2>&1
 }
 
 REBOOT_CONTENEUR () {
@@ -141,13 +142,13 @@ LXC_NETWORK_CONFIG () {
 	    echo "lxc.network.flags = up" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
 	fi
     fi
-    if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^lxc.network.link = lxc-pchecker"; then
+    if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^lxc.network.link = $LXC_BRIDGE"; then
 	lxc_network=1
 	check_repair=1
 	if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*lxc.network.link"; then
-	    sudo sed -i "s/.*lxc.network.link.*/lxc.network.link = lxc-pchecker/g" /var/lib/lxc/$LXC_NAME/config
+	    sudo sed -i "s/.*lxc.network.link.*/lxc.network.link = $LXC_BRIDGE" /var/lib/lxc/$LXC_NAME/config
 	else
-	    echo "lxc.network.link = lxc-pchecker" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
+	    echo "lxc.network.link = $LXC_BRIDGE" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
 	fi
     fi
     if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^lxc.network.name = eth0"; then
@@ -193,9 +194,9 @@ check_repair=0
 ### Test de la configuration réseau
 echo -e "\e[1m> Test de la configuration réseau du côté de l'hôte:\e[0m"
 CREATE_BRIDGE () {
-    echo | sudo tee /etc/network/interfaces.d/lxc-pchecker <<EOF
-    auto lxc-pchecker
-    iface lxc-pchecker inet static
+    echo | sudo tee /etc/network/interfaces.d/$LXC_BRIDGE <<EOF
+    auto $LXC_BRIDGE
+    iface $LXC_BRIDGE inet static
             address $PLAGE_IP.1/24
             bridge_ports none
             bridge_fd 0
@@ -203,7 +204,7 @@ CREATE_BRIDGE () {
 EOF
 }
 # Test la présence du fichier de config du bridge lxc-pchecher
-if ! test -e /etc/network/interfaces.d/lxc-pchecker
+if ! test -e /etc/network/interfaces.d/$LXC_BRIDGE
 then
     echo -e "\e[91mLe fichier de configuration du bridge est introuvable.\nIl va être recréé.\e[0m"
 	check_repair=1
@@ -215,12 +216,12 @@ fi
 bridge=0
 while test "$bridge" -ne 1
 do
-    sudo ifup lxc-pchecker --interfaces=/etc/network/interfaces.d/lxc-pchecker
-    if sudo ifconfig | grep -q lxc-pchecker
+    sudo ifup $LXC_BRIDGE --interfaces=/etc/network/interfaces.d/$LXC_BRIDGE
+    if sudo ifconfig | grep -q $LXC_BRIDGE
     then
         echo -e "\e[92mLe bridge démarre correctement.\e[0m"
         # Vérifie que le bridge obtient une adresse IP
-        if sudo ifconfig | grep -A 10 lxc-pchecker | grep "inet adr" | grep -q -F "$PLAGE_IP.1 "
+        if sudo ifconfig | grep -A 10 $LXC_BRIDGE | grep "inet adr" | grep -q -F "$PLAGE_IP.1 "
         then
             echo -e "\e[92mLe bridge obtient correctement son adresse IP.\e[0m"
         else
@@ -228,7 +229,7 @@ do
                 echo -e "\e[91mLe bridge n'obtient pas la bonne adresse IP. Tentative de réparation...\e[0m"
 				check_repair=1
                 CREATE_BRIDGE
-                sudo ifdown --force lxc-pchecker
+                sudo ifdown --force $LXC_BRIDGE
                 bridge=-1   # Bridge à -1 pour indiquer que cette erreur s'est déjà présentée.
                 continue    # Retourne au début de la boucle pour réessayer
             else
@@ -243,7 +244,7 @@ do
             echo -e "\e[91mLe bridge ne démarre pas. Tentative de réparation...\e[0m"
 			check_repair=1
             CREATE_BRIDGE
-            sudo ifdown --force lxc-pchecker
+            sudo ifdown --force $LXC_BRIDGE
             bridge=-2   # Bridge à -1 pour indiquer que cette erreur s'est déjà présentée.
             continue    # Retourne au début de la boucle pour réessayer
         else
@@ -257,11 +258,11 @@ do
 done
 
 # Test l'application des règles iptables
-sudo iptables -A FORWARD -i lxc-pchecker -o $main_iface -j ACCEPT
-sudo iptables -A FORWARD -i $main_iface -o lxc-pchecker -j ACCEPT
+sudo iptables -A FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT
+sudo iptables -A FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT
 sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE
 
-if sudo iptables -C FORWARD -i lxc-pchecker -o $main_iface -j ACCEPT && sudo iptables -C FORWARD -i $main_iface -o lxc-pchecker -j ACCEPT && sudo iptables -t nat -C POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE
+if sudo iptables -C FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT && sudo iptables -C FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT && sudo iptables -t nat -C POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE
 then
     echo -e "\e[92mLes règles iptables sont appliquées correctement.\e[0m"
 else

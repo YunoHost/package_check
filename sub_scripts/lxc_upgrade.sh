@@ -12,6 +12,7 @@ touch "$script_dir/../pcheck.lock" # Met en place le lock de Package check
 
 PLAGE_IP=$(cat "$script_dir/lxc_build.sh" | grep PLAGE_IP= | cut -d '"' -f2)
 LXC_NAME=$(cat "$script_dir/lxc_build.sh" | grep LXC_NAME= | cut -d '=' -f2)
+LXC_BRIDGE=$(cat "$script_dir/lxc_build.sh" | grep LXC_BRIDGE= | cut -d '=' -f2)
 if [ -e "$script_dir/../config" ]; then
 	main_iface=$(cat "$script_dir/../config" | grep iface= | cut -d '=' -f2)
 else	# Si le fichier de config n'existe pas
@@ -34,19 +35,19 @@ if [ "$(whoami)" != "$(cat "$script_dir/setup_user")" ] && test -e "$script_dir/
 fi
 
 echo "\e[1m> Active le bridge réseau\e[0m"
-if ! sudo ifquery lxc-pchecker --state > /dev/null
+if ! sudo ifquery $LXC_BRIDGE --state > /dev/null
 then
-	sudo ifup lxc-pchecker --interfaces=/etc/network/interfaces.d/lxc-pchecker
+	sudo ifup $LXC_BRIDGE --interfaces=/etc/network/interfaces.d/$LXC_BRIDGE
 fi
 
 echo "\e[1m> Configure le parefeu\e[0m"
-if ! sudo iptables -D FORWARD -i lxc-pchecker -o $main_iface -j ACCEPT 2> /dev/null
+if ! sudo iptables -D FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT 2> /dev/null
 then
-	sudo iptables -A FORWARD -i lxc-pchecker -o $main_iface -j ACCEPT
+	sudo iptables -A FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT
 fi
-if ! sudo iptables -C FORWARD -i $main_iface -o lxc-pchecker -j ACCEPT 2> /dev/null
+if ! sudo iptables -C FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT 2> /dev/null
 then
-	sudo iptables -A FORWARD -i $main_iface -o lxc-pchecker -j ACCEPT
+	sudo iptables -A FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT
 fi
 if ! sudo iptables -t nat -C POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE 2> /dev/null
 then
@@ -82,10 +83,10 @@ echo "\e[1m> Arrêt de la machine virtualisée\e[0m"
 sudo lxc-stop -n $LXC_NAME
 
 echo "\e[1m> Suppression des règles de parefeu\e[0m"
-sudo iptables -D FORWARD -i lxc-pchecker -o $main_iface -j ACCEPT
-sudo iptables -D FORWARD -i $main_iface -o lxc-pchecker -j ACCEPT
+sudo iptables -D FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT
+sudo iptables -D FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT
 sudo iptables -t nat -D POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE
-sudo ifdown --force lxc-pchecker
+sudo ifdown --force $LXC_BRIDGE
 
 
 if [ "$update_apt" -eq 1 ]
