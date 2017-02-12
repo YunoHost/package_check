@@ -78,6 +78,10 @@ sudo lxc-attach -n $LXC_NAME -- apt-get dist-upgrade -y
 echo "\e[1m> Clean\e[0m"
 sudo lxc-attach -n $LXC_NAME -- apt-get autoremove -y
 sudo lxc-attach -n $LXC_NAME -- apt-get autoclean
+if [ "$update_apt" -eq 1 ]
+then	# Print les numéros de version de Yunohost, si il y a eu un upgrade
+	(sudo lxc-attach -n $LXC_NAME -- yunohost -v) | sudo tee "$script_dir/ynh_version"
+fi
 
 echo "\e[1m> Arrêt de la machine virtualisée\e[0m"
 sudo lxc-stop -n $LXC_NAME
