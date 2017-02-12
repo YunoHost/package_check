@@ -171,6 +171,7 @@ L'usage de LXC est facilité par 4 scripts, permettant de gérer la création, l
 
 ---
 ---
+## Package checker for YunoHost
 
 Set of unit tests for check Yunohost packages.  
 The `package_check.sh` script perform a series of tests on a package for check its capability to install and remove in différents cases.  
