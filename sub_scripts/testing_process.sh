@@ -57,7 +57,13 @@ CHECK_URL () {
 			IP_CURL="127.0.0.1"
 		fi
 		echo -e "$IP_CURL $DOMAIN #package_check\n$IP_CURL $SOUS_DOMAIN #package_check" | sudo tee -a /etc/hosts > /dev/null	# Renseigne le hosts pour le domain à tester, pour passer directement sur localhost
-		sleep 1	# Évite peut-être (?) les erreurs de résolution dns de curl.
+		i=1; while [ "$i" -le 5 ]; do
+			curl -Lk $DOMAIN > /dev/null 2>&1
+			if [ $? -ne 6 ]; then
+				break	# Si curl renvoi 6, c'est l'erreur "Could not resolve host"
+			fi
+			sleep 1; (( i++ ))	# Boucle pendant 5 secondes max pour laisser du temps au dns.
+		done
 		curl_error=0
 		http503=0
 		i=1
