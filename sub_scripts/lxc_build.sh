@@ -83,7 +83,7 @@ echo -e "\e[1m> Update et install aptitude sudo git\e[0m" | tee -a "$LOG_BUILD_L
 sudo lxc-attach -n $LXC_NAME -- apt-get update
 sudo lxc-attach -n $LXC_NAME -- apt-get install -y aptitude sudo git
 echo -e "\e[1m> Installation des paquets standard et ssh-server\e[0m" | tee -a "$LOG_BUILD_LXC"
-sudo lxc-attach -n $LXC_NAME -- aptitude install -y ~pstandard ~prequired ~pimportant task-ssh-server
+sudo lxc-attach -n $LXC_NAME -- apt-get install -y ~pstandard ~prequired ~pimportant task-ssh-server
 
 echo -e "\e[1m> Renseigne /etc/hosts sur l'invité\e[0m" | tee -a "$LOG_BUILD_LXC"
 echo "127.0.0.1 $LXC_NAME" | sudo tee -a /var/lib/lxc/$LXC_NAME/rootfs/etc/hosts >> "$LOG_BUILD_LXC" 2>&1
