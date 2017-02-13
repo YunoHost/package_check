@@ -76,6 +76,9 @@ sudo lxc-start -n $LXC_NAME -d --logfile "$script_dir/lxc_boot.log" >> "$LOG_BUI
 sleep 3
 sudo lxc-ls -f >> "$LOG_BUILD_LXC" 2>&1
 
+echo -e "\e[1m> On lance l'interface réseau\e[0m" | tee -a "$LOG_BUILD_LXC"
+sudo lxc-attach -n $LXC_NAME -- /etc/init.d/networking start
+
 echo -e "\e[1m> Update et install aptitude sudo git\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo lxc-attach -n $LXC_NAME -- apt-get update
 sudo lxc-attach -n $LXC_NAME -- apt-get install -y aptitude sudo git
