@@ -70,11 +70,13 @@ echo "\e[1m> Update\e[0m"
 update_apt=0
 sudo lxc-attach -n $LXC_NAME -- apt-get update
 sudo lxc-attach -n $LXC_NAME -- apt-get dist-upgrade --dry-run | grep -q "^Inst "	# Vérifie si il y aura des mises à jour.
+
 if [ "$?" -eq 0 ]; then
 	update_apt=1
 fi
 echo "\e[1m> Upgrade\e[0m"
-sudo lxc-attach -n $LXC_NAME -- apt-get dist-upgrade -y
+sudo lxc-attach -n $LXC_NAME -- apt-get dist-upgrade --option Dpkg::Options::=--force-confold -yy
+
 echo "\e[1m> Clean\e[0m"
 sudo lxc-attach -n $LXC_NAME -- apt-get autoremove -y
 sudo lxc-attach -n $LXC_NAME -- apt-get autoclean
