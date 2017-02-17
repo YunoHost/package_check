@@ -129,8 +129,8 @@ Si un test est absent de la liste, il sera ignoré. Cela revient à le noter à 
 - `final_path_already_use`: *Non implémenté pour le moment...*
 
 ### `;;; Levels`
-Permet de choisir comment [chaque niveau](https://forum.yunohost.org/t/redaction-de-regles-pour-passer-une-app-en-officielle/2256/26) est déterminé.
-Chaque niveau fixé à *auto* sera déterminé par le script. Il est également possible de fixer le niveau à *1* ou à *0* pour respectivement le valider ou l'invalider.
+Permet de choisir comment [chaque niveau](https://yunohost.org/#/packaging_apps_levels_fr) est déterminé.  
+Chaque niveau fixé à *auto* sera déterminé par le script. Il est également possible de fixer le niveau à *1* ou à *0* pour respectivement le valider ou l'invalider.  
 Il est à noter que les niveaux 4, 8, 9 et 10 ne peuvent être fixés à *auto* car ils ne peuvent être testés par le script et nécessitent une vérification manuelle. Il est toutefois possible de les fixer à *na* pour indiquer que le niveau n'est pas applicable (par exemple pour le niveau 4 quand une app ne propose pas de SSO LDAP). Un niveau *na* sera tout simplement ignoré dans le calcul du niveau final.
 - Niveau 1 : L'application s'installe et se désinstalle correctement. -- Peut être vérifié par package_check
 - Niveau 2 : L'application s'installe et se désinstalle dans toutes les configurations communes. -- Peut être vérifié par package_check
@@ -286,6 +286,22 @@ If a test is not in the list, it will be ignored. It's similar to marked at 0.
         The `port_already_use` test may eventually take in argument the port number.  
         The port number must be written into parentheses, it will serve to test port.  
 - `final_path_already_use`: *Not implemented yet...*
+
+### `;;; Levels`
+Allow to choose how [each level](https://yunohost.org/#/packaging_apps_levels) is determined  
+Each level at *auto* will be determinate by the script. It's also possible to fixate the level at *1* or *0* to respectively validate or invalidate it.  
+The level 4, 8, 9 and 10 shouldn't be fixed at *auto*, because they don't be tested by the script and they need a manuel check. However, it's allowed to force them at *na* to inform that a level is not applicable (example for the level 4 when a app not permit to use SSO or LDAP). A level at *na* will be ignored in the sum of final level.
+
+- Level 1 : The application installs and uninstalls correctly. -- Can be checked by package_check
+- Level 2 : The application installs and uninstalls correctly in all standard configurations. -- Can be checked by package_check
+- Level 3 : The application may upgrade from an old version. -- Can be checked by package_check
+- Level 4 : The application manages LDAP and/or HTTP Auth. -- Must be validated manually
+- Level 5 : No errors with package_linter. -- Can be checked by package_check
+- Level 6 : The application may be saved and restored without any errors on the same server or an another. -- Can be checked by package_check
+- Level 7 : No errors with package check. -- Can be checked by package_check
+- Level 8 : The application respects all recommended YEP. -- Must be validated manually
+- Level 9 : The application respects all optionnal YEP. -- Must be validated manually
+- Level 10 : The application has judged as perfect. -- Must be validated manually
 
 ---
 The `package_check.sh` script accept 6 arguments in addition of package to be checked.
