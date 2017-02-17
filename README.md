@@ -288,7 +288,7 @@ If a test is not in the list, it will be ignored. It's similar to marked at 0.
 - `final_path_already_use`: *Not implemented yet...*
 
 ### `;;; Levels`
-Allow to choose how [each level](https://yunohost.org/#/packaging_apps_levels) is determined  
+Allow to choose how [each level](https://yunohost.org/#/packaging_apps_levels_fr) is determined  
 Each level at *auto* will be determinate by the script. It's also possible to fixate the level at *1* or *0* to respectively validate or invalidate it.  
 The level 4, 8, 9 and 10 shouldn't be fixed at *auto*, because they don't be tested by the script and they need a manuel check. However, it's allowed to force them at *na* to inform that a level is not applicable (example for the level 4 when a app not permit to use SSO or LDAP). A level at *na* will be ignored in the sum of final level.
 
