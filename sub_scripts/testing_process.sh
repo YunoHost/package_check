@@ -158,12 +158,12 @@ CHECK_SETUP_SUBDIR () {
 		return
 	fi
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-zA-Z./-$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-zA-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-zA-Z/-$]*\&@$MANIFEST_USER=$USER_TEST\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-zA-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[-[:alpha:].$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[-[:alpha:]$]*\&@$MANIFEST_USER=$USER_TEST\&@")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[[:alpha:]$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
 	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-zA-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[[:alpha:]]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
 	fi
 	# Installation de l'app
 	SETUP_APP
@@ -227,12 +227,12 @@ CHECK_SETUP_ROOT () {
 		return
 	fi
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-Z/-$]*\&@$MANIFEST_USER=$USER_TEST\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[-[:alpha:].$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=/\&@")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[-[:alpha:]$]*\&@$MANIFEST_USER=$USER_TEST\&@")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[[:alpha:]$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
 	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[[:alpha:]]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
 	fi
 	# Installation de l'app
 	SETUP_APP
@@ -357,17 +357,17 @@ CHECK_UPGRADE () {
 		return;
 	fi
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-Z/-$]*\&@$MANIFEST_USER=$USER_TEST\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[-[:alpha:].$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[-[:alpha:]$]*\&@$MANIFEST_USER=$USER_TEST\&@")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[[:alpha:]$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
 	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[[:alpha:]]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
 	fi
 	if [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=/\&@")
 		CHECK_PATH="/"
 	elif [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
 		CHECK_PATH="$PATH_TEST"
 	else
 		echo "Aucun mode d'installation n'a fonctionné, impossible d'effectuer ce test..."
@@ -424,11 +424,11 @@ CHECK_BACKUP_RESTORE () {
 		echo "L'installation a échouée, impossible d'effectuer ce test..."
 	fi
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-Z/-$]*\&@$MANIFEST_USER=$USER_TEST\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[-[:alpha:].$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[-[:alpha:]$]*\&@$MANIFEST_USER=$USER_TEST\&@")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[[:alpha:]$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
 	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[[:alpha:]]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
 	fi
 	GLOBAL_CHECK_BACKUP=0	# Remet à 0 le résultat du test. En cas de reboucle
 	GLOBAL_CHECK_RESTORE=0
@@ -437,7 +437,7 @@ CHECK_BACKUP_RESTORE () {
 		if [ "$i" -eq 0 ]
 		then	# Commence par l'install root
 			if [ "$GLOBAL_CHECK_ROOT" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné. Ou si l'argument force_install_ok est présent.
-				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
+				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=/\&@")
 				CHECK_PATH="/"
 				ECHO_FORMAT "\nInstallation préalable à la racine...\n" "white" "bold" clog
 			else
@@ -447,7 +447,7 @@ CHECK_BACKUP_RESTORE () {
 		elif [ "$i" -eq 1 ]
 		then	# Puis teste l'install sub_dir
 			if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
-				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
+				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
 				CHECK_PATH="$PATH_TEST"
 				ECHO_FORMAT "\nInstallation préalable en sous-dossier...\n" "white" "bold" clog
 			else
@@ -571,22 +571,22 @@ CHECK_PUBLIC_PRIVATE () {
 		return
 	fi
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-Z/-$]*\&@$MANIFEST_USER=$USER_TEST\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[-[:alpha:].$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[-[:alpha:]$]*\&@$MANIFEST_USER=$USER_TEST\&@")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[[:alpha:]$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
 	# Choix public/privé
 	if [ "$1" == "private" ]; then
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z0-9]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_private\&/")
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[[:alnum:]]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_private\&/")
 	fi
 	if [ "$1" == "public" ]; then
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z0-9]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[[:alnum:]]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
 	fi
 	for i in 0 1
 	do	# 2 passes, pour effectuer un test en root et en sub_dir
 		if [ "$i" -eq 0 ]
 		then	# Commence par l'install root
 			if [ "$GLOBAL_CHECK_ROOT" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné. Ou si l'argument force_install_ok est présent.
-				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
+				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=/\&@")
 				CHECK_PATH="/"
 			else
 				echo "L'installation à la racine n'a pas fonctionnée, impossible d'effectuer ce test..."
@@ -595,7 +595,7 @@ CHECK_PUBLIC_PRIVATE () {
 		elif [ "$i" -eq 1 ]
 		then	# Puis teste l'install sub_dir
 			if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
-				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
+				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
 				CHECK_PATH="$PATH_TEST"
 			else
 				echo "L'installation en sous-dossier n'a pas fonctionnée, impossible d'effectuer ce test..."
@@ -660,14 +660,14 @@ CHECK_MULTI_INSTANCE () {
 		return
 	fi
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-Z/-$]*\&@$MANIFEST_USER=$USER_TEST\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[-[:alpha:].$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[-[:alpha:]$]*\&@$MANIFEST_USER=$USER_TEST\&@")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[[:alpha:]$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
 	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[[:alpha:]]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
 	fi
 	if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
 	else
 		echo "L'installation en sous-dossier n'a pas fonctionné, impossible d'effectuer ce test..."
 		return;
@@ -681,7 +681,7 @@ CHECK_MULTI_INSTANCE () {
 	# Installation de l'app une deuxième fois, en ajoutant un suffixe au path
 	path2="$PATH_TEST-2"
 	ECHO_FORMAT "2e installation: path=$path2\n" clog
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$path2\&@")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=$path2\&@")
 	SETUP_APP
 	LOG_EXTRACTOR
 	APPID_second=$APPID	# Stocke le nom de la deuxième instance
@@ -763,40 +763,40 @@ CHECK_COMMON_ERROR () {
 	fi
 	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
 	if [ "$1" == "wrong_path" ]; then	# Force un domaine incorrect
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=domainenerreur.rien\&/")
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[-[:alpha:].$]*\&/$MANIFEST_DOMAIN=domainenerreur.rien\&/")
 	else
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[a-Z./-$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[-[:alpha:].$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
 	fi
 	if [ "$1" == "wrong_user" ]; then	# Force un user incorrect
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-Z/-$]*\&@$MANIFEST_USER=NO_USER\&@")
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[-[:alpha:]$]*\&@$MANIFEST_USER=NO_USER\&@")
 	else
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[a-Z/-$]*\&@$MANIFEST_USER=$USER_TEST\&@")
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[-[:alpha:]$]*\&@$MANIFEST_USER=$USER_TEST\&@")
 	fi
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[a-Z$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
+	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[[:alpha:]$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
 	if [ "$1" == "incorrect_path" ]; then	# Force un path mal formé: Ce sera path/ au lieu de /path
 		WRONG_PATH=${PATH_TEST#/}/	# Transforme le path de /path à path/
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$WRONG_PATH\&@")
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=$WRONG_PATH\&@")
 		CHECK_PATH="$PATH_TEST"
 	else
 		if [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné
-			MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=/\&@")
+			MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=/\&@")
 			CHECK_PATH="/"
 		elif [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
-			MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[a-Z/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
+			MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
 		else
 			echo "Aucun mode d'installation n'a fonctionné, impossible d'effectuer ce test..."
 			return;
 		fi
 	fi
 	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[a-Z]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
+		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[[:alpha:]]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
 	fi
 	if [ "$1" == "port_already_use" ]; then	# Force un port déjà utilisé
 		if [ "${MANIFEST_PORT:0:1}" == "#" ]	# Si le premier caractère de $MANIFEST_PORT est un #, c'est un numéro de port. Absent du manifest
 		then
 			check_port="${MANIFEST_PORT:1}"	# Récupère le numéro de port
 		else
-			MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PORT=[0-9$]*\&@$MANIFEST_PORT=6660\&@")
+			MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PORT=[[:digit:]$]*\&@$MANIFEST_PORT=6660\&@")
 			check_port=6660 # Sinon fixe le port à 6660 dans le manifest
 		fi
 		LXC_START "sudo yunohost firewall allow Both $check_port"
@@ -923,23 +923,23 @@ TEST_LAUNCHER () {
 	# $1 prend le nom de la fonction à démarrer.
 	# $2 prend l'argument de la fonction, le cas échéant
 	# Ce launcher permet de factoriser le code autour du lancement des fonctions de test
-	BUG654=1	# Patch #654
-	while [ "$BUG654" -eq "1" ]; do	# Patch #654
+# 	BUG654=1	# Patch #654
+# 	while [ "$BUG654" -eq "1" ]; do	# Patch #654
 		$1 $2	# Exécute le test demandé, avec son éventuel argument
 		LXC_STOP	# Arrête le conteneur LXC
-		PATCH_654	# Patch #654
-		BUG654=$?	# Patch #654
-		if [ "$BUG654" -eq "1" ]; then	# Patch #654
-			ECHO_FORMAT "\n!! Bug 654 détecté !!\n" "red" clog	# Patch #654
-			echo -e "date\nBug 654 sur $1 $2\n\n" >> "$script_dir/patch_#654.log"	# Patch #654
-			cur_test=$((cur_test-1))
-			tnote=$((tnote-1))
-		fi	# Patch #654
-	done	# Patch #654
+# 		PATCH_654	# Patch #654
+# 		BUG654=$?	# Patch #654
+# 		if [ "$BUG654" -eq "1" ]; then	# Patch #654
+# 			ECHO_FORMAT "\n!! Bug 654 détecté !!\n" "red" clog	# Patch #654
+# 			echo -e "date\nBug 654 sur $1 $2\n\n" >> "$script_dir/patch_#654.log"	# Patch #654
+# 			cur_test=$((cur_test-1))
+# 			tnote=$((tnote-1))
+# 		fi	# Patch #654
+# 	done	# Patch #654
 }
 
 TESTING_PROCESS () {
-source "$script_dir/sub_scripts/patch_#654.sh"	# Patch #654
+# source "$script_dir/sub_scripts/patch_#654.sh"	# Patch #654
 	# Lancement des tests
 	cur_test=1
 	ECHO_FORMAT "\nScénario de test: $PROCESS_NAME\n" "white" "underlined" clog
