@@ -85,6 +85,15 @@ LXC_STOP () {
 		fi		
 		# Restaure le snapshot.
 		echo "Restauration du snapshot de la machine lxc" | tee -a "$RESULT"
+		if ! sudo grep -q "$LXC_NAME" /var/lib/lxcsnaps/$LXC_NAME/snap0/rootfs/etc/hosts
+		then	# Si le nom de la machine n'est pas dans le hosts
+			if sudo grep -q "snap0" /var/lib/lxcsnaps/$LXC_NAME/snap0/rootfs/etc/hosts
+			then	# Si le hosts a été remplacé par snap0 (-_-), on corrige
+				sudo sed -i "s/snap0/$LXC_NAME/" /var/lib/lxcsnaps/$LXC_NAME/snap0/rootfs/etc/hosts
+			else	# Sinon ajoute simplement une ligne dans le hosts
+				echo "$LXC_NAME" | sudo tee -a /var/lib/lxcsnaps/$LXC_NAME/snap0/rootfs/etc/hosts > /dev/null
+			fi
+		fi
 		sudo rsync -aEAX --delete -i /var/lib/lxcsnaps/$LXC_NAME/snap0/rootfs/ /var/lib/lxc/$LXC_NAME/rootfs/ > /dev/null 2>> "$RESULT"
 	fi
 }
