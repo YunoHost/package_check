@@ -4,18 +4,18 @@
 if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
 
 LOG_BUILD_LXC="$script_dir/Build_lxc.log"
-PLAGE_IP="10.1.4"
+PLAGE_IP="10.0.3"
 ARG_SSH="-t"
 DOMAIN=domain.tld
 YUNO_PWD=admin
 LXC_NAME=pchecker_lxc
-LXC_BRIDGE=lxc-pchecker
+LXC_BRIDGE=lxcbr0
 
 # Tente de définir l'interface réseau principale
-main_iface=$(sudo route | grep default | awk '{print $8;}')	# Prend l'interface réseau défini par default
+main_iface=$(sudo route | grep default | awk '{print $8;}')     # Prend l'interface réseau défini par default
 if [ -z $main_iface ]; then
-	echo -e "\e[91mImpossible de déterminer le nom de l'interface réseau de l'hôte.\e[0m"
-	exit 1
+        echo -e "\e[91mImpossible de déterminer le nom de l'interface réseau de l'hôte.\e[0m"
+        exit 1
 fi
 
 touch "$script_dir/../pcheck.lock" # Met en place le lock de Package check, le temps de l'installation
@@ -28,23 +28,28 @@ echo -e "# interface réseau principale de l'hôte\niface=$main_iface\n" > "$scr
 
 echo -e "\e[1m> Update et install lxc lxctl\e[0m" | tee "$LOG_BUILD_LXC"
 sudo apt-get update >> "$LOG_BUILD_LXC" 2>&1
-sudo apt-get install -y lxc lxctl >> "$LOG_BUILD_LXC" 2>&1
+sudo apt-get install -y lxc lxctl debootstrap bridge-utils >> "$LOG_BUILD_LXC" 2>&1
 
 os_name=$(sed -n -e '/PRETTY_NAME/ s/^.*=\|"\| .*//gp' /etc/os-release);
 if [ os_name == "Ubuntu" ]
 then
-	echo -e "\e[1m> Install lxc-templates debootstrap si Ubuntu\e[0m" | tee "$LOG_BUILD_LXC"
-	sudo apt-get install -y lxc-templates debootstrap >> "$LOG_BUILD_LXC" 2>&1
+	sudo apt-get install -y lxc-templates >> "$LOG_BUILD_LXC" 2>&1
+fi
+if [ os_name == "Debian" ]
+then
+	echo -e "\e[1m> On configure le bridge de LXC sur Debian\e[0m" | tee "$LOG_BUILD_LXC"
+	sudo sed -i 's/^USE_LXC_BRIDGE="true"$/USE_LXC_BRIDGE="false"/' /etc/default/lxc-net >> "$LOG_BUILD_LXC" 2>&1
+	sudo service lxc-net restart >> "$LOG_BUILD_LXC" 2>&1
 fi
 
-sudo mkdir -p /var/lib/lxcsnaps	# Créer le dossier lxcsnaps, pour s'assurer que lxc utilisera ce dossier, même avec lxc 2.
+sudo mkdir -p /var/lib/lxcsnaps # Créer le dossier lxcsnaps, pour s'assurer que lxc utilisera ce dossier, même avec lxc 2.
 
 if sudo lxc-info -n $LXC_NAME > /dev/null 2>&1
-then	# Si le conteneur existe déjà
-	echo -e "\e[1m> Suppression du conteneur existant.\e[0m" | tee -a "$LOG_BUILD_LXC"
-	sudo lxc-snapshot -n $LXC_NAME -d snap0 | tee -a "$LOG_BUILD_LXC"
-	sudo rm -f /var/lib/lxcsnaps/$LXC_NAME/snap0.tar.gz | tee -a "$LOG_BUILD_LXC"
-	sudo lxc-destroy -n $LXC_NAME -f | tee -a "$LOG_BUILD_LXC"
+then    # Si le conteneur existe déjà
+        echo -e "\e[1m> Suppression du conteneur existant.\e[0m" | tee -a "$LOG_BUILD_LXC"
+        sudo lxc-snapshot -n $LXC_NAME -d snap0 | tee -a "$LOG_BUILD_LXC"
+        sudo rm -f /var/lib/lxcsnaps/$LXC_NAME/snap0.tar.gz | tee -a "$LOG_BUILD_LXC"
+        sudo lxc-destroy -n $LXC_NAME -f | tee -a "$LOG_BUILD_LXC"
 fi
 
 echo -e "\e[1m> Création d'une machine debian jessie minimaliste.\e[0m" | tee -a "$LOG_BUILD_LXC"
@@ -64,27 +69,19 @@ iface $LXC_BRIDGE inet static
         bridge_maxwait 0
 EOF
 
-echo -e "\e[1m> Active le bridge réseau\e[0m" | tee -a "$LOG_BUILD_LXC"
-sudo ifup $LXC_BRIDGE --interfaces=/etc/network/interfaces.d/$LXC_BRIDGE >> "$LOG_BUILD_LXC" 2>&1
-
 echo -e "\e[1m> Configuration réseau du conteneur\e[0m" | tee -a "$LOG_BUILD_LXC"
-sudo sed -i "s/^lxc.network.type = empty$/lxc.network.type = veth\nlxc.network.flags = up\nlxc.network.link = $LXC_BRIDGE\nlxc.network.name = eth0\nlxc.network.hwaddr = 00:FF:AA:00:00:01/" /var/lib/lxc/$LXC_NAME/config >> "$LOG_BUILD_LXC" 2>&1
+sudo sed -i "s/^lxc.network.type = empty$/lxc.network.type = veth\nlxc.network.flags = up\nnlxc.network.name = eth0\nlxc.network.ipv4 = $PLAGE_IP.2/24\nlxc.network.ipv4.gateway = $PLAGE_IP.1\nlxc.network.hwaddr = 00:FF:AA:00:00:01/" /var/lib/lxc/$LXC_NAME/config >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Configuration réseau de la machine virtualisée\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo sed -i "s@iface eth0 inet dhcp@iface eth0 inet static\n\taddress $PLAGE_IP.2/24\n\tgateway $PLAGE_IP.1@" /var/lib/lxc/$LXC_NAME/rootfs/etc/network/interfaces >> "$LOG_BUILD_LXC" 2>&1
 
-echo -e "\e[1m> Configure le parefeu\e[0m" | tee -a "$LOG_BUILD_LXC"
-sudo iptables -A FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
-sudo iptables -A FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
-sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE >> "$LOG_BUILD_LXC" 2>&1
+echo -e "\e[1m> On ajoute le bon resolver\e[0m" | tee -a "$LOG_BUILD_LXC"
+sudo sed -i "s/^nameserver 127.0.1.1$/nameserver $PLAGE_IP.1/" /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Démarrage de la machine\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo lxc-start -n $LXC_NAME -d --logfile "$script_dir/lxc_boot.log" >> "$LOG_BUILD_LXC" 2>&1
 sleep 3
 sudo lxc-ls -f >> "$LOG_BUILD_LXC" 2>&1
-
-echo -e "\e[1m> On lance l'interface réseau\e[0m" | tee -a "$LOG_BUILD_LXC"
-sudo lxc-attach -n $LXC_NAME -- /etc/init.d/networking start
 
 echo -e "\e[1m> Update et install aptitude sudo git\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo lxc-attach -n $LXC_NAME -- apt-get update
@@ -103,10 +100,11 @@ echo "pchecker    ALL=(ALL:ALL) NOPASSWD: ALL" | sudo tee -a /var/lib/lxc/$LXC_N
 
 echo -e "\e[1m> Mise en place de la connexion ssh vers l'invité.\e[0m" | tee -a "$LOG_BUILD_LXC"
 if [ -e $HOME/.ssh/$LXC_NAME ]; then
-	rm -f $HOME/.ssh/$LXC_NAME $HOME/.ssh/$LXC_NAME.pub
-	ssh-keygen -f $HOME/.ssh/known_hosts -R $PLAGE_IP.2
+        rm -f $HOME/.ssh/$LXC_NAME $HOME/.ssh/$LXC_NAME.pub
+        ssh-keygen -f $HOME/.ssh/known_hosts -R $PLAGE_IP.2
 fi
-ssh-keygen -t dsa -f $HOME/.ssh/$LXC_NAME -P '' >> "$LOG_BUILD_LXC" 2>&1
+
+ssh-keygen -t rsa -f $HOME/.ssh/$LXC_NAME -P '' >> "$LOG_BUILD_LXC" 2>&1
 sudo mkdir /var/lib/lxc/$LXC_NAME/rootfs/home/pchecker/.ssh >> "$LOG_BUILD_LXC" 2>&1
 sudo cp $HOME/.ssh/$LXC_NAME.pub /var/lib/lxc/$LXC_NAME/rootfs/home/pchecker/.ssh/authorized_keys >> "$LOG_BUILD_LXC" 2>&1
 sudo lxc-attach -n $LXC_NAME -- chown pchecker: -R /home/pchecker/.ssh >> "$LOG_BUILD_LXC" 2>&1
@@ -120,9 +118,9 @@ IdentityFile $HOME/.ssh/$LXC_NAME
 EOF
 
 ssh-keyscan -H $PLAGE_IP.2 >> ~/.ssh/known_hosts
-ssh $ARG_SSH $LXC_NAME "exit 0"	# Initie une premier connexion SSH pour valider la clé.
-if [ "$?" -ne 0 ]; then	# Si l'utilisateur tarde trop, la connexion sera refusée... ???
-	ssh $ARG_SSH $LXC_NAME "exit 0"	# Initie une premier connexion SSH pour valider la clé.
+ssh $ARG_SSH $LXC_NAME "exit 0" # Initie une premier connexion SSH pour valider la clé.
+if [ "$?" -ne 0 ]; then # Si l'utilisateur tarde trop, la connexion sera refusée... ???
+        ssh $ARG_SSH $LXC_NAME "exit 0" # Initie une premier connexion SSH pour valider la clé.
 fi
 
 ssh $ARG_SSH $LXC_NAME "git clone https://github.com/YunoHost/install_script /tmp/install_script" >> "$LOG_BUILD_LXC" 2>&1
@@ -144,15 +142,8 @@ ssh $ARG_SSH $LXC_NAME "sudo yunohost user create --firstname \"$USER_TEST_CLEAN
 echo -e -e "\e[1m\n> Vérification de l'état de Yunohost\e[0m" | tee -a "$LOG_BUILD_LXC"
 ssh $ARG_SSH $LXC_NAME "sudo yunohost -v" | tee -a "$LOG_BUILD_LXC" 2>&1
 
-
 echo -e "\e[1m> Arrêt de la machine virtualisée\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo lxc-stop -n $LXC_NAME >> "$LOG_BUILD_LXC" 2>&1
-
-echo -e "\e[1m> Suppression des règles de parefeu\e[0m" | tee -a "$LOG_BUILD_LXC"
-sudo iptables -D FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
-sudo iptables -D FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
-sudo iptables -t nat -D POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE >> "$LOG_BUILD_LXC" 2>&1
-sudo ifdown --force $LXC_BRIDGE >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Création d'un snapshot\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo lxc-snapshot -n $LXC_NAME >> "$LOG_BUILD_LXC" 2>&1
