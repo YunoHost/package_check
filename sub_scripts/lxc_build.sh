@@ -30,12 +30,12 @@ echo -e "\e[1m> Update et install lxc lxctl\e[0m" | tee "$LOG_BUILD_LXC"
 sudo apt-get update >> "$LOG_BUILD_LXC" 2>&1
 sudo apt-get install -y lxc lxctl debootstrap bridge-utils >> "$LOG_BUILD_LXC" 2>&1
 
-os_name=$(sed -n -e '/PRETTY_NAME/ s/^.*=\|"\| .*//gp' /etc/os-release);
-if [ os_name == "Ubuntu" ]
+os_name=$(lsb_release -i | awk '{ print $NF }');
+if [ $os_name == "Ubuntu" ]
 then
 	sudo apt-get install -y lxc-templates >> "$LOG_BUILD_LXC" 2>&1
 fi
-if [ os_name == "Debian" ]
+if [ $os_name == "Debian" ]
 then
 	echo -e "\e[1m> On configure le bridge de LXC sur Debian\e[0m" | tee "$LOG_BUILD_LXC"
 	sudo sed -i 's/^USE_LXC_BRIDGE="true"$/USE_LXC_BRIDGE="false"/' /etc/default/lxc-net >> "$LOG_BUILD_LXC" 2>&1
