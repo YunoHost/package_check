@@ -1,9 +1,9 @@
 #!/bin/bash
 
 ARG_SSH="-t"
-PLAGE_IP=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep PLAGE_IP= | cut -d '"' -f2)
-LXC_BRIDGE=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep LXC_BRIDGE= | cut -d '=' -f2)
-main_iface=$(cat "$script_dir/config" | grep iface= | cut -d '=' -f2)
+# PLAGE_IP=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep PLAGE_IP= | cut -d '"' -f2)
+# LXC_BRIDGE=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep LXC_BRIDGE= | cut -d '=' -f2)
+# main_iface=$(cat "$script_dir/config" | grep iface= | cut -d '=' -f2)
 
 echo -e "Chargement des fonctions de lxc_launcher.sh"
 
@@ -82,7 +82,7 @@ LXC_STOP () {
 		if [ $(sudo lxc-info --name $LXC_NAME | grep -c "STOPPED") -eq 0 ]; then
 			echo "Arrêt du conteneur LXC" | tee -a "$RESULT"
 			sudo lxc-stop -n $LXC_NAME | tee -a "$RESULT" 2>&1
-		fi		
+		fi
 		# Restaure le snapshot.
 		echo "Restauration du snapshot de la machine lxc" | tee -a "$RESULT"
 		if ! sudo grep -q "$LXC_NAME" /var/lib/lxcsnaps/$LXC_NAME/snap0/rootfs/etc/hosts
