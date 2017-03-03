@@ -10,9 +10,11 @@ then	# L'upgrade est annulé
 fi
 touch "$script_dir/../pcheck.lock" # Met en place le lock de Package check
 
-PLAGE_IP=$(cat "$script_dir/lxc_build.sh" | grep PLAGE_IP= | cut -d '"' -f2)
-LXC_NAME=$(cat "$script_dir/lxc_build.sh" | grep LXC_NAME= | cut -d '=' -f2)
-LXC_BRIDGE=$(cat "$script_dir/lxc_build.sh" | grep LXC_BRIDGE= | cut -d '=' -f2)
+pcheck_config="$script_dir/../config"
+PLAGE_IP=$(cat "$pcheck_config" | grep PLAGE_IP= | cut -d '=' -f2)
+LXC_NAME=$(cat "$pcheck_config" | grep LXC_NAME= | cut -d '=' -f2)
+LXC_BRIDGE=$(cat "$pcheck_config" | grep LXC_BRIDGE= | cut -d '=' -f2)
+
 if [ -e "$script_dir/../config" ]; then
 	main_iface=$(cat "$script_dir/../config" | grep iface= | cut -d '=' -f2)
 else	# Si le fichier de config n'existe pas

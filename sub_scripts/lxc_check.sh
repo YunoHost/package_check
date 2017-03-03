@@ -6,13 +6,40 @@
 # Récupère le dossier du script
 if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
 
-PLAGE_IP=$(cat "$script_dir/lxc_build.sh" | grep PLAGE_IP= | cut -d '"' -f2)
 ARG_SSH="-t"
-LXC_NAME=$(cat "$script_dir/lxc_build.sh" | grep LXC_NAME= | cut -d '=' -f2)
-LXC_BRIDGE=$(cat "$script_dir/lxc_build.sh" | grep LXC_BRIDGE= | cut -d '=' -f2)
-if [ -e "$script_dir/../config" ]; then
-	main_iface=$(cat "$script_dir/../config" | grep iface= | cut -d '=' -f2)
-else	# Si le fichier de config n'existe pas
+# Récupère les informations depuis le fichier de conf (Ou le complète le cas échéant)
+pcheck_config="$script_dir/../config"
+# Tente de lire les informations depuis le fichier de config si il existe
+if [ -e "$pcheck_config" ]
+then
+	PLAGE_IP=$(cat "$pcheck_config" | grep PLAGE_IP= | cut -d '=' -f2)
+	DOMAIN=$(cat "$pcheck_config" | grep DOMAIN= | cut -d '=' -f2)
+	YUNO_PWD=$(cat "$pcheck_config" | grep YUNO_PWD= | cut -d '=' -f2)
+	LXC_NAME=$(cat "$pcheck_config" | grep LXC_NAME= | cut -d '=' -f2)
+	LXC_BRIDGE=$(cat "$pcheck_config" | grep LXC_BRIDGE= | cut -d '=' -f2)
+fi
+# Utilise des valeurs par défaut si les variables sont vides, et génère le fichier de config
+if [ -z "$PLAGE_IP" ]; then
+	PLAGE_IP=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| PLAGE_IP=" | cut -d '"' -f4)
+	echo -e "# Plage IP du conteneur\nPLAGE_IP=$PLAGE_IP\n" >> "$pcheck_config"
+fi
+if [ -z "$DOMAIN" ]; then
+	DOMAIN=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| DOMAIN=" | cut -d '=' -f2)
+	echo -e "# Domaine de test\nDOMAIN=$DOMAIN\n" >> "$pcheck_config"
+fi
+if [ -z "$YUNO_PWD" ]; then
+	YUNO_PWD=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| YUNO_PWD=" | cut -d '=' -f2)
+	echo -e "# Mot de passe\nYUNO_PWD=$YUNO_PWD\n" >> "$pcheck_config"
+fi
+if [ -z "$LXC_NAME" ]; then
+	LXC_NAME=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| LXC_NAME=" | cut -d '=' -f2)
+	echo -e "# Nom du conteneur\nLXC_NAME=$LXC_NAME\n" >> "$pcheck_config"
+fi
+if [ -z "$LXC_BRIDGE" ]; then
+	LXC_BRIDGE=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| LXC_BRIDGE=" | cut -d '=' -f2)
+	echo -e "# Nom du bridge\nLXC_BRIDGE=$LXC_BRIDGE\n" >> "$pcheck_config"
+fi
+if [ -z "$main_iface" ]; then
 	# Tente de définir l'interface réseau principale
 	main_iface=$(sudo route | grep default | awk '{print $8;}')	# Prend l'interface réseau défini par default
 	if [ -z $main_iface ]; then
@@ -20,7 +47,7 @@ else	# Si le fichier de config n'existe pas
 		exit 1
 	fi
 	# Enregistre le nom de l'interface réseau de l'hôte dans un fichier de config
-	echo -e "# interface réseau principale de l'hôte\niface=$main_iface\n" > "$script_dir/../config"
+	echo -e "# Interface réseau principale de l'hôte\niface=$main_iface\n" >> "$pcheck_config"
 fi
 
 STOP_CONTAINER () {

@@ -3,13 +3,24 @@
 # Récupère le dossier du script
 if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
 
+pcheck_config="$script_dir/../config"
+# Tente de lire les informations depuis le fichier de config si il existe
+if [ -e "$pcheck_config" ]
+then
+	PLAGE_IP=$(cat "$pcheck_config" | grep PLAGE_IP= | cut -d '=' -f2)
+	DOMAIN=$(cat "$pcheck_config" | grep DOMAIN= | cut -d '=' -f2)
+	YUNO_PWD=$(cat "$pcheck_config" | grep YUNO_PWD= | cut -d '=' -f2)
+	LXC_NAME=$(cat "$pcheck_config" | grep LXC_NAME= | cut -d '=' -f2)
+	LXC_BRIDGE=$(cat "$pcheck_config" | grep LXC_BRIDGE= | cut -d '=' -f2)
+fi
+
 LOG_BUILD_LXC="$script_dir/Build_lxc.log"
-PLAGE_IP="10.1.4"
+test -n "$PLAGE_IP" || PLAGE_IP="10.1.4"	# Utilise des valeurs par défaut si les variables sont vides.
+test -n "$DOMAIN" || DOMAIN=domain.tld
+test -n "$YUNO_PWD" || YUNO_PWD=admin
+test -n "$LXC_NAME" || LXC_NAME=pchecker_lxc
+test -n "$LXC_BRIDGE" || LXC_BRIDGE=lxc-pchecker
 ARG_SSH="-t"
-DOMAIN=domain.tld
-YUNO_PWD=admin
-LXC_NAME=pchecker_lxc
-LXC_BRIDGE=lxc-pchecker
 
 # Tente de définir l'interface réseau principale
 main_iface=$(sudo route | grep default | awk '{print $8;}')	# Prend l'interface réseau défini par default
@@ -24,7 +35,14 @@ touch "$script_dir/../pcheck.lock" # Met en place le lock de Package check, le t
 echo $(whoami) > "$script_dir/setup_user"
 
 # Enregistre le nom de l'interface réseau de l'hôte dans un fichier de config
-echo -e "# interface réseau principale de l'hôte\niface=$main_iface\n" > "$script_dir/../config"
+echo -e "# interface réseau principale de l'hôte\niface=$main_iface\n" > "$pcheck_config"
+# Enregistre les infos dans le fichier de config.
+echo -e "# Plage IP du conteneur\nPLAGE_IP=$PLAGE_IP\n" >> "$pcheck_config"
+echo -e "# Domaine de test\nDOMAIN=$DOMAIN\n" >> "$pcheck_config"
+echo -e "# Mot de passe\nYUNO_PWD=$YUNO_PWD\n" >> "$pcheck_config"
+echo -e "# Nom du conteneur\nLXC_NAME=$LXC_NAME\n" >> "$pcheck_config"
+echo -e "# Nom du bridge\nLXC_BRIDGE=$LXC_BRIDGE\n" >> "$pcheck_config"
+
 
 echo -e "\e[1m> Update et install lxc lxctl\e[0m" | tee "$LOG_BUILD_LXC"
 sudo apt-get update >> "$LOG_BUILD_LXC" 2>&1
