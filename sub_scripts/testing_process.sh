@@ -117,16 +117,21 @@ CHECK_URL () {
 					fi
 				fi
 				if [ "$curl_error" -eq 1 ]; then
-					ECHO_FORMAT "Le code HTTP indique une erreur.\n" "white" clog
+					ECHO_FORMAT "Le code HTTP indique une erreur.\n" "white" "bold" clog
 				fi
 			fi
 			URL_TITLE=$(grep "<title>" "$script_dir/url_output" | cut -d '>' -f 2 | cut -d '<' -f1)
 			ECHO_FORMAT "Titre de la page: $URL_TITLE\n" "white"
 			if [ "$URL_TITLE" == "YunoHost Portal" ]; then
+				ECHO_FORMAT "La tentative de connexion aboutie au portail YunoHost.\n" "white" "bold" clog
 				YUNO_PORTAL=1
 				# Il serait utile de réussir à s'authentifier sur le portail pour tester une app protégée par celui-ci. Mais j'y arrive pas...
 			else
 				YUNO_PORTAL=0
+				if [ "$URL_TITLE" == "Welcome to nginx on Debian!" ]; then
+					curl_error=1	# Arriver sur la page nginx par défaut est considéré comme une erreur
+					ECHO_FORMAT "La tentative de connexion aboutie à la page par défaut de nginx.\n" "white" "bold" clog
+				fi
 				ECHO_FORMAT "Extrait du corps de la page:\n" "white"
 				echo -e "\e[37m"	# Écrit en light grey
 				grep "<body" -A 20 "$script_dir/url_output" | sed 1d | tee -a "$RESULT"
@@ -173,7 +178,7 @@ CHECK_SETUP_SUBDIR () {
 	CHECK_URL
 	tnote=$((tnote+2))
 	install_pass=1
-	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
+	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ] && [ "$YUNO_PORTAL" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		note=$((note+2))
 		GLOBAL_CHECK_SETUP=1	# Installation réussie
@@ -246,7 +251,7 @@ CHECK_SETUP_ROOT () {
 		install_pass=1
 		tnote=$((tnote+2))
 	fi
-	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
+	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ] && [ "$YUNO_PORTAL" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		if [ "$GLOBAL_CHECK_SETUP" -eq 1 ]; then
 			note=$((note+1))
@@ -396,7 +401,7 @@ CHECK_UPGRADE () {
 		CHECK_URL
 		tnote=$((tnote+1))
 	fi
-	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
+	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ] && [ "$YUNO_PORTAL" -eq 0 ]; then
 		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 		note=$((note+1))
 		GLOBAL_CHECK_UPGRADE=1	# Upgrade réussie
@@ -516,7 +521,7 @@ CHECK_BACKUP_RESTORE () {
 			# Test l'accès à l'app
 			CHECK_URL
 			tnote=$((tnote+1))
-			if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
+			if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ] && [ "$YUNO_PORTAL" -eq 0 ]; then
 				ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 				note=$((note+1))
 				if [ $GLOBAL_CHECK_RESTORE -ne -1 ]; then	# La restauration ne peux pas être réussie si elle a échouée précédemment...
@@ -695,20 +700,20 @@ CHECK_MULTI_INSTANCE () {
 	# Test l'accès à la 1ère instance de l'app
 	CHECK_PATH="$PATH_TEST"
 	CHECK_URL
-	if [ "$curl_error" -ne 0 ]; then
-		YUNOHOST_RESULT_first=$curl_error
+	if [ "$curl_error" -ne 0 ] || [ "$YUNO_PORTAL" -ne 0 ]; then
+		YUNOHOST_RESULT_first=1
 	fi
 	# Test l'accès à la 2e instance de l'app
 	CHECK_PATH="$path2"
 	CHECK_URL
-	if [ "$curl_error" -ne 0 ]; then
-		YUNOHOST_RESULT_second=$curl_error
+	if [ "$curl_error" -ne 0 ] || [ "$YUNO_PORTAL" -ne 0 ]; then
+		YUNOHOST_RESULT_second=1
 	fi
 	# Test l'accès à la 3e instance de l'app
 	CHECK_PATH="$path3"
 	CHECK_URL
-	if [ "$curl_error" -ne 0 ]; then
-		YUNOHOST_RESULT=$curl_error
+	if [ "$curl_error" -ne 0 ] || [ "$YUNO_PORTAL" -ne 0 ]; then
+		YUNOHOST_RESULT=1
 	fi
 	tnote=$((tnote+1))
 	if [ "$YUNOHOST_RESULT" -eq 0 ] || [ "$YUNOHOST_RESULT_second" -eq 0 ]
@@ -808,8 +813,8 @@ CHECK_COMMON_ERROR () {
 		# Test l'accès à l'app
 		if [ "$YUNOHOST_RESULT" -eq 0 ]; then	# Test l'url si l'installation à réussie.
 			CHECK_URL
-			if [ "$curl_error" -ne 0 ]; then
-				YUNOHOST_RESULT=$curl_error
+			if [ "$curl_error" -ne 0 ] || [ "$YUNO_PORTAL" -ne 0 ]; then
+				YUNOHOST_RESULT=1
 			fi
 		fi
 	fi
