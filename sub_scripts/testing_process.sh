@@ -52,7 +52,7 @@ CHECK_URL () {
 			ECHO_FORMAT "Accès public forcé pour le test d'accès par url.\n" "lyellow" "bold"
 		fi
 		if [ "$no_lxc" -eq 0 ]; then
-			IP_CURL="$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep PLAGE_IP= | cut -d '"' -f2).2"
+			IP_CURL="$(cat "$script_dir/config" | grep PLAGE_IP= | cut -d '=' -f2).2"
 		else
 			IP_CURL="127.0.0.1"
 		fi
