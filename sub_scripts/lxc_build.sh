@@ -12,6 +12,9 @@ then
 	YUNO_PWD=$(cat "$pcheck_config" | grep YUNO_PWD= | cut -d '=' -f2)
 	LXC_NAME=$(cat "$pcheck_config" | grep LXC_NAME= | cut -d '=' -f2)
 	LXC_BRIDGE=$(cat "$pcheck_config" | grep LXC_BRIDGE= | cut -d '=' -f2)
+	dns=$(cat "$pcheck_config" | grep dns= | cut -d '=' -f2)
+	dnsforce=$(cat "$pcheck_config" | grep dnsforce= | cut -d '=' -f2)
+	main_iface=$(cat "$pcheck_config" | grep main_iface= | cut -d '=' -f2)
 fi
 
 LOG_BUILD_LXC="$script_dir/Build_lxc.log"
@@ -20,13 +23,26 @@ test -n "$DOMAIN" || DOMAIN=domain.tld
 test -n "$YUNO_PWD" || YUNO_PWD=admin
 test -n "$LXC_NAME" || LXC_NAME=pchecker_lxc
 test -n "$LXC_BRIDGE" || LXC_BRIDGE=lxc-pchecker
+test -n "$dnsforce" || dnsforce=0
 ARG_SSH="-t"
 
 # Tente de définir l'interface réseau principale
-main_iface=$(sudo route | grep default | awk '{print $8;}')	# Prend l'interface réseau défini par default
-if [ -z $main_iface ]; then
-	echo -e "\e[91mImpossible de déterminer le nom de l'interface réseau de l'hôte.\e[0m"
-	exit 1
+if [ -z $main_iface ]	# Si main_iface est vide, tente de le trouver.
+then
+	main_iface=$(sudo route | grep default | awk '{print $8;}')	# Prend l'interface réseau défini par default
+	if [ -z $main_iface ]; then
+		echo -e "\e[91mImpossible de déterminer le nom de l'interface réseau de l'hôte.\e[0m"
+		exit 1
+	fi
+fi
+
+if [ -z $dns ]	# Si l'adresse du dns est vide, tente de le déterminer à partir de la passerelle par défaut.
+then
+	dns=$(sudo route -n | grep ^0.0.0.0 | awk '{print $2;}')
+	if [ -z $dns ]; then
+		echo -e "\e[91mImpossible de déterminer l'adresse de la passerelle.\e[0m"
+		exit 1
+	fi
 fi
 
 touch "$script_dir/../pcheck.lock" # Met en place le lock de Package check, le temps de l'installation
@@ -35,14 +51,15 @@ touch "$script_dir/../pcheck.lock" # Met en place le lock de Package check, le t
 echo $(whoami) > "$script_dir/setup_user"
 
 # Enregistre le nom de l'interface réseau de l'hôte dans un fichier de config
-echo -e "# interface réseau principale de l'hôte\niface=$main_iface\n" > "$pcheck_config"
+echo -e "# Interface réseau principale de l'hôte\niface=$main_iface\n" > "$pcheck_config"
+echo -e "# Adresse du dns\ndns=$dns\n" >> "$pcheck_config"
+echo -e "# Forçage du dns\ndnsforce=$dnsforce\n" >> "$pcheck_config"
 # Enregistre les infos dans le fichier de config.
 echo -e "# Plage IP du conteneur\nPLAGE_IP=$PLAGE_IP\n" >> "$pcheck_config"
 echo -e "# Domaine de test\nDOMAIN=$DOMAIN\n" >> "$pcheck_config"
 echo -e "# Mot de passe\nYUNO_PWD=$YUNO_PWD\n" >> "$pcheck_config"
 echo -e "# Nom du conteneur\nLXC_NAME=$LXC_NAME\n" >> "$pcheck_config"
 echo -e "# Nom du bridge\nLXC_BRIDGE=$LXC_BRIDGE\n" >> "$pcheck_config"
-
 
 echo -e "\e[1m> Update et install lxc lxctl\e[0m" | tee "$LOG_BUILD_LXC"
 sudo apt-get update >> "$LOG_BUILD_LXC" 2>&1
@@ -88,6 +105,15 @@ echo -e "\e[1m> Configure le parefeu\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo iptables -A FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
 sudo iptables -A FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT >> "$LOG_BUILD_LXC" 2>&1
 sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE >> "$LOG_BUILD_LXC" 2>&1
+
+echo -e "\e[1m> Vérification du contenu du resolv.conf\e[0m" | tee -a "$LOG_BUILD_LXC"
+if ! sudo cat /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf | grep -q nameserver; then
+	dnsforce=1	# Le resolv.conf est vide, on force l'ajout d'un dns.
+	sed -i "s/dnsforce=*/dnsforce=$dnsforce/" "$pcheck_config"
+fi
+if [ $dnsforce -eq 1 ]; then	# Force la réécriture du resolv.conf
+	echo "nameserver $dns" | sudo tee /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf
+fi
 
 echo -e "\e[1m> Démarrage de la machine\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo lxc-start -n $LXC_NAME -d --logfile "$script_dir/lxc_boot.log" >> "$LOG_BUILD_LXC" 2>&1
