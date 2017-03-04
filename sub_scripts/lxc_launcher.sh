@@ -119,3 +119,15 @@ LXC_TURNOFF () {
 		sudo ifdown --force $LXC_BRIDGE | tee -a "$RESULT" 2>&1
 	fi
 }
+
+LXC_CONNECT_INFO () {
+	echo "> Connexion au conteneur:"
+	echo "Pour exécuter une seule commande:"
+	echo -e "\e[1msudo lxc-attach -n $LXC_NAME -- commande\e[0m"
+
+	echo "Pour établir une connexion ssh:"
+	if [ $(cat "$script_dir/setup_user") = "root" ]; then
+		echo -ne "\e[1msudo "
+	fi
+	echo -e "\e[1mssh $ARG_SSH $LXC_NAME\e[0m"
+}

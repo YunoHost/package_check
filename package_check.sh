@@ -64,6 +64,10 @@ if [ "$(whoami)" != "$(cat "$script_dir/sub_scripts/setup_user")" ] && test -e "
 	exit 0
 fi
 
+source "$script_dir/sub_scripts/lxc_launcher.sh"
+source "$script_dir/sub_scripts/testing_process.sh"
+source /usr/share/yunohost/helpers
+
 # Vérifie la connexion internet.
 ping -q -c 2 yunohost.org > /dev/null 2>&1
 if [ "$?" -ne 0 ]; then	# En cas d'échec de connexion, tente de pinger un autre domaine pour être sûr
@@ -173,10 +177,6 @@ if [ -z "$main_iface" ]; then
 	# Enregistre le nom de l'interface réseau de l'hôte dans un fichier de config
 	echo -e "# Interface réseau principale de l'hôte\niface=$main_iface\n" >> "$pcheck_config"
 fi
-
-source "$script_dir/sub_scripts/lxc_launcher.sh"
-source "$script_dir/sub_scripts/testing_process.sh"
-source /usr/share/yunohost/helpers
 
 if [ "$no_lxc" -eq 0 ]
 then

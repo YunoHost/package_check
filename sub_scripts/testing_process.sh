@@ -25,7 +25,7 @@ SETUP_APP () {
 REMOVE_APP () {
 	if [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
 		if [ "$no_lxc" -eq 0 ]; then
-			echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+			LXC_CONNECT_INFO
 		fi
 		read -p "Appuyer sur une touche pour supprimer l'application et continuer les tests..." < /dev/tty
 	fi
@@ -409,7 +409,7 @@ CHECK_UPGRADE () {
 		REMOVE_APP
 	elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
 		if [ "$no_lxc" -eq 0 ]; then
-			echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+			LXC_CONNECT_INFO
 		fi
 		read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
 	fi
@@ -533,7 +533,7 @@ CHECK_BACKUP_RESTORE () {
 				sudo yunohost backup delete Backup_test > /dev/null
 			elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
 				if [ "$no_lxc" -eq 0 ]; then
-					echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+					LXC_CONNECT_INFO
 				fi
 				read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
 			fi
@@ -642,7 +642,7 @@ CHECK_PUBLIC_PRIVATE () {
 		fi
 		if [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
 			if [ "$no_lxc" -eq 0 ]; then
-				echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+				LXC_CONNECT_INFO
 			fi
 			read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
 		fi
@@ -731,7 +731,7 @@ CHECK_MULTI_INSTANCE () {
 		REMOVE_APP
 	elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
 		if [ "$no_lxc" -eq 0 ]; then
-			echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+			LXC_CONNECT_INFO
 		fi
 		read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
 	fi
@@ -861,7 +861,7 @@ CHECK_COMMON_ERROR () {
 		fi
 	elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
 		if [ "$no_lxc" -eq 0 ]; then
-			echo "Utilisez ssh pour vous connecter au conteneur LXC. 'ssh $ARG_SSH $LXC_NAME'"
+			LXC_CONNECT_INFO
 		fi
 		read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
 	fi
