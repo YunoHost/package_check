@@ -14,10 +14,9 @@ pcheck_config="$script_dir/../config"
 PLAGE_IP=$(cat "$pcheck_config" | grep PLAGE_IP= | cut -d '=' -f2)
 LXC_NAME=$(cat "$pcheck_config" | grep LXC_NAME= | cut -d '=' -f2)
 LXC_BRIDGE=$(cat "$pcheck_config" | grep LXC_BRIDGE= | cut -d '=' -f2)
+main_iface=$(cat "$pcheck_config" | grep iface= | cut -d '=' -f2)
 
-if [ -e "$script_dir/../config" ]; then
-	main_iface=$(cat "$script_dir/../config" | grep iface= | cut -d '=' -f2)
-else	# Si le fichier de config n'existe pas
+if [ -z "$main_iface" ]; then
 	# Tente de définir l'interface réseau principale
 	main_iface=$(sudo route | grep default | awk '{print $8;}')	# Prend l'interface réseau défini par default
 	if [ -z $main_iface ]; then
@@ -25,7 +24,7 @@ else	# Si le fichier de config n'existe pas
 		exit 1
 	fi
 	# Enregistre le nom de l'interface réseau de l'hôte dans un fichier de config
-	echo -e "# interface réseau principale de l'hôte\niface=$main_iface\n" > "$script_dir/../config"
+	echo -e "# Interface réseau principale de l'hôte\niface=$main_iface\n" >> "$pcheck_config"
 fi
 
 # Check user

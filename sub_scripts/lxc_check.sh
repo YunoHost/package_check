@@ -17,6 +17,7 @@ then
 	YUNO_PWD=$(cat "$pcheck_config" | grep YUNO_PWD= | cut -d '=' -f2)
 	LXC_NAME=$(cat "$pcheck_config" | grep LXC_NAME= | cut -d '=' -f2)
 	LXC_BRIDGE=$(cat "$pcheck_config" | grep LXC_BRIDGE= | cut -d '=' -f2)
+	main_iface=$(cat "$pcheck_config" | grep iface= | cut -d '=' -f2)
 fi
 # Utilise des valeurs par défaut si les variables sont vides, et génère le fichier de config
 if [ -z "$PLAGE_IP" ]; then

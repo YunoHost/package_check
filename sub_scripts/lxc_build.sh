@@ -109,7 +109,7 @@ sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE >> "$LOG_BUI
 echo -e "\e[1m> Vérification du contenu du resolv.conf\e[0m" | tee -a "$LOG_BUILD_LXC"
 if ! sudo cat /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf | grep -q nameserver; then
 	dnsforce=1	# Le resolv.conf est vide, on force l'ajout d'un dns.
-	sed -i "s/dnsforce=*/dnsforce=$dnsforce/" "$pcheck_config"
+	sed -i "s/dnsforce=.*/dnsforce=$dnsforce/" "$pcheck_config"
 fi
 if [ $dnsforce -eq 1 ]; then	# Force la réécriture du resolv.conf
 	echo "nameserver $dns" | sudo tee /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf
