@@ -579,14 +579,6 @@ TEST_RESULTS () {
 			ECHO_FORMAT "0\n"
 		fi
 	done
-	if [ "$level" -eq 0 ]
-	then	# Si l'app est au niveau 0, et que le test tourne en CI, envoi un mail d'avertissement.
-		if [ -e "$script_dir/../config" ]
-		then	# Test l'existence du fichier de config de CI_package_check, pour déterminer le type d'exécution du test
-			dest=$(grep "dest=" "$script_dir/../config" | cut -d= -f2)	# Récupère le destinataire du mail de CI
-			mail -s "Échec d'installation d'une application dans le CI" "$dest" <<< "L'application $(basename "$arg_app") vient d'échouer aux tests d'intégration continue !"	# Envoi un avertissement par mail.
-		fi
-	fi
 }
 
 INIT_VAR() {
@@ -926,6 +918,31 @@ if [ "$no_lxc" -eq 0 ]; then
 	LXC_TURNOFF
 fi
 TEST_RESULTS
+
+# Mail et bot xmpp pour le niveau de l'app
+if [ "$level" -eq 0 ]
+then
+	message="L'application $(basename "$arg_app") vient d'échouer aux tests d'intégration continue"
+else
+	message="L'application $(basename "$arg_app") vient d'atteindre le niveau $level"
+fi
+
+if [ -e "$script_dir/../auto_build/auto.conf" ]
+then
+	ci_path=$(grep "DOMAIN=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)/$(grep "CI_PATH=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)
+	message="$message sur https://$ci_path"
+	"$script_dir/../auto_build/xmpp_bot/xmpp_post.sh" "$message"	# Notifie sur le salon apps
+fi
+
+if [ "$level" -eq 0 ] && [ -e "$script_dir/../config" ]
+then	# Si l'app est au niveau 0, et que le test tourne en CI, envoi un mail d'avertissement.
+	dest=$(grep "dest=" "$script_dir/../config" | cut -d= -f2)	# Récupère le destinataire du mail de CI
+	ci_path=$(grep "CI_URL=" "$script_dir/../config" | cut -d= -f2)
+	if [ -n "$ci_path" ]; then
+		message="$message sur $ci_path"
+	fi
+	mail -s "Échec d'installation d'une application dans le CI" "$dest" <<< "$message"	# Envoi un avertissement par mail.
+fi
 
 echo "Le log complet des installations et suppressions est disponible dans le fichier $COMPLETE_LOG"
 # Clean
