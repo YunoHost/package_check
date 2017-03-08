@@ -936,17 +936,19 @@ fi
 
 if [ "$level" -eq 0 ] && [ -e "$script_dir/../config" ]
 then	# Si l'app est au niveau 0, et que le test tourne en CI, envoi un mail d'avertissement.
-	dest=$(grep "dest=" "$script_dir/../config" | cut -d= -f2)	# Récupère le destinataire du mail de CI
+	dest=$(cat "$APP_CHECK/manifest.json" | grep '\"email\": ' | cut -d '"' -f 4)	# Utilise l'adresse du mainteneur de l'application
 	ci_path=$(grep "CI_URL=" "$script_dir/../config" | cut -d= -f2)
 	if [ -n "$ci_path" ]; then
 		message="$message sur $ci_path"
 	fi
-	mail -s "Échec d'installation d'une application dans le CI" "$dest" <<< "$message"	# Envoi un avertissement par mail.
+	mail -s "[YunoHost] Échec d'installation d'une application dans le CI" "$dest" <<< "$message"	# Envoi un avertissement par mail.
 fi
 
 echo "Le log complet des installations et suppressions est disponible dans le fichier $COMPLETE_LOG"
 # Clean
 rm -f "$OUTPUTD" "$temp_RESULT" "$script_dir/url_output" "$script_dir/curl_print" "$script_dir/manifest_extract"
 
-sudo rm -rf "$APP_CHECK"
+if [ -n "$APP_CHECK" ]; then
+	sudo rm -rf "$APP_CHECK"
+fi
 sudo rm "$script_dir/pcheck.lock" # Retire le lock
