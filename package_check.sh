@@ -726,6 +726,10 @@ then # Si le fichier check_process est trouvé
 					fi
 					if echo "$LIGNE" | grep -q "(PATH)"; then	# Path dans le manifest
 						MANIFEST_PATH=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au path
+						parse_path=$(echo "$LIGNE" | cut -d '"' -f2)	# Lit le path du check_process
+						if [ -n "$parse_path" ]; then	# Si le path n'est pas null, utilise ce path au lieu de la valeur par défaut.
+							PATH_TEST=$(echo "$LIGNE" | cut -d '"' -f2)
+						fi
 						LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
 					fi
 					if echo "$LIGNE" | grep -q "(USER)"; then	# User dans le manifest

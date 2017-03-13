@@ -928,23 +928,11 @@ TEST_LAUNCHER () {
 	# $1 prend le nom de la fonction à démarrer.
 	# $2 prend l'argument de la fonction, le cas échéant
 	# Ce launcher permet de factoriser le code autour du lancement des fonctions de test
-# 	BUG654=1	# Patch #654
-# 	while [ "$BUG654" -eq "1" ]; do	# Patch #654
-		$1 $2	# Exécute le test demandé, avec son éventuel argument
-		LXC_STOP	# Arrête le conteneur LXC
-# 		PATCH_654	# Patch #654
-# 		BUG654=$?	# Patch #654
-# 		if [ "$BUG654" -eq "1" ]; then	# Patch #654
-# 			ECHO_FORMAT "\n!! Bug 654 détecté !!\n" "red" clog	# Patch #654
-# 			echo -e "date\nBug 654 sur $1 $2\n\n" >> "$script_dir/patch_#654.log"	# Patch #654
-# 			cur_test=$((cur_test-1))
-# 			tnote=$((tnote-1))
-# 		fi	# Patch #654
-# 	done	# Patch #654
+	$1 $2	# Exécute le test demandé, avec son éventuel argument
+	LXC_STOP	# Arrête le conteneur LXC
 }
 
 TESTING_PROCESS () {
-# source "$script_dir/sub_scripts/patch_#654.sh"	# Patch #654
 	# Lancement des tests
 	cur_test=1
 	ECHO_FORMAT "\nScénario de test: $PROCESS_NAME\n" "white" "underlined" clog
