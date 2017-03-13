@@ -61,6 +61,15 @@ fi
 # Récupère le dossier du script
 if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
 
+# Détermine l'environnement d'exécution de Package check
+type_exec_env=0	# Par défaut, exécution de package check seul
+if [ -e "$script_dir/../config" ]; then
+	type_exec_env=1	# Exécution en contexte de CI
+fi
+if [ -e "$script_dir/../auto_build/auto.conf" ]; then
+	type_exec_env=2	# Exécution en contexte de CI officiel
+fi
+
 # Check user
 if [ "$(whoami)" != "$(cat "$script_dir/sub_scripts/setup_user")" ] && test -e "$script_dir/sub_scripts/setup_user"; then
 	echo -e "\e[91mCe script doit être exécuté avec l'utilisateur $(cat "$script_dir/sub_scripts/setup_user") !\nL'utilisateur actuel est $(whoami)."
@@ -933,22 +942,31 @@ if [ "$no_lxc" -eq 0 ]; then
 fi
 TEST_RESULTS
 
+app_name=${arg_app%_ynh}	# Supprime '_ynh' à la fin du nom de l'app
 # Mail et bot xmpp pour le niveau de l'app
-if [ "$level" -eq 0 ]
-then
-	message="L'application $(basename "$arg_app") vient d'échouer aux tests d'intégration continue"
-else
-	message="L'application $(basename "$arg_app") vient d'atteindre le niveau $level"
+if [ "$level" -eq 0 ]; then
+	message="L'application $(basename "$app_name") vient d'échouer aux tests d'intégration continue"
 fi
 
-if [ -e "$script_dir/../auto_build/auto.conf" ]
+if [ $type_exec_env -eq 2 ]
 then
+	previous_level=$(grep "$app_name" "$script_dir/../auto_build/list_level_stable" | cut -d: -f2)
+	message="L'application $(basename "$app_name")"
+	if [ -z "$previous_level" ]; then
+		message="$message vient d'atteindre le niveau $level"
+	elif [ $level -eq $previous_level ]; then
+		message="$message reste au niveau $level"
+	elif [ $level -gt $previous_level ]; then
+		message="$message monte du niveau $previous_level au niveau $level"
+	elif [ $level -lt $previous_level ]; then
+		message="$message descend du niveau $previous_level au niveau $level"
+	fi
 	ci_path=$(grep "DOMAIN=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)/$(grep "CI_PATH=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)
 	message="$message sur https://$ci_path"
 	"$script_dir/../auto_build/xmpp_bot/xmpp_post.sh" "$message"	# Notifie sur le salon apps
 fi
 
-if [ "$level" -eq 0 ] && [ -e "$script_dir/../config" ]
+if [ "$level" -eq 0 ] && [ $type_exec_env -eq 1 ]
 then	# Si l'app est au niveau 0, et que le test tourne en CI, envoi un mail d'avertissement.
 	dest=$(cat "$APP_CHECK/manifest.json" | grep '\"email\": ' | cut -d '"' -f 4)	# Utilise l'adresse du mainteneur de l'application
 	ci_path=$(grep "CI_URL=" "$script_dir/../config" | cut -d= -f2)
