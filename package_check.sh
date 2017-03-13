@@ -950,7 +950,7 @@ fi
 
 if [ $type_exec_env -eq 2 ]
 then
-	previous_level=$(grep "$app_name" "$script_dir/../auto_build/list_level_stable" | cut -d: -f2)
+	previous_level=$(grep "$(basename "$app_name")" "$script_dir/../auto_build/list_level_stable" | cut -d: -f2)
 	message="L'application $(basename "$app_name")"
 	if [ -z "$previous_level" ]; then
 		message="$message vient d'atteindre le niveau $level"
