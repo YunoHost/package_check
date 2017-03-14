@@ -142,6 +142,7 @@ CHECK_URL () {
 	else
 		ECHO_FORMAT "Test de connexion annulé.\n" "white"
 		curl_error=0
+		YUNO_PORTAL=0
 	fi
 }
 
