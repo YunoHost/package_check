@@ -950,20 +950,32 @@ fi
 
 if [ $type_exec_env -eq 2 ]
 then
+	# Récupère le nom du job dans le CI
+	id=$(cat "$script_dir/../CI.lock")	# Récupère l'id du job en cours
+	job=$(grep "$id" "$script_dir/../work_list" | cut -d ';' -f 3)	# Et récupère le nom du job dans le work_list
+	if [ -n "$job" ]; then
+		job_log="/job/$job/lastBuild/console"
+	fi
+	# Prend le niveau précédemment calculé
 	previous_level=$(grep "$(basename "$app_name")" "$script_dir/../auto_build/list_level_stable" | cut -d: -f2)
-	message="L'application $(basename "$app_name")"
-	if [ -z "$previous_level" ]; then
-		message="$message vient d'atteindre le niveau $level"
-	elif [ $level -eq $previous_level ]; then
-		message="$message reste au niveau $level"
-	elif [ $level -gt $previous_level ]; then
-		message="$message monte du niveau $previous_level au niveau $level"
-	elif [ $level -lt $previous_level ]; then
-		message="$message descend du niveau $previous_level au niveau $level"
+	if [ "$level" -ne 0 ]
+	then
+		message="L'application $(basename "$app_name")"
+		if [ -z "$previous_level" ]; then
+			message="$message vient d'atteindre le niveau $level"
+		elif [ $level -eq $previous_level ]; then
+			message="$message reste au niveau $level"
+		elif [ $level -gt $previous_level ]; then
+			message="$message monte du niveau $previous_level au niveau $level"
+		elif [ $level -lt $previous_level ]; then
+			message="$message descend du niveau $previous_level au niveau $level"
+		fi
 	fi
 	ci_path=$(grep "DOMAIN=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)/$(grep "CI_PATH=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)
-	message="$message sur https://$ci_path"
-	"$script_dir/../auto_build/xmpp_bot/xmpp_post.sh" "$message"	# Notifie sur le salon apps
+	message="$message sur https://$ci_path$job_log"
+	if ! echo "$job" | grep -q "(testing)\|(unstable)"; then	# Notifie par xmpp seulement sur stable
+		"$script_dir/../auto_build/xmpp_bot/xmpp_post.sh" "$message"	# Notifie sur le salon apps
+	fi
 fi
 
 if [ "$level" -eq 0 ] && [ $type_exec_env -eq 1 ]
