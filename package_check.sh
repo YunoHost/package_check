@@ -1,65 +1,144 @@
 #!/bin/bash
 
-# Arguments du script
-# --bash-mode	Mode bash, le script est autonome. Il ignore la valeur de $auto_remove
-# --build-lxc	Installe lxc et créer la machine si nécessaire.
-# --branch=nom-de-la-branche	Teste une branche du dépôt, plutôt que tester master
-# --force-install-ok	Force la réussite des installations, même si elles échouent. Permet d'effectuer les tests qui suivent même si l'installation a échouée.
-# --interrupt	Force l'option auto_remove à 0.
-# --no-lxc	N'utilise pas la virtualisation en conteneur lxc. La virtualisation est utilisée par défaut si disponible.
-# --help	Affiche l'aide du script
+#=================================================
+# Grab the script directory
+#=================================================
+
+if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
+
+#=================================================
+# Check and read CLI arguments
+#=================================================
 
 echo ""
 
+# Init arguments value
+gitbranch=0
+force_install_ok=0
+interrupt=0
 notice=0
+build_lxc=0
+bash_mode=0
+
+# If no arguments provided
 if [ "$#" -eq 0 ]
 then
-	echo "Le script prend en argument le package à tester."
+	# Print the help and exit
+	notice=1
+else
+	# Reduce the arguments for getopts
+	arguments="$*"
+	arguments=${arguments//--branch=/-b }
+	arguments=${arguments//--force-install-ok/-f}
+	arguments=${arguments//--interrupt/-i}
+	arguments=${arguments//--help/-h}
+	arguments=${arguments//--build-lxc/-l}
+	arguments=${arguments//--bash-mode/-y}
+
+	# Read and parse all the arguments
+	while [ $# -ne 0 ]
+	do
+		# Initialize getopts' index
+		OPTIND=1
+		# Parse with getopts only if the argument begin by -
+		if [ ${1:0:1} = "-" ]
+		then
+			getopts ":b:fihly " parameter
+			case $parameter in
+				b)
+					# --branch=branch-name
+					gitbranch="$OPTARG"
+					;;
+				f)
+					# --force-install-ok
+					force_install_ok=1
+					;;
+				i)
+					# --interrupt
+					interrupt=1
+					;;
+				h)
+					# --help
+					notice=1
+					;;
+				l)
+					# --build-lxc
+					build_lxc=1
+					;;
+				y)
+					# --bash-mode
+					bash_mode=1
+					;;
+				\?)
+					echo "Invalid argument: -$OPTARG" >&2
+					notice=1
+					;;
+				:)
+					echo "-$OPTARG parameter requires an argument." >&2
+					notice=1
+					;;
+			esac
+		else
+			other_args="$other_args $1"
+		fi
+		shift
+	done
+fi
+
+# Prevent a conflict between --interrupt and --bash-mode
+if [ $interrupt -eq 1 ] && [ $bash_mode -eq 1 ]
+then
+	echo "You can't use --interrupt and --bash-mode together !"
 	notice=1
 fi
 
-## Récupère les arguments
-# --bash-mode
-bash_mode=$(echo "$*" | grep -c -e "--bash-mode")	# bash_mode vaut 1 si l'argument est présent.
-# --no-lxc
-no_lxc=$(echo "$*" | grep -c -e "--no-lxc")	# no_lxc vaut 1 si l'argument est présent.
-# --build-lxc
-build_lxc=$(echo "$*" | grep -c -e "--build-lxc")	# build_lxc vaut 1 si l'argument est présent.
-# --force-install-ok
-force_install_ok=$(echo "$*" | grep -c -e "--force-install-ok")	# force-install-ok vaut 1 si l'argument est présent.
-# --branch=
-gitbranch=$(echo "$*" | grep -e "--branch")	# gitbranch prend l'ensemble des arguments à partir de --branch
-# --interrupt
-interrupt=$(echo "$*" | grep -c -e "--interrupt")	# interrupt vaut 1 si l'argument est présent.
-if test -n "$gitbranch"; then
-	if ! echo "$gitbranch" | grep -q "branch=[[:alnum:]]"; then
-		notice=1	# Renvoi vers l'aide si la syntaxe est incorrecte
-	else
-		gitbranch="--branch $(echo "$gitbranch" | cut -d'=' -f2 | cut -d' ' -f1)"	# Isole le nom de la branche entre le = et l'espace. Et ajoute l'argument de git clone
-	fi
-fi
-# --help
-if [ "$notice" -eq 0 ]; then
-	notice=$(echo "$*" | grep -c -e "--help")	# notice vaut 1 si l'argument est présent. Il affichera alors l'aide.
-fi
-arg_app=$(echo "$*" | sed 's/--bash-mode\|--no-lxc\|--build-lxc\|--force-install-ok\|--interrupt\|--branch=[[:alnum:]-]*//g' | sed 's/^ *\| *$//g')	# Supprime les arguments déjà lu pour ne garder que l'app. Et supprime les espaces au début et à la fin
-# echo "arg_app=$arg_app."
+# Print help
+if [ $notice -eq 1 ]
+then
+	cat << EOF
 
-if [ "$notice" -eq 1 ]; then
-	echo -e "\nUsage:"
-	echo "package_check.sh [--bash-mode] [--branch=] [--build-lxc] [--force-install-ok] [--no-lxc] [--help] \"package to check\""
-	echo -e "\n\t--bash-mode\t\tDo not ask for continue check. Ignore auto_remove."
-	echo -e "\t--branch=branch-name\tSpecify a branch to check."
-	echo -e "\t--build-lxc\t\tInstall LXC and build the container if necessary."
-	echo -e "\t--force-install-ok\tForce following test even if all install are failed."
-	echo -e "\t--interrupt\tForce auto_remove value, break before each remove."
-	echo -e "\t--no-lxc\t\tDo not use a LXC container. You should use this option only on a test environnement."
-	echo -e "\t--help\t\t\tDisplay this notice."
+Usage:
+package_check.sh [OPTION]... PACKAGE_TO_CHECK
+	-b, --branch=BRANCH
+		Specify a branch to check.
+	-f, --force-install-ok
+		Force following test even if all install have failed.
+	-i, --interrupt
+		Force auto_remove value, break before each remove.
+	-h, --help
+		Display this notice.
+	-l, --build-lxc
+		Install LXC and build the container if necessary.
+	-y, --bash-mode
+		Do not ask for continue check. Ignore auto_remove.
+EOF
 	exit 0
 fi
 
-# Récupère le dossier du script
-if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
+
+
+
+
+
+#=================================================
+# Globals variables
+#=================================================
+
+complete_log="$script_dir/Complete.log"
+temp_log="$script_dir/temp_yunohost-cli.log"
+temp_result="$script_dir/temp_result.log"
+test_result="$script_dir/Test_results.log"
+yunohost_log="/var/lib/lxc/\$LXC_NAME/rootfs/var/log/yunohost/yunohost-cli.log"
+
+
+
+
+
+
+
+
+
+
 
 # Détermine l'environnement d'exécution de Package check
 type_exec_env=0	# Par défaut, exécution de package check seul

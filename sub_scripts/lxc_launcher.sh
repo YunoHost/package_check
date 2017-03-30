@@ -1,9 +1,14 @@
 #!/bin/bash
 
-# arg_ssh="-t"
+echo -e "Load functions from lxc_launcher.sh"
+
+#=================================================
+# Globals variables
+#=================================================
+
 arg_ssh="-tt"
 
-echo -e "Load functions from lxc_launcher.sh"
+#=================================================
 
 is_lxc_running () {
 	sudo lxc-info --name=$LXC_NAME | grep --quiet "RUNNING"

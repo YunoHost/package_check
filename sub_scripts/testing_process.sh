@@ -1,12 +1,14 @@
 #!/bin/bash
 
-test_result="$script_dir/Test_results.log"
-backup_hooks="conf_ssowat data_home conf_ynh_firewall conf_cron"	# La liste des hooks disponible pour le backup se trouve dans /usr/share/yunohost/hooks/backup/
-
 echo -e "Load functions from testing_process.sh"
 
 #=================================================
 # Globals variables
+#=================================================
+
+# A complete list of backup hooks is available at /usr/share/yunohost/hooks/backup/
+backup_hooks="conf_ssowat data_home conf_ynh_firewall conf_cron"
+
 #=================================================
 
 break_before_continue () {

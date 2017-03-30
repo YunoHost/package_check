@@ -1,11 +1,5 @@
 #!/bin/bash
 
-temp_log="$script_dir/temp_yunohost-cli.log"
-# yunohost_log="/var/lib/lxc/$LXC_NAME/rootfs/var/log/yunohost/yunohost-cli.log"
-yunohost_log="/var/lib/lxc/pchecker_lxc/rootfs/var/log/yunohost/yunohost-cli.log"
-complete_log="$script_dir/Complete.log"
-temp_result="$script_dir/temp_result.log"
-
 echo "Load functions from log_extractor.sh"
 
 ECHO_FORMAT () {
