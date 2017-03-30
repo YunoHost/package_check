@@ -1,988 +1,1113 @@
 #!/bin/bash
 
-RESULT="$script_dir/Test_results.log"
-BACKUP_HOOKS="conf_ssowat data_home conf_ynh_firewall conf_cron"	# La liste des hooks disponible pour le backup se trouve dans /usr/share/yunohost/hooks/backup/
+test_result="$script_dir/Test_results.log"
+backup_hooks="conf_ssowat data_home conf_ynh_firewall conf_cron"	# La liste des hooks disponible pour le backup se trouve dans /usr/share/yunohost/hooks/backup/
 
-echo -e "Chargement des fonctions de testing_process.sh"
+echo -e "Load functions from testing_process.sh"
 
-source "$script_dir/sub_scripts/log_extractor.sh"
+#=================================================
+# Globals variables
+#=================================================
+
+break_before_continue () {
+	# Make a break if auto_remove is set
+
+	if [ $auto_remove -eq 0 ] && [ $bash_mode -ne 1 ]
+	then
+		LXC_CONNECT_INFO	# Print access information
+		read -p "Press a key to delete the application and continue...." < /dev/tty
+	fi
+}
+
+#=================================================
+# Install and remove an app
+#=================================================
 
 SETUP_APP () {
-# echo -e "MANIFEST_ARGS=$MANIFEST_ARGS"
-# echo -e "MANIFEST_ARGS_MOD=$MANIFEST_ARGS_MOD"
-	COPY_LOG 1
-	LXC_START "sudo yunohost --debug app install \"$APP_PATH_YUNO\" -a \"$MANIFEST_ARGS_MOD\""
-	YUNOHOST_RESULT=$?
-	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
-		ECHO_FORMAT "Installation terminée avec succès. ($YUNOHOST_RESULT)\n" "white" clog
+	# Install an application in a LXC container
+
+	# Install the application in a LXC container
+	LXC_START "sudo yunohost --debug app install \"$APP_PATH_YUNO\" -a \"$manifest_args_mod\""
+
+	# yunohost_result gets the return code of the installation
+	yunohost_result=$?
+
+	# Print the result of the install command
+	if [ $yunohost_result -eq 0 ]; then
+		ECHO_FORMAT "Installation successful. ($yunohost_result)\n" "white" clog
 	else
-		ECHO_FORMAT "Installation échouée. ($YUNOHOST_RESULT)\n" "white" clog
+		ECHO_FORMAT "Installation failed. ($yunohost_result)\n" "white" clog
 	fi
-	COPY_LOG 2
-	APPID=$(grep -o -m1 "YNH_APP_INSTANCE_NAME=[^ ]*" "$OUTPUTD" | cut -d '=' -f2)	# Récupère le nom de l'app au moment de l'install. Pour pouvoir le réutiliser dans les commandes yunohost. La regex matche tout ce qui suit le =, jusqu'à l'espace.
+
+	# Retrieve the app id in the log. To manage the app after
+	ynh_app_id=$(sudo tac "$yunohost_log" | grep --only-matching --max-count=1 "YNH_APP_INSTANCE_NAME=[^ ]*" | cut --delimiter='=' --fields=2)
 }
 
 REMOVE_APP () {
-	if [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
-		if [ "$no_lxc" -eq 0 ]; then
-			LXC_CONNECT_INFO
-		fi
-		read -p "Appuyer sur une touche pour supprimer l'application et continuer les tests..." < /dev/tty
-	fi
-	ECHO_FORMAT "\nSuppression...\n" "white" "bold" clog
-	COPY_LOG 1
-	LXC_START "sudo yunohost --debug app remove \"$APPID\""
+	# Remove an application
+
+	# Make a break if auto_remove is set
+	break_before_continue
+
+	ECHO_FORMAT "\nDeleting...\n" "white" "bold" clog
+
+	# Remove the application from the LXC container
+	LXC_START "sudo yunohost --debug app remove \"$ynh_app_id\""
+
+	# YUNOHOST_REMOVE gets the return code of the deletion
 	YUNOHOST_REMOVE=$?
+
+	# Print the result of the remove command
 	if [ "$YUNOHOST_REMOVE" -eq 0 ]; then
-		ECHO_FORMAT "Suppression terminée avec succès. ($YUNOHOST_REMOVE)\n" "white" clog
+		ECHO_FORMAT "Deleting successful. ($YUNOHOST_REMOVE)\n" "white" clog
 	else
-		ECHO_FORMAT "Suppression échouée. ($YUNOHOST_REMOVE)\n" "white" clog
+		ECHO_FORMAT "Deleting failed. ($YUNOHOST_REMOVE)\n" "white" clog
 	fi
-	COPY_LOG 2
 }
+
+#=================================================
+# Try to access the app by its url
+#=================================================
 
 CHECK_URL () {
-	if [ "$use_curl" -eq 1 ]
+	# Try to access the app by its url
+	
+	if [ $use_curl -eq 1 ]
 	then
-		ECHO_FORMAT "\nAccès par l'url...\n" "white" "bold"
-		if [ "$MANIFEST_PUBLIC" == "null" ]
-		then	# Si la clé du manifest pour l'accès public n'a pas été trouvé, on suppose une app sans accès public
-			LXC_START "sudo yunohost app setting \"$APPID\" skipped_uris -v \"/\""	# Force un skipped_uris à la racine pour forcer un accès public.
+		ECHO_FORMAT "\nTry to access by url...\n" "white" "bold"
+
+		# Force a skipped_uris if public mode is not set
+		if [ "$MANIFEST_PUBLIC" = "null" ]
+		then
+			# Add a skipped_uris on / for the app
+			LXC_START "sudo yunohost app setting \"$ynh_app_id\" skipped_uris -v \"/\""
+			# Regen the sso's config
 			LXC_START "sudo yunohost app ssowatconf"
-			ECHO_FORMAT "Accès public forcé pour le test d'accès par url.\n" "lyellow" "bold"
+			ECHO_FORMAT "Public access forced by a skipped_uris to check.\n" "lyellow" "bold"
 		fi
-		if [ "$no_lxc" -eq 0 ]; then
-			IP_CURL="$(cat "$script_dir/config" | grep PLAGE_IP= | cut -d '=' -f2).2"
-		else
-			IP_CURL="127.0.0.1"
-		fi
-		echo -e "$IP_CURL $DOMAIN #package_check\n$IP_CURL $SOUS_DOMAIN #package_check" | sudo tee -a /etc/hosts > /dev/null	# Renseigne le hosts pour le domain à tester, pour passer directement sur localhost
-		i=1; while [ "$i" -le 5 ]; do
-			curl -Lk $DOMAIN > /dev/null 2>&1
+
+		# Inform /etc/hosts of LXC's IP to resolve the domain.
+		# This is set only here and not before to prevent to help the app's scripts
+		echo -e "$PLAGE_IP.2 $DOMAIN #package_check\n$PLAGE_IP.2 $SOUS_DOMAIN #package_check" | sudo tee --append /etc/hosts > /dev/null
+
+		# Try to resolv the domain during 10 seconds maximum.
+		local i=0
+		for i in `seq 1 10`; do
+			curl --location --insecure $SOUS_DOMAIN > /dev/null 2>&1
+			# If curl return 6, it's an error "Could not resolve host"
 			if [ $? -ne 6 ]; then
-				break	# Si curl renvoi 6, c'est l'erreur "Could not resolve host"
+				# If not, curl is ready to work.
+				break
 			fi
-			sleep 1; (( i++ ))	# Boucle pendant 5 secondes max pour laisser du temps au dns.
+			echo -n .
+			sleep 1
 		done
+
+		# curl_error indicate the result of curl test
 		curl_error=0
-		http503=0
-		i=1
-		while [ "$i" -ne 3 ]	# Tant que i vaut 1 ou 2, les tests continuent.
-		do	# 2 passes, pour effectuer un test avec le / final, et un autre sans.
-			if [ "$i" -eq 1 ]; then	# Test sans / final.
-				if [ "${CHECK_PATH:${#CHECK_PATH}-1}" == "/" ]	# Si le dernier caractère est un /
+		# 503 Service Unavailable can would have some time to work.
+		local http503=0
+
+		# Try to access to the url in 2 times, with a final / and without
+		i=1; while [ $i -ne 3 ]
+		do
+
+			# First time, try without final /
+			if [ $i -eq 1 ]
+			then
+				# If the last character is /
+				if [ "${check_path: -1}" = "/" ]
 				then
-					MOD_CHECK_PATH="${CHECK_PATH:0:${#CHECK_PATH}-1}"	# Supprime le /
+					# Remove it
+					local curl_check_path="${check_path:0:${#check_path}-1}"
 				else
-					MOD_CHECK_PATH=$CHECK_PATH
+					curl_check_path=$check_path
 				fi
-				i=2	# La prochaine boucle passera au 2e test
-			fi
-			if [ "$i" -eq 2 ]; then	# Test avec / final.
-				if [ "${CHECK_PATH:${#CHECK_PATH}-1}" != "/" ]	# Si le dernier caractère n'est pas un /
+
+				# The next loop will try the second test
+				i=2
+			elif [ $i -eq 2 ]
+			then
+				# Second time, try with the final /
+
+				# If the last character isn't /
+				if [ "${check_path: -1}" != "/" ]
 				then
-					MOD_CHECK_PATH="$CHECK_PATH/"	# Ajoute / à la fin du path
+					# Add it
+					curl_check_path="$check_path/"
 				else
-					MOD_CHECK_PATH=$CHECK_PATH
+					curl_check_path=$check_path
 				fi
-				i=3	# La prochaine boucle terminera les tests
+
+				# The next loop will break the while loop
+				i=3
 			fi
-			rm -f "$script_dir/url_output"	# Supprime le précédent fichier html si il est encore présent
-			curl -LksS -w "%{http_code};%{url_effective}\n" $SOUS_DOMAIN$MOD_CHECK_PATH -o "$script_dir/url_output" > "$script_dir/curl_print"
-			if [ "$?" -ne 0 ]; then
-				ECHO_FORMAT "Erreur de connexion...\n" "lred" "bold"
+
+			# Remove the previous curl output
+			rm -f "$script_dir/url_output"
+
+			# Call curl to try to access to the appp's url
+			curl --location --insecure --silent --show-error --write-out "%{http_code};%{url_effective}\n" $SOUS_DOMAIN$curl_check_path --output "$script_dir/url_output" > "$script_dir/curl_print"
+
+			# Analyze the result of curl command
+			if [ $? -ne 0 ]
+			then
+				ECHO_FORMAT "Connection error...\n" "lred" "bold"
 				curl_error=1
 			fi
-			ECHO_FORMAT "Adresse de test: $SOUS_DOMAIN$MOD_CHECK_PATH\n" "white"
-			ECHO_FORMAT "Adresse de la page: $(cat "$script_dir/curl_print" | cut -d ';' -f2)\n" "white"
-			HTTP_CODE=$(cat "$script_dir/curl_print" | cut -d ';' -f1)
-			ECHO_FORMAT "Code HTTP: $HTTP_CODE\n" "white"
-			if [ "${HTTP_CODE:0:1}" == "0" ] || [ "${HTTP_CODE:0:1}" == "4" ] || [ "${HTTP_CODE:0:1}" == "5" ]
-			then	# Si le code d'erreur http est du type 0xx 4xx ou 5xx, c'est un code d'erreur.
-				if [ "${HTTP_CODE}" != "401" ]
-				then	# Le code d'erreur 401 fait exception, si il y a 401 c'est en général l'application qui le renvoi. Donc l'install est bonne.
-					curl_error=1
-				fi
-				if [ "${HTTP_CODE}" = "503" ]
-				then	# Le code d'erreur 503 indique que la ressource est temporairement indisponible. On va le croire pour cette fois et lui donner une autre chance.
+
+			# Print informations about the connection
+			ECHO_FORMAT "Test url: $SOUS_DOMAIN$curl_check_path\n" "white"
+			ECHO_FORMAT "Real url: $(cat "$script_dir/curl_print" | cut --delimiter=';' --fields=2)\n" "white"
+			local http_code=$(cat "$script_dir/curl_print" | cut -d ';' -f1)
+			ECHO_FORMAT "HTTP code: $http_code\n" "white"
+
+			# Analyze the http code
+			if [ "${http_code:0:1}" = "0" ] || [ "${http_code:0:1}" = "4" ] || [ "${http_code:0:1}" = "5" ]
+			then
+				# If the http code is a 0xx 4xx or 5xx, it's an error code.
+				curl_error=1
+
+				# 401 is "Unauthorized", so is a answer of the server. So, it works!
+				test [ "${http_code}" = "401" ] && curl_error=0
+
+				# 503 is Service Unavailable, it's a temporary error.
+				if [ "${http_code}" = "503" ]
+				then
 					curl_error=0
-					ECHO_FORMAT "Service temporairement indisponible...\n" "lyellow" "bold"
-					http503=$(( $http503 + 1 ))
+					ECHO_FORMAT "Service temporarily unavailable\n" "lyellow" "bold"
+					# 3 successive error are allowed
+					http503=$(( http503 + 1 ))
 					if [ $http503 -eq 3 ]; then
-						curl_error=1	# Après 3 erreurs 503, le code est considéré définitivement comme une erreur
+						# Over 3, it's definitively an error
+						curl_error=1
 					else
-						i=$(( $i - 1 ))	# La boucle est décrémenté de 1 pour refaire le même test.
-						sleep 1 # Attend 1 seconde pour laisser le temps au service de se mettre en place.
-						continue	# Retourne en début de boucle pour recommencer le test
+						# Below 3 times, retry.
+						# Decrease the value of 'i' to retry the same test
+						i=$(( i - 1 ))
+						# Wait 1 second to let's some time to the 503 error
+						sleep 1
+						# And retry immediately
+						continue
 					fi
 				fi
-				if [ "$curl_error" -eq 1 ]; then
-					ECHO_FORMAT "Le code HTTP indique une erreur.\n" "white" "bold" clog
+
+				if [ $curl_error -eq 1 ]; then
+					ECHO_FORMAT "The HTTP code show an error.\n" "white" "bold" clog
 				fi
 			fi
-			URL_TITLE=$(grep "<title>" "$script_dir/url_output" | cut -d '>' -f 2 | cut -d '<' -f1)
-			ECHO_FORMAT "Titre de la page: $URL_TITLE\n" "white"
-			if [ "$URL_TITLE" == "YunoHost Portal" ]; then
-				ECHO_FORMAT "La tentative de connexion aboutie au portail YunoHost.\n" "white" "bold" clog
-				YUNO_PORTAL=1
-				# Il serait utile de réussir à s'authentifier sur le portail pour tester une app protégée par celui-ci. Mais j'y arrive pas...
-			else
-				YUNO_PORTAL=0
-				if [ "$URL_TITLE" == "Welcome to nginx on Debian!" ]; then
-					curl_error=1	# Arriver sur la page nginx par défaut est considéré comme une erreur
-					ECHO_FORMAT "La tentative de connexion aboutie à la page par défaut de nginx.\n" "white" "bold" clog
+
+			# Analyze the output of curl
+			if [ -e "$script_dir/url_output" ]
+			then
+				# Print the page's title
+				local url_title=$(grep "<title>" "$script_dir/url_output" | cut --delimiter='>' --fields=2 | cut --delimiter='<' --fields=1)
+				ECHO_FORMAT "Titre de la page: $url_title\n" "white"
+
+				# Check if the page title is neither the YunoHost portail or default nginx page
+				if [ "$url_title" = "YunoHost Portal" ]
+				then
+					ECHO_FORMAT "The connection attempt fall on the YunoHost portal.\n" "white" "bold" clog
+					yuno_portal=1
+				else
+					yuno_portal=0
+					if [ "$url_title" = "Welcome to nginx on Debian!" ]
+					then
+						# Falling on nginx default page is an error.
+						curl_error=1
+						ECHO_FORMAT "The connection attempt fall on nginx default page.\n" "white" "bold" clog
+					fi
+
+					# Print the first 20 lines of the body
+					ECHO_FORMAT "Extract of page's body:\n" "white"
+					echo -e "\e[37m"	# Write in 'light grey'
+					grep "<body" --after-context=20 "$script_dir/url_output" | sed 1d | tee --append "$test_result"
+					echo -e "\e[0m"
 				fi
-				ECHO_FORMAT "Extrait du corps de la page:\n" "white"
-				echo -e "\e[37m"	# Écrit en light grey
-				grep "<body" -A 20 "$script_dir/url_output" | sed 1d | tee -a "$RESULT"
-				echo -e "\e[0m"
 			fi
 		done
-		sudo sed -i '/#package_check/d' /etc/hosts	# Supprime la ligne dans le hosts
+
+		# Remove the entries in /etc/hosts for the test domain
+		sudo sed --in-place '/#package_check/d' /etc/hosts
 	else
-		ECHO_FORMAT "Test de connexion annulé.\n" "white"
+		# If use_curl is set to 0, the url will not tried
+		ECHO_FORMAT "Connexion attempt aborted.\n" "white"
 		curl_error=0
-		YUNO_PORTAL=0
+		yuno_portal=0
 	fi
 }
 
-CHECK_SETUP_SUBDIR () {
-	# Test d'installation en sous-dossier
-	ECHO_FORMAT "\n\n>> Installation en sous-dossier... [Test $cur_test/$all_test]\n" "white" "bold" clog
+#=================================================
+# Generic functions for unit tests
+#=================================================
+
+unit_test_title () {
+	# Print a title for the test
+	# $1 = Name of the test
+
+	ECHO_FORMAT "\n\n>> $1 [Test $cur_test/$all_test]\n" "white" "bold" clog
+
+	# Increment the value of the current test
 	cur_test=$((cur_test+1))
-	use_curl=1
-	if [ -z "$MANIFEST_DOMAIN" ]; then
-		echo "Clé de manifest pour 'domain' introuvable dans le fichier check_process. Impossible de procéder à ce test"
-		return
+}
+
+check_manifest_key () {
+	# Check if a manifest key is set
+	# $1 = manifest key
+
+	if [ -z "$MANIFEST_$1" ]
+	then
+		ECHO_FORMAT "Unable to find a manifest key for '${1,,}' in the check_process file. Impossible to perform this test\n" "lred" clog
+		return 1
 	fi
-	if [ -z "$MANIFEST_PATH" ]; then
-		echo "Clé de manifest pour 'path' introuvable dans le fichier check_process. Impossible de procéder à ce test"
-		return
+}
+
+replace_manifest_key () {
+	# Replace a generic manifest key by another
+	# $1 = Manifest key
+	# $2 = Replacement value
+
+	# Build the variable name by concatenate MANIFEST and $1
+	local manifest_key=$(eval echo \$MANIFEST_$1)
+
+	if [ -n "$manifest_key" ]
+	then
+		manifest_args_mod=$(echo $manifest_args_mod | sed "s@$manifest_key=[^&]*\&@${manifest_key}=${2}\&@")
+	else
+		ECHO_FORMAT "The manifest key $manifest_key doesn't found in the check_process\n" "lred" clog
 	fi
-	if [ -z "$MANIFEST_USER" ]; then
-		echo "Clé de manifest pour 'user' introuvable dans le fichier check_process. Impossible de procéder à ce test"
-		return
+}
+
+check_success () {
+	ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
+}
+
+check_failed () {
+	ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
+}
+
+check_test_result () {
+	# Check the result and print SUCCESS or FAIL
+
+	if [ $yunohost_result -eq 0 ] && [ $curl_error -eq 0 ] && [ $yuno_portal -eq 0 ]
+	then
+		check_success
+		return 0
+	else
+		check_failed
+		return 1
 	fi
-	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[-[:alpha:].$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[-[:alpha:]$]*\&@$MANIFEST_USER=$USER_TEST\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[[:alpha:]$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
-	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[[:alpha:]]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
+}
+
+check_test_result_remove () {
+	# Check the result of a remove and print SUCCESS or FAIL
+
+	if [ $YUNOHOST_REMOVE -eq 0 ]
+	then
+		check_success
+		return 0
+	else
+		check_failed
+		return 1
 	fi
-	# Installation de l'app
+}
+
+is_install_failed () {
+	# Check if an install have previously work
+
+	if [ $GLOBAL_CHECK_ROOT -eq 1 ]
+	then
+		# If root installation worked, return root.
+		echo root
+	elif [ $GLOBAL_CHECK_SUB_DIR -eq 1 ] || [ $force_install_ok -eq 1 ]
+	then
+		# If subdir installation worked or force_install_ok setted, return subdir.
+		echo subdir
+	else
+		ECHO_FORMAT "All install checks failed, impossible to perform this test...\n" "lred" clog
+		return 1
+	fi
+}
+
+#=================================================
+# Unit tests
+#=================================================
+
+CHECK_SETUP () {
+	# Try to install in a sub path, on root or without url access
+	# $1 = install type
+
+	local install_type=$1
+	if [ "$install_type" = "subdir" ]; then
+		unit_test_title "Installation in a sub path..."
+	elif [ "$install_type" = "root" ]; then
+		unit_test_title "Installation on the root..."
+	else
+		unit_test_title "Installation without url access..."
+		# Disable the curl test
+		use_curl=0
+	fi
+
+	# Check if the needed manifest key are set or abort the test
+	if [ "$install_type" != "no_url" ]; then
+		check_manifest_key "DOMAIN" || return
+		check_manifest_key "PATH" || return
+	fi
+
+	# Copy original arguments
+	local manifest_args_mod=$MANIFEST_ARGS
+
+	# Replace manifest key for the test
+	replace_manifest_key "DOMAIN" "$SOUS_DOMAIN"
+	if [ "$install_type" = "subdir" ]; then
+		local check_path=$PATH_TEST
+	elif [ "$install_type" = "root" ]; then
+		local check_path=/
+	fi
+	replace_manifest_key "PATH" "$check_path"
+	replace_manifest_key "USER" "$USER_TEST"
+	replace_manifest_key "PASSWORD" "$PASSWORD_TEST"
+	replace_manifest_key "PUBLIC" "$MANIFEST_PUBLIC_public"
+
+	# Install the application in a LXC container
 	SETUP_APP
+
+	# Analyse the log to extract "warning" and "error" lines
 	LOG_EXTRACTOR
-	# Test l'accès à l'app
-	CHECK_PATH=$PATH_TEST
+
+	# Try to access the app by its url
 	CHECK_URL
-	tnote=$((tnote+2))
-	install_pass=1
-	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ] && [ "$YUNO_PORTAL" -eq 0 ]; then
-		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-		note=$((note+2))
-		GLOBAL_CHECK_SETUP=1	# Installation réussie
-		GLOBAL_CHECK_SUB_DIR=1	# Installation en sous-dossier réussie
-	else
-		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-		if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
-			GLOBAL_CHECK_SETUP=-1	# Installation échouée
-		fi
-		GLOBAL_CHECK_SUB_DIR=-1	# Installation en sous-dossier échouée
-	fi
-	# Suppression de l'app
-	REMOVE_APP
-	if [ "$YUNOHOST_RESULT" -eq 0 ]	# Si l'installation a été un succès. On teste la suppression
-	then
-		LOG_EXTRACTOR
-		tnote=$((tnote+2))
-		install_pass=2
-		if [ "$YUNOHOST_REMOVE" -eq 0 ]; then
-			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-			note=$((note+2))
-			GLOBAL_CHECK_REMOVE_SUBDIR=1	# Suppression en sous-dossier réussie
-			GLOBAL_CHECK_REMOVE=1	# Suppression réussie
-		else
-			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-			if [ "$GLOBAL_CHECK_REMOVE" -ne 1 ]; then
-				GLOBAL_CHECK_REMOVE=-1	# Suppression échouée
-			fi
-			GLOBAL_CHECK_REMOVE_SUBDIR=-1	# Suppression en sous-dossier échouée
-		fi
-	fi
-	YUNOHOST_RESULT=-1
-	YUNOHOST_REMOVE=-1
-}
 
-CHECK_SETUP_ROOT () {
-	# Test d'installation à la racine
-	ECHO_FORMAT "\n\n>> Installation à la racine... [Test $cur_test/$all_test]\n" "white" "bold" clog
-	cur_test=$((cur_test+1))
-	use_curl=1
-	if [ -z "$MANIFEST_DOMAIN" ]; then
-		echo "Clé de manifest pour 'domain' introuvable dans le fichier check_process. Impossible de procéder à ce test"
-		return
-	fi
-	if [ -z "$MANIFEST_PATH" ]; then
-		echo "Clé de manifest pour 'path' introuvable dans le fichier check_process. Impossible de procéder à ce test"
-		return
-	fi
-	if [ -z "$MANIFEST_USER" ]; then
-		echo "Clé de manifest pour 'user' introuvable dans le fichier check_process. Impossible de procéder à ce test"
-		return
-	fi
-	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[-[:alpha:].$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=/\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[-[:alpha:]$]*\&@$MANIFEST_USER=$USER_TEST\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[[:alpha:]$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
-	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[[:alpha:]]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
-	fi
-	# Installation de l'app
-	SETUP_APP
-	LOG_EXTRACTOR
-	# Test l'accès à l'app
-	CHECK_PATH="/"
-	CHECK_URL
-	if [ "$install_pass" -gt 0 ]; then	# Si install_pass>0, une installation a déjà été faite.
-		tnote=$((tnote+1))
-	else
-		install_pass=1
-		tnote=$((tnote+2))
-	fi
-	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ] && [ "$YUNO_PORTAL" -eq 0 ]; then
-		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-		if [ "$GLOBAL_CHECK_SETUP" -eq 1 ]; then
-			note=$((note+1))
-		else
-			note=$((note+2))
+	# Check the result and print SUCCESS or FAIL
+	if check_test_result
+	then	# Success
+		GLOBAL_CHECK_SETUP=1	# Installation succeed
+		local check_result_setup=1	# Installation in a sub path succeed
+	else	# Fail
+		# The global success for a installation can't be failed if another installation succeed
+		if [ $GLOBAL_CHECK_SETUP -ne 1 ]; then
+			GLOBAL_CHECK_SETUP=-1	# Installation failed
 		fi
-		GLOBAL_CHECK_SETUP=1	# Installation réussie
-		GLOBAL_CHECK_ROOT=1	# Installation à la racine réussie
-	else
-		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-		if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
-			GLOBAL_CHECK_SETUP=-1	# Installation échouée
-		fi
-		GLOBAL_CHECK_ROOT=-1	# Installation à la racine échouée
+		local check_result_setup=-1	# Installation in a sub path failed
 	fi
-	# Suppression de l'app
-	REMOVE_APP
-	if [ "$YUNOHOST_RESULT" -eq 0 ]	# Si l'installation a été un succès. On teste la suppression
-	then
-		LOG_EXTRACTOR
-		if [ "$install_pass" -eq 2 ]; then	# Si install_pass=2, une suppression a déjà été faite.
-			tnote=$((tnote+1))
-		else
-			install_pass=2
-			tnote=$((tnote+2))
-		fi
-		if [ "$YUNOHOST_REMOVE" -eq 0 ]; then
-			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-			if [ "$GLOBAL_CHECK_REMOVE" -eq 0 ]; then
-				note=$((note+2))
-			else
-				note=$((note+1))
-			fi
-			GLOBAL_CHECK_REMOVE_ROOT=1	# Suppression à la racine réussie
-			GLOBAL_CHECK_REMOVE=1	# Suppression réussie
-		else
-			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-			if [ "$GLOBAL_CHECK_REMOVE" -ne 1 ]; then
-				GLOBAL_CHECK_REMOVE=-1	# Suppression échouée
-			fi
-			GLOBAL_CHECK_REMOVE_ROOT=-1	# Suppression à la racine échouée
-		fi
-	fi
-	YUNOHOST_RESULT=-1
-	YUNOHOST_REMOVE=-1
-}
 
-CHECK_SETUP_NO_URL () {
-	# Test d'installation sans accès par url
-	use_curl=0
-	ECHO_FORMAT "\n\n>> Installation sans accès par url... [Test $cur_test/$all_test]\n" "white" "bold" clog
-	cur_test=$((cur_test+1))
-	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
-	# Installation de l'app
-	SETUP_APP
-	LOG_EXTRACTOR
-	if [ "$install_pass" -eq 0 ]; then	# Si install_pass=0, aucune installation n'a été faite.
-		install_pass=1
-		tnote=$((tnote+1))
-	fi
-	if [ "$YUNOHOST_RESULT" -eq 0 ]; then
-		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-		if [ "$GLOBAL_CHECK_SETUP" -eq 0 ]; then
-			note=$((note+1))
-		fi
-		GLOBAL_CHECK_SETUP=1	# Installation réussie
-		GLOBAL_CHECK_ROOT=1
-	else
-		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-		if [ "$GLOBAL_CHECK_SETUP" -ne 1 ]; then
-			GLOBAL_CHECK_SETUP=-1	# Installation échouée
-		fi
-	fi
-	# Suppression de l'app
+	# Remove the application
 	REMOVE_APP
-	if [ "$YUNOHOST_RESULT" -eq 0 ]	# Si l'installation a été un succès. On teste la suppression
-	then
-		LOG_EXTRACTOR
-		if [ "$install_pass" -ne 2 ]; then	# Si install_pass!=2, aucune suppression n'a été faite.
-			install_pass=2
-			tnote=$((tnote+1))
+
+	# Analyse the log to extract "warning" and "error" lines
+	LOG_EXTRACTOR
+
+	# Check the result and print SUCCESS or FAIL
+	if check_test_result_remove
+	then	# Success
+		local check_result_remove=1	# Remove in sub path succeed
+		GLOBAL_CHECK_REMOVE=1	# Remove succeed
+	else	# Fail
+		# The global success for a deletion can't be failed if another remove succeed
+		if [ $GLOBAL_CHECK_REMOVE -ne 1 ]; then
+			GLOBAL_CHECK_REMOVE=-1	# Remove failed
 		fi
-		if [ "$YUNOHOST_REMOVE" -eq 0 ]; then
-			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-			if [ "$GLOBAL_CHECK_REMOVE_ROOT" -eq 0 ]; then
-				note=$((note+1))
-			fi
-			GLOBAL_CHECK_REMOVE=1	# Suppression réussie
-			GLOBAL_CHECK_REMOVE_ROOT=1
-		else
-			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-			if [ "$GLOBAL_CHECK_REMOVE" -ne 1 ]; then
-				GLOBAL_CHECK_REMOVE=-1	# Suppression échouée
-			fi
-			GLOBAL_CHECK_REMOVE_ROOT=-1	# Suppression échouée
-		fi
+		local check_result_remove=-1	# Remove in sub path failed
 	fi
-	YUNOHOST_RESULT=-1
-	YUNOHOST_REMOVE=-1
+
+	# Fill the correct variable depend on the type of test
+	if [ "$install_type" = "subdir" ]
+	then
+		GLOBAL_CHECK_SUB_DIR=$check_result_setup
+		GLOBAL_CHECK_REMOVE_SUBDIR=$check_result_remove
+	else	# root and no_url
+		GLOBAL_CHECK_ROOT=$check_result_setup
+		GLOBAL_CHECK_REMOVE_ROOT=$check_result_remove
+	fi
 }
 
 CHECK_UPGRADE () {
-	# Test d'upgrade
-	ECHO_FORMAT "\n\n>> Upgrade... [Test $cur_test/$all_test]\n" "white" "bold" clog
-	cur_test=$((cur_test+1))
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
-		echo "L'installation a échouée, impossible d'effectuer ce test..."
-		return;
-	fi
-	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[-[:alpha:].$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[-[:alpha:]$]*\&@$MANIFEST_USER=$USER_TEST\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[[:alpha:]$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
-	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[[:alpha:]]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
-	fi
-	if [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=/\&@")
-		CHECK_PATH="/"
-	elif [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
-		CHECK_PATH="$PATH_TEST"
-	else
-		echo "Aucun mode d'installation n'a fonctionné, impossible d'effectuer ce test..."
-		return;
-	fi
-	ECHO_FORMAT "\nInstallation préalable...\n" "white" "bold" clog
-	# Installation de l'app
-	SETUP_APP
-	LOG_EXTRACTOR
-	if [ "$YUNOHOST_RESULT" -ne 0 ]; then
-		ECHO_FORMAT "\nInstallation échouée...\n" "lred" "bold"
-	else
-		ECHO_FORMAT "\nUpgrade sur la même version du package...\n" "white" "bold" clog
-		# Upgrade de l'app
-		COPY_LOG 1
-		LXC_START "sudo yunohost --debug app upgrade $APPID -f \"$APP_PATH_YUNO\""
-		YUNOHOST_RESULT=$?
-		if [ "$YUNOHOST_RESULT" -eq 0 ]; then
-			ECHO_FORMAT "Upgrade terminée avec succès. ($YUNOHOST_RESULT)\n" "white" clog
-		else
-			ECHO_FORMAT "Upgrade échoué. ($YUNOHOST_RESULT)\n" "white" clog
-		fi
-		COPY_LOG 2
-		LOG_EXTRACTOR
-		# Test l'accès à l'app
-		CHECK_URL
-		tnote=$((tnote+1))
-	fi
-	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ] && [ "$YUNO_PORTAL" -eq 0 ]; then
-		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-		note=$((note+1))
-		GLOBAL_CHECK_UPGRADE=1	# Upgrade réussie
-	else
-		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-		GLOBAL_CHECK_UPGRADE=-1	# Upgrade échouée
-	fi
-	if [ "$no_lxc" -ne 0 ]; then
-		# Suppression de l'app si lxc n'est pas utilisé.
-		REMOVE_APP
-	elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
-		if [ "$no_lxc" -eq 0 ]; then
-			LXC_CONNECT_INFO
-		fi
-		read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
-	fi
-	YUNOHOST_RESULT=-1
-}
+	# Try the upgrade script
 
-CHECK_BACKUP_RESTORE () {
-	# Test de backup
-	ECHO_FORMAT "\n\n>> Backup/Restore... [Test $cur_test/$all_test]\n" "white" "bold" clog
-	cur_test=$((cur_test+1))
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
-		echo "L'installation a échouée, impossible d'effectuer ce test..."
+	unit_test_title "Upgrade..."
+
+	# Check if an install have previously work
+	local previous_install=$(is_install_failed)
+	# Abort if none install worked
+	[ "$previous_install" = "1" ] && return
+
+	# Copy original arguments
+	local manifest_args_mod=$MANIFEST_ARGS
+
+	# Replace manifest key for the test
+	replace_manifest_key "DOMAIN" "$SOUS_DOMAIN"
+	# Use a path according to previous succeeded installs
+	if [ "$previous_install" = "subdir" ]; then
+		local check_path=$PATH_TEST
+	elif [ "$previous_install" = "root" ]; then
+		local check_path=/
 	fi
-	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[-[:alpha:].$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[-[:alpha:]$]*\&@$MANIFEST_USER=$USER_TEST\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[[:alpha:]$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
-	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[[:alpha:]]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
-	fi
-	GLOBAL_CHECK_BACKUP=0	# Remet à 0 le résultat du test. En cas de reboucle
-	GLOBAL_CHECK_RESTORE=0
-	for i in 0 1
-	do	# 2 passes, pour effectuer un test en root et en sub_dir
-		if [ "$i" -eq 0 ]
-		then	# Commence par l'install root
-			if [ "$GLOBAL_CHECK_ROOT" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné. Ou si l'argument force_install_ok est présent.
-				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=/\&@")
-				CHECK_PATH="/"
-				ECHO_FORMAT "\nInstallation préalable à la racine...\n" "white" "bold" clog
-			else
-				echo "L'installation à la racine n'a pas fonctionnée, impossible d'effectuer ce test..."
-				continue;
-			fi
-		elif [ "$i" -eq 1 ]
-		then	# Puis teste l'install sub_dir
-			if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
-				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
-				CHECK_PATH="$PATH_TEST"
-				ECHO_FORMAT "\nInstallation préalable en sous-dossier...\n" "white" "bold" clog
-			else
-				echo "L'installation en sous-dossier n'a pas fonctionnée, impossible d'effectuer ce test..."
-				return;
-			fi
+	replace_manifest_key "PATH" "$check_path"
+	replace_manifest_key "USER" "$USER_TEST"
+	replace_manifest_key "PASSWORD" "$PASSWORD_TEST"
+	replace_manifest_key "PUBLIC" "$MANIFEST_PUBLIC_public"
+
+	# Install the application in a LXC container
+	ECHO_FORMAT "\nPreliminary install...\n" "white" "bold" clog
+	SETUP_APP
+
+	# Analyse the log to extract "warning" and "error" lines
+	LOG_EXTRACTOR
+
+	# Check if the install had work
+	if [ $yunohost_result -ne 0 ]
+	then
+		ECHO_FORMAT "\nInstallation failed...\n" "lred" "bold"
+	else
+		ECHO_FORMAT "\nUpgrade on the same version...\n" "white" "bold" clog
+
+		# Upgrade the application in a LXC container
+		LXC_START "sudo yunohost --debug app upgrade $ynh_app_id -f \"$APP_PATH_YUNO\""
+
+		# yunohost_result gets the return code of the upgrade
+		yunohost_result=$?
+
+		# Print the result of the upgrade command
+		if [ $yunohost_result -eq 0 ]; then
+			ECHO_FORMAT "Upgrade successful. ($yunohost_result)\n" "white" clog
+		else
+			ECHO_FORMAT "Upgrade failed. ($yunohost_result)\n" "white" clog
 		fi
-		# Installation de l'app
-		SETUP_APP
+
+		# Analyse the log to extract "warning" and "error" lines
 		LOG_EXTRACTOR
-		if [ "$YUNOHOST_RESULT" -ne 0 ]; then
-			ECHO_FORMAT "\nInstallation échouée...\n" "lred" "bold"
-		else
-			ECHO_FORMAT "\nBackup de l'application...\n" "white" "bold" clog
-			# Backup de l'app
-			COPY_LOG 1
-			LXC_START "sudo yunohost --debug backup create -n Backup_test --apps $APPID --hooks $BACKUP_HOOKS"
-			YUNOHOST_RESULT=$?
-			if [ "$YUNOHOST_RESULT" -eq 0 ]; then
-				ECHO_FORMAT "Backup terminé avec succès. ($YUNOHOST_RESULT)\n" "white" clog
-			else
-				ECHO_FORMAT "Backup échoué. ($YUNOHOST_RESULT)\n" "white" clog
-			fi
-			COPY_LOG 2
-			LOG_EXTRACTOR
-			tnote=$((tnote+1))
-		fi
-		if [ "$YUNOHOST_RESULT" -eq 0 ]; then
-			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-			note=$((note+1))
-			if [ $GLOBAL_CHECK_BACKUP -ne -1 ]; then	# Le backup ne peux pas être réussi si il a échoué précédemment...
-			    GLOBAL_CHECK_BACKUP=1	# Backup réussi
-			fi
-		else
-			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-			GLOBAL_CHECK_BACKUP=-1	# Backup échoué
-		fi
-		sudo cp -a /var/lib/lxc/$LXC_NAME/rootfs/home/yunohost.backup/archives ./	# Récupère le backup sur le conteneur
-		for j in 0 1
-		do	# 2 passes, pour tester la restauration après suppression de l'app ET après restauration du conteneur.
-			if [ "$j" -eq 0 ]
-			then	# Commence par tester la restauration après suppression de l'application
-				REMOVE_APP	# Suppression de l'app
-				ECHO_FORMAT "\nRestauration de l'application après suppression de l'application...\n" "white" "bold" clog
-				if [ "$no_lxc" -ne 0 ]; then	# Si lxc n'est pas utilisé, impossible d'effectuer le 2e test
-					j=2	# Ignore le 2e test
-					echo -e "LXC n'est pas utilisé, impossible de tester la restauration sur un système vierge...\n"
-				fi
-			elif [ "$j" -eq 1 ]
-			then	# Puis la restauration après restauration du conteneur (si LXC est utilisé)
-				LXC_STOP	# Restaure le conteneur.
-				sudo mv -f ./archives /var/lib/lxc/$LXC_NAME/rootfs/home/yunohost.backup/	# Replace le backup sur le conteneur
-				ECHO_FORMAT "\nRestauration de l'application sur un système vierge...\n" "white" "bold" clog
-			fi
-			# Restore de l'app
-			COPY_LOG 1
-			LXC_START "sudo yunohost --debug backup restore Backup_test --force --apps $APPID"
-			YUNOHOST_RESULT=$?
-			if [ "$YUNOHOST_RESULT" -eq 0 ]; then
-				ECHO_FORMAT "Restauration terminée avec succès. ($YUNOHOST_RESULT)\n" "white" clog
-			else
-				ECHO_FORMAT "Restauration échouée. ($YUNOHOST_RESULT)\n" "white" clog
-			fi
-			COPY_LOG 2
-			LOG_EXTRACTOR
-			# Test l'accès à l'app
-			CHECK_URL
-			tnote=$((tnote+1))
-			if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ] && [ "$YUNO_PORTAL" -eq 0 ]; then
-				ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-				note=$((note+1))
-				if [ $GLOBAL_CHECK_RESTORE -ne -1 ]; then	# La restauration ne peux pas être réussie si elle a échouée précédemment...
-					GLOBAL_CHECK_RESTORE=1	# Restore réussi
-				fi
-			else
-				ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-				GLOBAL_CHECK_RESTORE=-1	# Restore échoué
-			fi
-			if [ "$no_lxc" -ne 0 ]; then
-				# Suppression de l'app si lxc n'est pas utilisé.
-				REMOVE_APP
-				# Suppression de l'archive
-				sudo yunohost backup delete Backup_test > /dev/null
-			elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
-				if [ "$no_lxc" -eq 0 ]; then
-					LXC_CONNECT_INFO
-				fi
-				read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
-			fi
-			YUNOHOST_RESULT=-1
-			LXC_STOP        # Restaure le snapshot du conteneur avant de recommencer le processus de backup
-		done
-	done
+
+		# Try to access the app by its url
+		CHECK_URL
+	fi
+
+	# Check the result and print SUCCESS or FAIL
+	if check_test_result
+	then	# Success
+		GLOBAL_CHECK_UPGRADE=1	# Upgrade succeed
+	else	# Fail
+		GLOBAL_CHECK_UPGRADE=-1	# Upgrade failed
+	fi
+
+	# Remove the application
+	REMOVE_APP
 }
 
 CHECK_PUBLIC_PRIVATE () {
-	# Test d'installation en public/privé
-	if [ "$1" == "private" ]; then
-		ECHO_FORMAT "\n\n>> Installation privée... [Test $cur_test/$all_test]\n" "white" "bold" clog
-		GLOBAL_CHECK_PRIVATE=0	# Remet à 0 le résultat du test. En cas de reboucle
+	# Try to install in public or private mode
+	# $1 = install type
+
+	local install_type=$1
+	if [ "$install_type" = "private" ]; then
+		unit_test_title "Installation in private mode..."
+	else [ "$install_type" = "public" ]
+		unit_test_title "Installation in public mode..."
 	fi
-	if [ "$1" == "public" ]; then
-		ECHO_FORMAT "\n\n>> Installation publique... [Test $cur_test/$all_test]\n" "white" "bold" clog
-		GLOBAL_CHECK_PUBLIC=0	# Remet à 0 le résultat du test. En cas de reboucle
+
+	# Check if the needed manifest key are set or abort the test
+	check_manifest_key "PUBLIC" || return
+	check_manifest_key "PUBLIC_public" || return
+	check_manifest_key "PUBLIC_private" || return
+
+	# Check if an install have previously work
+	local previous_install=$(is_install_failed)
+	# Abort if none install worked
+	[ "$previous_install" = "1" ] && return
+
+	# Copy original arguments
+	local manifest_args_mod=$MANIFEST_ARGS
+
+	# Replace manifest key for the test
+	replace_manifest_key "DOMAIN" "$SOUS_DOMAIN"
+	replace_manifest_key "USER" "$USER_TEST"
+	replace_manifest_key "PASSWORD" "$PASSWORD_TEST"
+	# Set public or private according to type of test requested
+	if [ "$install_type" = "private" ]; then
+		replace_manifest_key "PUBLIC" "$MANIFEST_PUBLIC_private"
+	elif [ "$install_type" = "public" ]; then
+		replace_manifest_key "PUBLIC" "$MANIFEST_PUBLIC_public"
 	fi
-	cur_test=$((cur_test+1))
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
-		echo "L'installation a échouée, impossible d'effectuer ce test..."
-		return
-	fi
-	if [ -z "$MANIFEST_PUBLIC" ]; then
-		echo "Clé de manifest pour 'is_public' introuvable dans le fichier check_process. Impossible de procéder à ce test"
-		return
-	fi
-	if [ -z "$MANIFEST_PUBLIC_public" ]; then
-		echo "Valeur 'public' pour la clé de manifest 'is_public' introuvable dans le fichier check_process. Impossible de procéder à ce test"
-		return
-	fi
-	if [ -z "$MANIFEST_PUBLIC_private" ]; then
-		echo "Valeur 'private' pour la clé de manifest 'is_public' introuvable dans le fichier check_process. Impossible de procéder à ce test"
-		return
-	fi
-	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[-[:alpha:].$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[-[:alpha:]$]*\&@$MANIFEST_USER=$USER_TEST\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[[:alpha:]$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
-	# Choix public/privé
-	if [ "$1" == "private" ]; then
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[[:alnum:]]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_private\&/")
-	fi
-	if [ "$1" == "public" ]; then
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[[:alnum:]]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
-	fi
+
+	# Initialize the value
+	local check_result_public_private=0
+
+	# Try in 2 times, first in root and second in sub path.
+	local i=0
 	for i in 0 1
-	do	# 2 passes, pour effectuer un test en root et en sub_dir
-		if [ "$i" -eq 0 ]
-		then	# Commence par l'install root
-			if [ "$GLOBAL_CHECK_ROOT" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné. Ou si l'argument force_install_ok est présent.
-				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=/\&@")
-				CHECK_PATH="/"
+	do
+		# First, try with a root install
+		if [ $i -eq 0 ]
+		then
+			# Check if root installation worked, or if force_install_ok is setted.
+			if [ $GLOBAL_CHECK_ROOT -eq 1 ] || [ $force_install_ok -eq 1 ]
+			then
+				# Replace manifest key for path
+				local check_path=/
+				replace_manifest_key "PATH" "$check_path"
 			else
-				echo "L'installation à la racine n'a pas fonctionnée, impossible d'effectuer ce test..."
-				continue;
+				# Jump to the second path if this check cannot be do
+				ECHO_FORMAT "Root install check failed, impossible to perform this test...\n" "lyellow" clog
+				continue
 			fi
-		elif [ "$i" -eq 1 ]
-		then	# Puis teste l'install sub_dir
-			if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
-				MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
-				CHECK_PATH="$PATH_TEST"
+
+		# Second, try with a sub path install
+		elif [ $i -eq 1 ]
+		then
+			# Check if sub path installation worked, or if force_install_ok is setted.
+			if [ $GLOBAL_CHECK_SUB_DIR -eq 1 ] || [ $force_install_ok -eq 1 ]
+			then
+				# Replace manifest key for path
+				local check_path=$PATH_TEST
+				replace_manifest_key "PATH" "$check_path"
 			else
-				echo "L'installation en sous-dossier n'a pas fonctionnée, impossible d'effectuer ce test..."
-				return;
+				# Jump to the second path if this check cannot be do
+				ECHO_FORMAT "Sub path install check failed, impossible to perform this test...\n" "lyellow" clog
+				return
 			fi
 		fi
-		# Installation de l'app
+
+		# Install the application in a LXC container
 		SETUP_APP
-		# Test l'accès à l'app
-		CHECK_URL
-		if [ "$1" == "private" ]; then
-			if [ "$YUNO_PORTAL" -eq 0 ]; then	# En privé, si l'accès url n'arrive pas sur le portail. C'est un échec.
-				YUNOHOST_RESULT=1
-			fi
-		fi
-		if [ "$1" == "public" ]; then
-			if [ "$YUNO_PORTAL" -eq 1 ]; then	# En public, si l'accès url arrive sur le portail. C'est un échec.
-				YUNOHOST_RESULT=1
-			fi
-		fi	
+
+		# Analyse the log to extract "warning" and "error" lines
 		LOG_EXTRACTOR
-		tnote=$((tnote+1))
-		if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
-			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-			note=$((note+1))
-			if [ "$1" == "private" ]; then
-				if [ $GLOBAL_CHECK_PRIVATE -ne -1 ]; then	# L'installation ne peux pas être réussie si elle a échouée précédemment...
-				    GLOBAL_CHECK_PRIVATE=1	# Installation privée réussie
-				fi
+
+		# Try to access the app by its url
+		CHECK_URL
+
+		# Change the result according to the results of the curl test
+		if [ "$install_type" = "private" ]
+		then
+			# In private mode, if curl doesn't fell on the ynh portal, it's a fail.
+			if [ $yuno_portal -eq 0 ]; then
+				yunohost_result=1
 			fi
-			if [ "$1" == "public" ]; then
-				if [ $GLOBAL_CHECK_PUBLIC -ne -1 ]; then	# L'installation ne peux pas être réussie si elle a échouée précédemment...
-				    GLOBAL_CHECK_PUBLIC=1	# Installation publique réussie
-				fi
-			fi
-		else
-			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-			if [ "$1" == "private" ]; then
-				GLOBAL_CHECK_PRIVATE=-1	# Installation privée échouée
-			fi
-			if [ "$1" == "public" ]; then
-				GLOBAL_CHECK_PUBLIC=-1	# Installation publique échouée
+		elif [ "$install_type" = "public" ]
+		then
+			# In public mode, if curl fell on the ynh portal, it's a fail.
+			if [ $yuno_portal -eq 1 ]; then
+				yunohost_result=1
 			fi
 		fi
-		if [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
-			if [ "$no_lxc" -eq 0 ]; then
-				LXC_CONNECT_INFO
+
+		# Check the result and print SUCCESS or FAIL
+		if [ $yunohost_result -eq 0 ] && [ $curl_error -eq 0 ]
+		then	# Success
+			check_success
+			# The global success for public/private mode can't be a success if another installation failed
+			if [ $check_result_public_private -ne -1 ]; then
+				check_result_public_private=1	# Installation succeed
 			fi
-			read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
+		else	# Fail
+			check_failed
+			check_result_public_private=-1	# Installation failed
 		fi
-		REMOVE_APP
-		YUNOHOST_RESULT=-1
+
+		# Fill the correct variable depend on the type of test
+		if [ "$install_type" = "private" ]
+		then
+			GLOBAL_CHECK_PRIVATE=$check_result_public_private
+		else	# public
+			GLOBAL_CHECK_PUBLIC=$check_result_public_private
+		fi
+
+		# Make a break if auto_remove is set
+		break_before_continue
+
+		# Stop and restore the LXC container
+		LXC_STOP
 	done
 }
 
 CHECK_MULTI_INSTANCE () {
-	# Test d'installation en multi-instance
-	ECHO_FORMAT "\n\n>> Installation multi-instance... [Test $cur_test/$all_test]\n" "white" "bold" clog
-	cur_test=$((cur_test+1))
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
-		echo "L'installation a échouée, impossible d'effectuer ce test..."
+	# Try multi-instance installations
+
+	unit_test_title "Installation multi-instance..."
+
+	# Check if the sub path install have previously work
+	if [ $GLOBAL_CHECK_SUB_DIR -ne 1 ] && [ $force_install_ok -ne 1 ]
+	then
+		# If subdir installation doesn't worked and force_install_ok not setted, aborted this test.
+		ECHO_FORMAT "Sub path install check failed, impossible to perform this test...\n" "lred" clog
 		return
 	fi
-	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[-[:alpha:].$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[-[:alpha:]$]*\&@$MANIFEST_USER=$USER_TEST\&@")
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[[:alpha:]$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
-	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[[:alpha:]]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
-	fi
-	if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
-	else
-		echo "L'installation en sous-dossier n'a pas fonctionné, impossible d'effectuer ce test..."
-		return;
-	fi
-	# Installation de l'app une première fois
-	ECHO_FORMAT "1ère installation: path=$PATH_TEST\n" clog
-	SETUP_APP
-	LOG_EXTRACTOR
-	APPID_first=$APPID	# Stocke le nom de la première instance
-	YUNOHOST_RESULT_first=$YUNOHOST_RESULT	# Stocke le résulat de l'installation de la première instance
-	# Installation de l'app une deuxième fois, en ajoutant un suffixe au path
-	path2="$PATH_TEST-2"
-	ECHO_FORMAT "2e installation: path=$path2\n" clog
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=$path2\&@")
-	SETUP_APP
-	LOG_EXTRACTOR
-	APPID_second=$APPID	# Stocke le nom de la deuxième instance
-	YUNOHOST_RESULT_second=$YUNOHOST_RESULT	# Stocke le résulat de l'installation de la deuxième instance
-	path3="/3-${PATH_TEST#/}"
-	ECHO_FORMAT "3e installation: path=$path3\n" clog
-	# Installation de l'app une troisième fois, en ajoutant un préfixe au path
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=$path2\&@$MANIFEST_PATH=$path3\&@")
-	SETUP_APP
-	LOG_EXTRACTOR
-	# Test l'accès à la 1ère instance de l'app
-	CHECK_PATH="$PATH_TEST"
-	CHECK_URL
-	if [ "$curl_error" -ne 0 ] || [ "$YUNO_PORTAL" -ne 0 ]; then
-		YUNOHOST_RESULT_first=1
-	fi
-	# Test l'accès à la 2e instance de l'app
-	CHECK_PATH="$path2"
-	CHECK_URL
-	if [ "$curl_error" -ne 0 ] || [ "$YUNO_PORTAL" -ne 0 ]; then
-		YUNOHOST_RESULT_second=1
-	fi
-	# Test l'accès à la 3e instance de l'app
-	CHECK_PATH="$path3"
-	CHECK_URL
-	if [ "$curl_error" -ne 0 ] || [ "$YUNO_PORTAL" -ne 0 ]; then
-		YUNOHOST_RESULT=1
-	fi
-	tnote=$((tnote+1))
-	if [ "$YUNOHOST_RESULT" -eq 0 ] || [ "$YUNOHOST_RESULT_second" -eq 0 ]
-	then	# Si la 2e OU la 3e installation à fonctionné, le test est validé. Car le SSO peut bloquer des installations en suffixe sur la même racine.
-		YUNOHOST_RESULT=0
-	fi
-	if [ "$YUNOHOST_RESULT" -eq 0 ] && [ "$YUNOHOST_RESULT_first" -eq 0 ] && [ "$curl_error" -eq 0 ]; then
-		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-		note=$((note+1))
-		GLOBAL_CHECK_MULTI_INSTANCE=1	# Installation multi-instance réussie
-	else
-		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-		GLOBAL_CHECK_MULTI_INSTANCE=-1	# Installation multi-instance échouée
-	fi
-	if [ "$no_lxc" -ne 0 ]; then
-		# Suppression de la 2e app si lxc n'est pas utilisé.
-		REMOVE_APP
-		# Suppression de la 1ère app
-		APPID=$APPID_first
-		REMOVE_APP
-	elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
-		if [ "$no_lxc" -eq 0 ]; then
-			LXC_CONNECT_INFO
+
+	# Copy original arguments
+	local manifest_args_mod=$MANIFEST_ARGS
+
+	# Replace manifest key for the test
+	replace_manifest_key "DOMAIN" "$SOUS_DOMAIN"
+	replace_manifest_key "USER" "$USER_TEST"
+	replace_manifest_key "PASSWORD" "$PASSWORD_TEST"
+	replace_manifest_key "PUBLIC" "$MANIFEST_PUBLIC_public"
+
+	# Install 3 times the same app
+	local i=0
+	for i in 1 2 3
+	do
+		# First installation
+		if [ $i -eq 1 ]
+		then
+			local path_1=$PATH_TEST
+			ECHO_FORMAT "First installation: path=$path_1\n" clog
+			check_path=$path_1
+		# Second installation
+		elif [ $i -eq 2 ]
+		then
+			local path_2=$PATH_TEST-2
+			ECHO_FORMAT "Second installation: path=$path_2\n" clog
+			check_path=$path_2
+		# Third installation
+		else
+			local path_3="/3-${PATH_TEST#/}"
+			ECHO_FORMAT "Third installation: path=$path_3\n" clog
+			check_path=$path_3
 		fi
-		read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
+
+		# Replace path manifest key for the test
+		replace_manifest_key "PATH" "$check_path"
+
+		# Install the application in a LXC container
+		SETUP_APP
+
+		# Analyse the log to extract "warning" and "error" lines
+		LOG_EXTRACTOR
+
+		# Store the result in the correct variable
+		# First installation
+		if [ $i -eq 1 ]
+		then
+			local multi_yunohost_result_1=$yunohost_result
+		# Second installation
+		elif [ $i -eq 2 ]
+		then
+			local multi_yunohost_result_2=$yunohost_result
+		# Third installation
+		else
+			local multi_yunohost_result_3=$yunohost_result
+		fi
+	done
+
+	# Try to access to the 3 apps by theirs url
+	for i in 1 2 3
+	do
+		# First app
+		if [ $i -eq 1 ]
+		then
+			check_path=$path_1
+		# Second app
+		elif [ $i -eq 2 ]
+		then
+			check_path=$path_2
+		# Third app
+		else
+			check_path=$path_3
+		fi
+
+		# Try to access the app by its url
+		CHECK_URL
+
+		# Check the result of curl test
+		if [ $curl_error -ne 0 ] || [ $yuno_portal -ne 0 ]
+		then
+			# The test failed if curl fell on ynh portal or had an error.
+			# First app
+			if [ $i -eq 1 ]
+			then
+				multi_yunohost_result_1=1
+			# Second app
+			elif [ $i -eq 2 ]
+			then
+				multi_yunohost_result_2=1
+			# Third app
+			else
+				multi_yunohost_result_3=1
+			fi
+		fi
+	done
+
+	# Check the result and print SUCCESS or FAIL
+	# Succeed if first installation works, and either the second or the third works also
+	if [ $multi_yunohost_result_1 -eq 0 ] && ( [ $multi_yunohost_result_2 -eq 0 ] || [ $multi_yunohost_result_3 -eq 0 ] )
+	then	# Success
+		check_success
+		GLOBAL_CHECK_MULTI_INSTANCE=1
+	else	# Fail
+		check_failed
+		GLOBAL_CHECK_MULTI_INSTANCE=-1
 	fi
-	YUNOHOST_RESULT=-1
+
+	# Make a break if auto_remove is set
+	break_before_continue
 }
 
 CHECK_COMMON_ERROR () {
-	# Test d'erreur depuis le manifest
-	if [ "$1" == "wrong_user" ]; then
-		ECHO_FORMAT "\n\n>> Erreur d'utilisateur... [Test $cur_test/$all_test]\n" "white" "bold" clog
+	# Try to install with specific complications
+	# $1 = install type
+
+	local install_type=$1
+	if [ "$install_type" = "incorrect_path" ]; then
+		unit_test_title "Malformed path..."
+		# Check if the needed manifest key are set or abort the test
+		check_manifest_key "PATH" || return
+	else [ "$install_type" = "port_already_use" ]
+		unit_test_title "Port already used..."
+		# Check if the needed manifest key are set or abort the test
+		check_manifest_key "PORT" || return
 	fi
-	if [ "$1" == "wrong_path" ]; then
-		ECHO_FORMAT "\n\n>> Erreur de domaine... [Test $cur_test/$all_test]\n" "white" "bold" clog
-	fi
-	if [ "$1" == "incorrect_path" ]; then
-		ECHO_FORMAT "\n\n>> Path mal formé... [Test $cur_test/$all_test]\n" "white" "bold" clog
-	fi
-	if [ "$1" == "port_already_use" ]; then
-		ECHO_FORMAT "\n\n>> Port déjà utilisé... [Test $cur_test/$all_test]\n" "white" "bold" clog
-		if [ -z "$MANIFEST_PORT" ]; then
-			echo "Clé de manifest pour 'port' introuvable ou port non renseigné dans le fichier check_process. Impossible de procéder à ce test"
-			return
+
+	# Check if an install have previously work
+	local previous_install=$(is_install_failed)
+	# Abort if none install worked
+	[ "$previous_install" = "1" ] && return
+
+	# Copy original arguments
+	local manifest_args_mod=$MANIFEST_ARGS
+
+	# Replace manifest key for the test
+	replace_manifest_key "DOMAIN" "$SOUS_DOMAIN"
+	replace_manifest_key "USER" "$USER_TEST"
+	replace_manifest_key "PASSWORD" "$PASSWORD_TEST"
+	replace_manifest_key "PUBLIC" "$MANIFEST_PUBLIC_public"
+
+	# Replace path manifest key for the test
+	if [ "$install_type" = "incorrect_path" ]; then
+		# Change the path from /path to path/
+		local wrong_path=${PATH_TEST#/}/
+		# Use this wrong path only for the arguments that will give to yunohost for installation.
+		replace_manifest_key "PATH" "$wrong_path"
+		local check_path=$PATH_TEST
+	else [ "$install_type" = "port_already_use" ]
+		# Use a path according to previous succeeded installs
+		if [ "$previous_install" = "subdir" ]; then
+			local check_path=$PATH_TEST
+		elif [ "$previous_install" = "root" ]; then
+			local check_path=/
 		fi
+		replace_manifest_key "PATH" "$check_path"
 	fi
-	cur_test=$((cur_test+1))
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
-		echo "L'installation a échouée, impossible d'effectuer ce test..."
-		return
-	fi
-	MANIFEST_ARGS_MOD=$MANIFEST_ARGS	# Copie des arguments
-	if [ "$1" == "wrong_path" ]; then	# Force un domaine incorrect
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[-[:alpha:].$]*\&/$MANIFEST_DOMAIN=domainenerreur.rien\&/")
-	else
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_DOMAIN=[-[:alpha:].$]*\&/$MANIFEST_DOMAIN=$SOUS_DOMAIN\&/")
-	fi
-	if [ "$1" == "wrong_user" ]; then	# Force un user incorrect
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[-[:alpha:]$]*\&@$MANIFEST_USER=NO_USER\&@")
-	else
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_USER=[-[:alpha:]$]*\&@$MANIFEST_USER=$USER_TEST\&@")
-	fi
-	MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PASSWORD=[[:alpha:]$]*\&/$MANIFEST_PASSWORD=$PASSWORD_TEST\&/")
-	if [ "$1" == "incorrect_path" ]; then	# Force un path mal formé: Ce sera path/ au lieu de /path
-		WRONG_PATH=${PATH_TEST#/}/	# Transforme le path de /path à path/
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=$WRONG_PATH\&@")
-		CHECK_PATH="$PATH_TEST"
-	else
-		if [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then	# Utilise une install root, si elle a fonctionné
-			MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=/\&@")
-			CHECK_PATH="/"
-		elif [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ] || [ "$force_install_ok" -eq 1 ]; then	# Si l'install en sub_dir à fonctionné. Ou si l'argument force_install_ok est présent. Utilise ce mode d'installation
-			MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PATH=[[:alpha:]/$]*\&@$MANIFEST_PATH=$PATH_TEST\&@")
-		else
-			echo "Aucun mode d'installation n'a fonctionné, impossible d'effectuer ce test..."
-			return;
-		fi
-	fi
-	if [ -n "$MANIFEST_PUBLIC" ] && [ -n "$MANIFEST_PUBLIC_public" ]; then	# Si possible, install en public pour le test d'accès url
-		MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s/$MANIFEST_PUBLIC=[[:alpha:]]*\&/$MANIFEST_PUBLIC=$MANIFEST_PUBLIC_public\&/")
-	fi
-	if [ "$1" == "port_already_use" ]; then	# Force un port déjà utilisé
-		if [ "${MANIFEST_PORT:0:1}" == "#" ]	# Si le premier caractère de $MANIFEST_PORT est un #, c'est un numéro de port. Absent du manifest
+
+	# Open the specified port to force the script to find another
+	if [ "$install_type" = "port_already_use" ]
+	then
+
+		# If the first character is a #, that means it this port number is not in the manifest
+		if [ "${MANIFEST_PORT:0:1}" = "#" ]
 		then
-			check_port="${MANIFEST_PORT:1}"	# Récupère le numéro de port
+			# Retrieve the port number
+			local check_port="${MANIFEST_PORT:1}"
+
+		# Else, the port number is in the manifest. So the port number is set at a fixed value.
 		else
-			MANIFEST_ARGS_MOD=$(echo $MANIFEST_ARGS_MOD | sed "s@$MANIFEST_PORT=[[:digit:]$]*\&@$MANIFEST_PORT=6660\&@")
-			check_port=6660 # Sinon fixe le port à 6660 dans le manifest
+			local check_port=6660
+			# Replace port manifest key for the test
+			replace_manifest_key "PORT" "$check_port"
 		fi
+
+		# Open the port before the installation
 		LXC_START "sudo yunohost firewall allow Both $check_port"
 	fi
-	# Installation de l'app
+
+	# Install the application in a LXC container
 	SETUP_APP
+
+	# Analyse the log to extract "warning" and "error" lines
 	LOG_EXTRACTOR
-	if [ "$1" == "incorrect_path" ] || [ "$1" == "port_already_use" ]; then
-		# Test l'accès à l'app
-		if [ "$YUNOHOST_RESULT" -eq 0 ]; then	# Test l'url si l'installation à réussie.
-			CHECK_URL
-			if [ "$curl_error" -ne 0 ] || [ "$YUNO_PORTAL" -ne 0 ]; then
-				YUNOHOST_RESULT=1
+
+	# Try to access the app by its url
+	CHECK_URL
+
+	# Check the result and print SUCCESS or FAIL
+	if check_test_result
+	then	# Success
+		local check_result_setup=1
+	else	# Fail
+		local check_result_setup=-1
+	fi
+
+	# Fill the correct variable depend on the type of test
+	if [ "$install_type" = "incorrect_path" ]
+	then
+		GLOBAL_CHECK_PATH=$check_result_setup
+	elif [ "$install_type" = "port_already_use" ]; then
+		GLOBAL_CHECK_PORT=$check_result_setup
+	fi
+
+	# Make a break if auto_remove is set
+	break_before_continue
+}
+
+CHECK_BACKUP_RESTORE () {
+	# Try to backup then restore the app
+
+	unit_test_title "Backup/Restore..."
+
+	# Check if an install have previously work
+	local previous_install=$(is_install_failed)
+	# Abort if none install worked
+	[ "$previous_install" = "1" ] && return
+
+	# Copy original arguments
+	local manifest_args_mod=$MANIFEST_ARGS
+
+	# Replace manifest key for the test
+	replace_manifest_key "DOMAIN" "$SOUS_DOMAIN"
+	replace_manifest_key "USER" "$USER_TEST"
+	replace_manifest_key "PASSWORD" "$PASSWORD_TEST"
+	replace_manifest_key "PUBLIC" "$MANIFEST_PUBLIC_public"
+
+	# Try in 2 times, first in root and second in sub path.
+	local i=0
+	for i in 0 1
+	do
+		# First, try with a root install
+		if [ $i -eq 0 ]
+		then
+			# Check if root installation worked, or if force_install_ok is setted.
+			if [ $GLOBAL_CHECK_ROOT -eq 1 ] || [ $force_install_ok -eq 1 ]
+			then
+				# Replace manifest key for path
+				local check_path=/
+				replace_manifest_key "PATH" "$check_path"
+				ECHO_FORMAT "\nPreliminary installation on the root...\n" "white" "bold" clog
+			else
+				# Jump to the second path if this check cannot be do
+				ECHO_FORMAT "Root install check failed, impossible to perform this test...\n" "lyellow" clog
+				continue
+			fi
+
+		# Second, try with a sub path install
+		elif [ $i -eq 1 ]
+		then
+			# Check if sub path installation worked, or if force_install_ok is setted.
+			if [ $GLOBAL_CHECK_SUB_DIR -eq 1 ] || [ $force_install_ok -eq 1 ]
+			then
+				# Replace manifest key for path
+				local check_path=$PATH_TEST
+				replace_manifest_key "PATH" "$check_path"
+				ECHO_FORMAT "\nPreliminary installation in a sub path...\n" "white" "bold" clog
+			else
+				# Jump to the second path if this check cannot be do
+				ECHO_FORMAT "Sub path install check failed, impossible to perform this test...\n" "lyellow" clog
+				return
 			fi
 		fi
-	fi
-	tnote=$((tnote+1))
-	if [ "$YUNOHOST_RESULT" -eq 0 ]; then	# wrong_user et wrong_path doivent aboutir à échec de l'installation. C'est l'inverse pour incorrect_path et port_already_use.
-		if [ "$1" == "wrong_user" ]; then
-			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-			GLOBAL_CHECK_ADMIN=-1	# Installation privée réussie
+
+		# Install the application in a LXC container
+		SETUP_APP
+
+		# Analyse the log to extract "warning" and "error" lines
+		LOG_EXTRACTOR
+
+		# BACKUP
+		# Made a backup if the installation succeed
+		if [ $yunohost_result -ne 0 ]
+		then
+			ECHO_FORMAT "\nInstallation failed...\n" "lred" "bold"
+		else
+			ECHO_FORMAT "\nBackup of the application...\n" "white" "bold" clog
+
+			# Made a backup of the application
+			LXC_START "sudo yunohost --debug backup create -n Backup_test --apps $ynh_app_id --hooks $backup_hooks"
+
+			# yunohost_result gets the return code of the backup
+			yunohost_result=$?
+
+			# Print the result of the backup command
+			if [ $yunohost_result -eq 0 ]; then
+				ECHO_FORMAT "Backup successful. ($yunohost_result)\n" "white" clog
+			else
+				ECHO_FORMAT "Backup failed. ($yunohost_result)\n" "white" clog
+			fi
+
+			# Analyse the log to extract "warning" and "error" lines
+			LOG_EXTRACTOR
 		fi
-		if [ "$1" == "wrong_path" ]; then
-			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-			GLOBAL_CHECK_DOMAIN=-1	# Installation privée réussie
+
+		# Check the result and print SUCCESS or FAIL
+		if [ $yunohost_result -eq 0 ]
+		then	# Success
+			check_success
+			# The global success for a backup can't be a success if another backup failed
+			if [ $GLOBAL_CHECK_BACKUP -ne -1 ]; then
+			    GLOBAL_CHECK_BACKUP=1	# Backup succeed
+			fi
+		else	# Fail
+			check_failed
+			GLOBAL_CHECK_BACKUP=-1	# Backup failed
 		fi
-		if [ "$1" == "incorrect_path" ]; then
-			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-			note=$((note+1))
-			GLOBAL_CHECK_PATH=1	# Correction de path réussie
-		fi
-		if [ "$1" == "port_already_use" ]; then
-			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-			note=$((note+1))
-			GLOBAL_CHECK_PORT=1	# Changement de port réussi
-		fi
-	else
-		if [ "$1" == "wrong_user" ]; then
-			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-			note=$((note+1))
-			GLOBAL_CHECK_ADMIN=1	# Installation privée échouée
-		fi
-		if [ "$1" == "wrong_path" ]; then
-			ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-			note=$((note+1))
-			GLOBAL_CHECK_DOMAIN=1	# Installation privée échouée
-		fi
-		if [ "$1" == "incorrect_path" ]; then
-			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-			GLOBAL_CHECK_PATH=-1	# Installation privée échouée
-		fi
-		if [ "$1" == "port_already_use" ]; then
-			ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-			GLOBAL_CHECK_PORT=-1	# Installation privée échouée
-		fi
-	fi
-	if [ "$no_lxc" -ne 0 ]; then
-		# Suppression de l'app si lxc n'est pas utilisé.
-		REMOVE_APP
-		if [ "$1" == "port_already_use" ]; then	# Libère le port ouvert pour le test
-			sudo yunohost firewall disallow Both $check_port > /dev/null
-		fi
-	elif [ "$auto_remove" -eq 0 ] && [ "$bash_mode" -ne 1 ]; then	# Si l'auto_remove est désactivée. Marque une pause avant de continuer.
-		if [ "$no_lxc" -eq 0 ]; then
-			LXC_CONNECT_INFO
-		fi
-		read -p "Appuyer sur une touche pour continuer les tests..." < /dev/tty
-	fi
-	YUNOHOST_RESULT=-1
+
+		# Grab the backup archive into the LXC container, and keep a copy
+		sudo cp -a /var/lib/lxc/$LXC_NAME/rootfs/home/yunohost.backup/archives ./
+
+		# RESTORE
+		# Try the restore process in 2 times, first after removing the app, second after a restore of the container.
+		local j=0
+		for j in 0 1
+		do
+			# First, simply remove the application
+			if [ $j -eq 0 ]
+			then
+				# Remove the application
+				REMOVE_APP
+
+				ECHO_FORMAT "\nRestore after removing the application...\n" "white" "bold" clog
+
+			# Second, restore the whole container to remove completely the application
+			elif [ $j -eq 1 ]
+			then
+				# Stop and restore the LXC container
+				LXC_STOP
+
+				# Place the copy of the backup archive in the container.
+				sudo mv -f ./archives /var/lib/lxc/$LXC_NAME/rootfs/home/yunohost.backup/
+
+				ECHO_FORMAT "\nRestore on a clean YunoHost system...\n" "white" "bold" clog
+			fi
+
+			# Restore the application from the previous backup
+			LXC_START "sudo yunohost --debug backup restore Backup_test --force --apps $ynh_app_id"
+
+			# yunohost_result gets the return code of the restore
+			yunohost_result=$?
+
+			# Print the result of the backup command
+			if [ $yunohost_result -eq 0 ]; then
+				ECHO_FORMAT "Restore successful. ($yunohost_result)\n" "white" clog
+			else
+				ECHO_FORMAT "Restore failed. ($yunohost_result)\n" "white" clog
+			fi
+
+			# Analyse the log to extract "warning" and "error" lines
+			LOG_EXTRACTOR
+
+			# Try to access the app by its url
+			CHECK_URL
+
+			# Check the result and print SUCCESS or FAIL
+			if check_test_result
+			then	# Success
+				# The global success for a restore can't be a success if another restore failed
+				if [ $GLOBAL_CHECK_RESTORE -ne -1 ]; then
+					GLOBAL_CHECK_RESTORE=1	# Restore succeed
+				fi
+			else	# Fail
+				GLOBAL_CHECK_RESTORE=-1	# Restore failed
+			fi
+
+			# Make a break if auto_remove is set
+			break_before_continue
+
+			# Stop and restore the LXC container
+			LXC_STOP
+		done
+	done
 }
 
 PACKAGE_LINTER () {
 	# Package linter
-	ECHO_FORMAT "\n\n>> Package linter... [Test $cur_test/$all_test]\n" "white" "bold" clog
-	cur_test=$((cur_test+1))
-	"$script_dir/package_linter/package_linter.py" "$APP_CHECK" | tee "$script_dir/package_linter.log"	# Effectue un test du package avec package_linter
-	if grep -q ">>>> " "$script_dir/package_linter.log"; then
-		GLOBAL_LINTER=1	# Si au moins 1 header est trouvé, c'est que l'exécution s'est bien déroulée.
-	fi
-	if grep -q -F "[91m" "$script_dir/package_linter.log"; then	# Si une erreur a été détectée par package_linter.
-		GLOBAL_LINTER=-1	# Au moins une erreur a été détectée par package_linter
-	fi
-	tnote=$((tnote+1))
-	if [ "$GLOBAL_LINTER" -eq 1 ]; then
-		ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
-		note=$((note+1))	# package_linter n'a détecté aucune erreur
-	else
-		ECHO_FORMAT "--- FAIL ---\n" "lred" "bold"
-	fi
-}
 
-CHECK_CORRUPT () {
-	# Test d'erreur sur source corrompue
-	ECHO_FORMAT "\n\n>> Source corrompue après téléchargement... [Test $cur_test/$all_test]\n" "white" "bold" clog
-	cur_test=$((cur_test+1))
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
-		echo "L'installation a échouée, impossible d'effectuer ce test..."
+	unit_test_title "Package linter..."
+
+	# Execute package linter and linter_result gets the return code of the package linter
+	"$script_dir/package_linter/package_linter.py" "$APP_CHECK" > "$temp_result"
+
+	# linter_result gets the return code of the package linter
+	local linter_result=$?
+
+	# Print the results of package linter and copy these result in the complete log
+	cat "$temp_result" | tee --append "$complete_log"
+
+	# Check the result and print SUCCESS or FAIL
+	if [ $linter_result -eq 0 ]
+	then	# Success
+		check_success
+		GLOBAL_LINTER=1
+	else	# Fail
+		check_failed
+		GLOBAL_LINTER=-1
 	fi
-echo -n "Non implémenté"
-# GLOBAL_CHECK_CORRUPT=0
-}
-CHECK_DL () {
-	# Test d'erreur de téléchargement de la source
-	ECHO_FORMAT "\n\n>> Erreur de téléchargement de la source... [Test $cur_test/$all_test]\n" "white" "bold" clog
-	cur_test=$((cur_test+1))
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
-		echo "L'installation a échouée, impossible d'effectuer ce test..."
-	fi
-echo -n "Non implémenté"
-# GLOBAL_CHECK_DL=0
-}
-CHECK_FINALPATH () {
-	# Test sur final path déjà utilisé.
-	ECHO_FORMAT "\n\n>> Final path déjà utilisé... [Test $cur_test/$all_test]\n" "white" "bold" clog
-	cur_test=$((cur_test+1))
-	if [ "$GLOBAL_CHECK_SETUP" -ne 1 ] && [ "$force_install_ok" -ne 1 ]; then
-		echo "L'installation a échouée, impossible d'effectuer ce test..."
-	fi
-echo -n "Non implémenté"
-# GLOBAL_CHECK_FINALPATH=0
 }
 
 TEST_LAUNCHER () {
-	# $1 prend le nom de la fonction à démarrer.
-	# $2 prend l'argument de la fonction, le cas échéant
-	# Ce launcher permet de factoriser le code autour du lancement des fonctions de test
-	$1 $2	# Exécute le test demandé, avec son éventuel argument
-	LXC_STOP	# Arrête le conteneur LXC
+	# Abstract for test execution.
+	# $1 = Name of the function to execute
+	# $2 = Argument for the function
+
+	# Intialize values
+	yunohost_result=-1
+	YUNOHOST_REMOVE=-1
+
+	# Execute the test
+	$1 $2
+
+	# Stop and restore the LXC container
+	LXC_STOP
 }
 
 TESTING_PROCESS () {
-	# Lancement des tests
-	cur_test=1
+	# Launch all tests successively
+
 	ECHO_FORMAT "\nScénario de test: $PROCESS_NAME\n" "white" "underlined" clog
-	if [ "$pkg_linter" -eq 1 ]; then
-		PACKAGE_LINTER	# Vérification du package avec package linter
+
+	# Init the value for the current test
+	cur_test=1
+
+	# By default, all tests will try to access the app with curl
+	use_curl=1
+
+	# Check the package with package linter
+	if [ $pkg_linter -eq 1 ]; then
+		PACKAGE_LINTER
 	fi
-	if [ "$setup_sub_dir" -eq 1 ]; then
-		TEST_LAUNCHER CHECK_SETUP_SUBDIR	# Test d'installation en sous-dossier
+
+	# Try to install in a sub path
+	if [ $setup_sub_dir -eq 1 ]; then
+		TEST_LAUNCHER CHECK_SETUP subdir
 	fi
-	if [ "$setup_root" -eq 1 ]; then
-		TEST_LAUNCHER CHECK_SETUP_ROOT	# Test d'installation à la racine du domaine
+
+	# Try to install on root
+	if [ $setup_root -eq 1 ]; then
+		TEST_LAUNCHER CHECK_SETUP root
 	fi
-	if [ "$setup_nourl" -eq 1 ]; then
-		TEST_LAUNCHER CHECK_SETUP_NO_URL	# Test d'installation sans accès par url
+
+	# Try to install without url access
+	if [ $setup_nourl -eq 1 ]; then
+		TEST_LAUNCHER CHECK_SETUP no_url
 	fi
-	if [ "$upgrade" -eq 1 ]; then
-		TEST_LAUNCHER CHECK_UPGRADE	# Test d'upgrade
+
+	# Try the upgrade script
+	if [ $upgrade -eq 1 ]; then
+		TEST_LAUNCHER CHECK_UPGRADE
 	fi
-	if [ "$setup_private" -eq 1 ]; then
-		TEST_LAUNCHER CHECK_PUBLIC_PRIVATE private	# Test d'installation en privé
+
+	# Try to install in private mode
+	if [ $setup_private -eq 1 ]; then
+		TEST_LAUNCHER CHECK_PUBLIC_PRIVATE private
 	fi
-	if [ "$setup_public" -eq 1 ]; then
-		TEST_LAUNCHER CHECK_PUBLIC_PRIVATE public	# Test d'installation en public
+
+	# Try to install in public mode
+	if [ $setup_public -eq 1 ]; then
+		TEST_LAUNCHER CHECK_PUBLIC_PRIVATE public
 	fi
-	if [ "$multi_instance" -eq 1 ]; then
-		TEST_LAUNCHER CHECK_MULTI_INSTANCE	# Test d'installation multiple
+
+	# Try multi-instance installations
+	if [ $multi_instance -eq 1 ]; then
+		TEST_LAUNCHER CHECK_MULTI_INSTANCE
 	fi
-	if [ "$wrong_user" -eq 1 ]; then
-		TEST_LAUNCHER CHECK_COMMON_ERROR wrong_user	# Test d'erreur d'utilisateur
+
+	# Try to install with an malformed path
+	if [ $incorrect_path -eq 1 ]; then
+		TEST_LAUNCHER CHECK_COMMON_ERROR incorrect_path
 	fi
-	if [ "$wrong_path" -eq 1 ]; then
-		TEST_LAUNCHER CHECK_COMMON_ERROR wrong_path	# Test d'erreur de path ou de domaine
+
+	# Try to install with a port already used
+	if [ $port_already_use -eq 1 ]; then
+		TEST_LAUNCHER CHECK_COMMON_ERROR port_already_use
 	fi
-	if [ "$incorrect_path" -eq 1 ]; then
-		TEST_LAUNCHER CHECK_COMMON_ERROR incorrect_path	# Test d'erreur de forme de path
-	fi
-	if [ "$port_already_use" -eq 1 ]; then
-		TEST_LAUNCHER CHECK_COMMON_ERROR port_already_use	# Test d'erreur de port
-	fi
-	if [ "$corrupt_source" -eq 1 ]; then
-		TEST_LAUNCHER CHECK_CORRUPT	# Test d'erreur sur source corrompue -> Comment je vais provoquer ça!?
-	fi
-	if [ "$fail_download_source" -eq 1 ]; then
-		TEST_LAUNCHER CHECK_DL	# Test d'erreur de téléchargement de la source -> Comment!?
-	fi
-	if [ "$final_path_already_use" -eq 1 ]; then
-		TEST_LAUNCHER CHECK_FINALPATH	# Test sur final path déjà utilisé.
-	fi
-	if [ "$backup_restore" -eq 1 ]; then
-		TEST_LAUNCHER CHECK_BACKUP_RESTORE	# Test de backup puis de Restauration
+
+	# Try to backup then restore the app
+	if [ $backup_restore -eq 1 ]; then
+		TEST_LAUNCHER CHECK_BACKUP_RESTORE
 	fi
 }
