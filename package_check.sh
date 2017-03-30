@@ -115,8 +115,82 @@ EOF
 	exit 0
 fi
 
+#=================================================
+# Upgrade Package check
+#=================================================
 
+git_repository=https://github.com/YunoHost/package_check
+version_file="$script_dir/pcheck_version"
 
+check_version="$(git ls-remote $git_repository | cut -f 1 | head -n1)"
+
+# If the version file exist, check for an upgrade
+if [ -e "$version_file" ]
+then
+	# Check if the last commit on the repository match with the current version
+	if [ "$check_version" != "$(cat "$version_file")" ]
+	then
+		# If the versions don't matches. Do an upgrade
+		echo -e "\e[97m\e[1mUpgrade Package check...\n\e[0m"
+
+		# Build the upgrade script
+		cat > "$script_dir/upgrade_script.sh" << EOF
+
+#!/bin/bash
+# Clone in another directory
+git clone --quiet $git_repository "$script_dir/upgrade"
+sudo cp -a "$script_dir/upgrade/." "$script_dir/."
+sudo rm -r "$script_dir/upgrade"
+# Update the version file
+echo "$check_version" > "$version_file"
+sudo rm "$script_dir/pcheck.lock"
+# Execute package check by replacement of this process
+exec "$script_dir/package_check.sh" "$arguments"
+EOF
+
+		# Give the execution right
+		chmod +x "$script_dir/upgrade_script.sh"
+
+		# Start the upgrade script by replacement of this process
+		exec "$script_dir/upgrade_script.sh"
+	fi
+fi
+
+# Update the version file
+echo "$check_version" > "$version_file"
+
+#=================================================
+# Upgrade Package linter
+#=================================================
+
+git_repository=https://github.com/YunoHost/package_linter
+version_file="$script_dir/plinter_version"
+
+check_version="$(git ls-remote $git_repository | cut -f 1 | head -n1)"
+
+# If the version file exist, check for an upgrade
+if [ -e "$version_file" ]
+then
+	# Check if the last commit on the repository match with the current version
+	if [ "$check_version" != "$(cat "$version_file")" ]
+	then
+		# If the versions don't matches. Do an upgrade
+		echo -e "\e[97m\e[1mUpgrade Package linter...\n\e[0m"
+
+		# Clone in another directory
+		git clone --quiet https://github.com/YunoHost/package_linter "$script_dir/package_linter_tmp"
+
+		# And replace
+		sudo cp -a "$script_dir/package_linter_tmp/." "$script_dir/package_linter/."
+		sudo rm -r "$script_dir/package_linter_tmp"
+	fi
+else
+	echo -e "\e[97mInstall Package linter.\n\e[0m"
+	git clone --quiet $git_repository "$script_dir/package_linter"
+fi
+
+# Update the version file
+echo "$check_version" > "$version_file"
 
 
 
@@ -129,6 +203,15 @@ temp_log="$script_dir/temp_yunohost-cli.log"
 temp_result="$script_dir/temp_result.log"
 test_result="$script_dir/Test_results.log"
 yunohost_log="/var/lib/lxc/\$LXC_NAME/rootfs/var/log/yunohost/yunohost-cli.log"
+
+#=================================================
+# Load all functions
+#=================================================
+
+source "$script_dir/sub_scripts/lxc_launcher.sh"
+source "$script_dir/sub_scripts/testing_process.sh"
+source "$script_dir/sub_scripts/log_extractor.sh"
+source /usr/share/yunohost/helpers
 
 
 
@@ -156,11 +239,6 @@ if [ "$(whoami)" != "$(cat "$script_dir/sub_scripts/setup_user")" ] && test -e "
 	exit 0
 fi
 
-source "$script_dir/sub_scripts/lxc_launcher.sh"
-source "$script_dir/sub_scripts/testing_process.sh"
-source "$script_dir/sub_scripts/log_extractor.sh"
-source /usr/share/yunohost/helpers
-
 # Vérifie la connexion internet.
 ping -q -c 2 yunohost.org > /dev/null 2>&1
 if [ "$?" -ne 0 ]; then	# En cas d'échec de connexion, tente de pinger un autre domaine pour être sûr
@@ -186,42 +264,6 @@ then	# Présence du lock, Package check ne peut pas continuer.
 	fi
 fi
 touch "$script_dir/pcheck.lock" # Met en place le lock de Package check
-
-version_script="$(git ls-remote https://github.com/YunoHost/package_check | cut -f 1 | head -n1)"
-if [ -e "$script_dir/package_version" ]
-then
-	if [ "$version_script" != "$(cat "$script_dir/package_version")" ]; then	# Si le dernier commit sur github ne correspond pas au commit enregistré, il y a une mise à jour.
-		# Écrit le script de mise à jour, qui sera exécuté à la place de ce script, pour le remplacer et le relancer après.
-		ECHO_FORMAT "Mise à jour de Package check...\n" "white" "bold"
-		echo -e "#!/bin/bash\n" > "$script_dir/upgrade_script.sh"
-		echo "git clone --quiet https://github.com/YunoHost/package_check \"$script_dir/upgrade\"" >> "$script_dir/upgrade_script.sh"
-		echo "sudo cp -a \"$script_dir/upgrade/.\" \"$script_dir/.\"" >> "$script_dir/upgrade_script.sh"
-		echo "sudo rm -r \"$script_dir/upgrade\"" >> "$script_dir/upgrade_script.sh"
-		echo "echo \"$version_script\" > \"$script_dir/package_version\"" >> "$script_dir/upgrade_script.sh"
-		echo "sudo rm \"$script_dir/pcheck.lock\"" >> "$script_dir/upgrade_script.sh"
-		echo "exec \"$script_dir/package_check.sh\" \"$*\"" >> "$script_dir/upgrade_script.sh"
-		chmod +x "$script_dir/upgrade_script.sh"
-		exec "$script_dir/upgrade_script.sh"	#Exécute le script de mise à jour.
-	fi
-else
-	echo "$version_script" > "$script_dir/package_version"
-fi
-
-version_plinter="$(git ls-remote https://github.com/YunoHost/package_linter | cut -f 1 | head -n1)"
-if [ -e "$script_dir/plinter_version" ]
-then
-	if [ "$version_plinter" != "$(cat "$script_dir/plinter_version")" ]; then	# Si le dernier commit sur github ne correspond pas au commit enregistré, il y a une mise à jour.
-		ECHO_FORMAT "Mise à jour de package_linter..." "white" "bold"
-		git clone --quiet https://github.com/YunoHost/package_linter "$script_dir/package_linter_tmp"
-		sudo cp -a "$script_dir/package_linter_tmp/." "$script_dir/package_linter/."
-		sudo rm -r "$script_dir/package_linter_tmp"
-	fi
-else	# Si le fichier de version n'existe pas, il est créé.
-	echo "$version_plinter" > "$script_dir/plinter_version"
-	ECHO_FORMAT "Installation de package_linter.\n" "white"
-	git clone --quiet https://github.com/YunoHost/package_linter "$script_dir/package_linter"
-fi
-echo "$version_plinter" > "$script_dir/plinter_version"
 
 USER_TEST=package_checker
 PASSWORD_TEST=checker_pwd
