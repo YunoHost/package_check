@@ -79,6 +79,7 @@ fi
 
 source "$script_dir/sub_scripts/lxc_launcher.sh"
 source "$script_dir/sub_scripts/testing_process.sh"
+source "$script_dir/sub_scripts/log_extractor.sh"
 source /usr/share/yunohost/helpers
 
 # Vérifie la connexion internet.
@@ -627,7 +628,6 @@ INIT_VAR() {
 	note=0
 	tnote=0
 	all_test=0
-	use_curl=0
 
 	MANIFEST_DOMAIN="null"
 	MANIFEST_PATH="null"
@@ -671,8 +671,8 @@ INIT_LEVEL() {
 
 INIT_VAR
 INIT_LEVEL
-echo -n "" > "$COMPLETE_LOG"	# Initialise le fichier de log
-echo -n "" > "$RESULT"	# Initialise le fichier des résulats d'analyse
+echo -n "" > "$complete_log"	# Initialise le fichier de log
+echo -n "" > "$test_result"	# Initialise le fichier des résulats d'analyse
 echo -n "" | sudo tee "$script_dir/lxc_boot.log"	# Initialise le fichier de log du boot du conteneur
 if [ "$no_lxc" -eq 0 ]; then
 	LXC_INIT
@@ -953,6 +953,7 @@ then
 	# Récupère le nom du job dans le CI
 	id=$(cat "$script_dir/../CI.lock")	# Récupère l'id du job en cours
 	job=$(grep "$id" "$script_dir/../work_list" | cut -d ';' -f 3)	# Et récupère le nom du job dans le work_list
+	job=${job// /%20}       # Replace all space by %20
 	if [ -n "$job" ]; then
 		job_log="/job/$job/lastBuild/console"
 	fi
@@ -988,7 +989,7 @@ then	# Si l'app est au niveau 0, et que le test tourne en CI, envoi un mail d'av
 	mail -s "[YunoHost] Échec d'installation d'une application dans le CI" "$dest" <<< "$message"	# Envoi un avertissement par mail.
 fi
 
-echo "Le log complet des installations et suppressions est disponible dans le fichier $COMPLETE_LOG"
+echo "Le log complet des installations et suppressions est disponible dans le fichier $complete_log"
 # Clean
 rm -f "$OUTPUTD" "$temp_RESULT" "$script_dir/url_output" "$script_dir/curl_print" "$script_dir/manifest_extract"
 
