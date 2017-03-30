@@ -35,7 +35,10 @@ LXC_START () {
 		# Start the container and log the booting process in $script_dir/lxc_boot.log
 		# Try to start only if the container is not already started
 		if ! is_lxc_running; then
+			echo "Start the LXC container" | tee --append "$test_result"
 			sudo lxc-start --name=$LXC_NAME --daemon --logfile "$script_dir/lxc_boot.log" | tee --append "$test_result" 2>&1
+		else
+			echo "An LXC container is already running" | tee --append "$test_result"
 		fi
 
 		# Check during 20 seconds if the container has finished to start.
