@@ -1,5 +1,4 @@
 ;; Nom du test
-	auto_remove=1
 # Commentaire ignoré
 	; Manifest
 		domain="domain.tld"	(DOMAIN)
@@ -20,13 +19,8 @@
 		upgrade=1
 		backup_restore=1
 		multi_instance=1
-		wrong_user=1
-		wrong_path=1
 		incorrect_path=1
-		corrupt_source=0
-		fail_download_source=0
 		port_already_use=1	(66)
-		final_path_already_use=0
 ;;; Levels
 	Level 1=auto
 	Level 2=auto
