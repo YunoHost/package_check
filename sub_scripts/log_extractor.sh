@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Load functions from log_extractor.sh"
+echo "Loads functions from log_extractor.sh"
 
 ECHO_FORMAT () {
 	# Simply an echo with color and typo
@@ -13,9 +13,6 @@ ECHO_FORMAT () {
 	fi
 	if [ "$2" == "lyellow" ]; then
 		echo -en "\e[93m"
-	fi
-	if [ "$2" == "lred" ]; then
-		echo -en "\e[91m"
 	fi
 	if [ "$2" == "lgreen" ]; then
 		echo -en "\e[92m"

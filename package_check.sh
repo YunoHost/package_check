@@ -7,6 +7,39 @@
 if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
 
 #=================================================
+# Generic functions
+#=================================================
+
+is_it_locked () {
+	test -e "$script_dir/pcheck.lock"
+}
+
+clean_exit () {
+	# Exit and remove all temp files
+	# $1 = exit code
+	
+	# Deactivate LXC network
+	LXC_TURNOFF
+
+	# Remove temporary files
+	rm -f "$temp_log"
+	rm -f "$temp_result"
+	rm -f "$script_dir/url_output"
+	rm -f "$script_dir/curl_print"
+	rm -f "$script_dir/manifest_extract"
+
+	# Remove the application which been tested
+	if [ -n "$package_path" ]; then
+		rm -rf "$package_path"
+	fi
+
+	# Remove the lock file
+	rm -f "$lock_file"
+
+	exit $1
+}
+
+#=================================================
 # Check and read CLI arguments
 #=================================================
 
@@ -38,7 +71,7 @@ else
 	# Read and parse all the arguments
 	while [ $# -ne 0 ]
 	do
-		# Initialize getopts' index
+		# Initialize the index of getopts
 		OPTIND=1
 		# Parse with getopts only if the argument begin by -
 		if [ ${1:0:1} = "-" ]
@@ -112,8 +145,34 @@ package_check.sh [OPTION]... PACKAGE_TO_CHECK
 	-y, --bash-mode
 		Do not ask for continue check. Ignore auto_remove.
 EOF
-	exit 0
+	clean_exit 0
 fi
+
+#=================================================
+# Check if the lock file exist
+#=================================================
+
+lock_file="$script_dir/pcheck.lock"
+
+if test -e "$lock_file"
+then
+	# If the lock file exist
+	echo "The lock file $lock_file is present. Package check would not continue."
+	answer="y"
+	if [ $bash_mode -ne 1 ]; then
+		echo -n "Do you want to continue anymore? (y/n) :"
+		read answer
+	fi
+	# Set the answer at lowercase only
+	answer=${answer,,}
+	if [ "${rep:0:1}" != "y" ]
+	then
+		echo "Cancel Package check execution"
+		clean_exit 0
+	fi
+fi
+# Create the lock file
+touch "$lock_file"
 
 #=================================================
 # Upgrade Package check
@@ -139,11 +198,11 @@ then
 #!/bin/bash
 # Clone in another directory
 git clone --quiet $git_repository "$script_dir/upgrade"
-sudo cp -a "$script_dir/upgrade/." "$script_dir/."
-sudo rm -r "$script_dir/upgrade"
+cp -a "$script_dir/upgrade/." "$script_dir/."
+rm -r "$script_dir/upgrade"
 # Update the version file
 echo "$check_version" > "$version_file"
-sudo rm "$script_dir/pcheck.lock"
+rm "$script_dir/pcheck.lock"
 # Execute package check by replacement of this process
 exec "$script_dir/package_check.sh" "$arguments"
 EOF
@@ -181,8 +240,8 @@ then
 		git clone --quiet https://github.com/YunoHost/package_linter "$script_dir/package_linter_tmp"
 
 		# And replace
-		sudo cp -a "$script_dir/package_linter_tmp/." "$script_dir/package_linter/."
-		sudo rm -r "$script_dir/package_linter_tmp"
+		cp -a "$script_dir/package_linter_tmp/." "$script_dir/package_linter/."
+		rm -r "$script_dir/package_linter_tmp"
 	fi
 else
 	echo -e "\e[97mInstall Package linter.\n\e[0m"
@@ -192,17 +251,111 @@ fi
 # Update the version file
 echo "$check_version" > "$version_file"
 
-
-
 #=================================================
-# Globals variables
+# Get variables from the config file
 #=================================================
 
+pcheck_config="$script_dir/config"
+build_script="$script_dir/sub_scripts/lxc_build.sh"
+
+if [ -e "$pcheck_config" ]
+then
+	# Read the config file if it exists
+	ip_range=$(grep PLAGE_IP= "$pcheck_config" | cut -d '=' -f2)
+	main_domain=$(grep DOMAIN= "$pcheck_config" | cut -d '=' -f2)
+	yuno_pwd=$(grep YUNO_PWD= "$pcheck_config" | cut -d '=' -f2)
+	lxc_name=$(grep LXC_NAME= "$pcheck_config" | cut -d '=' -f2)
+	lxc_bridge=$(grep LXC_BRIDGE= "$pcheck_config" | cut -d '=' -f2)
+	main_iface=$(grep iface= "$pcheck_config" | cut -d '=' -f2)
+fi
+
+# Use default value from the build script if needed
+if [ -z "$ip_range" ]; then
+	ip_range=$(grep "|| PLAGE_IP=" "$build_script" | cut -d '"' -f4)
+	echo -e "# Ip range for the container\nPLAGE_IP=$ip_range\n" >> "$pcheck_config"
+fi
+if [ -z "$main_domain" ]; then
+	main_domain=$(grep "|| DOMAIN="  "$build_script" | cut -d '=' -f2)
+	echo -e "# Test domain\nDOMAIN=$main_domain\n" >> "$pcheck_config"
+fi
+if [ -z "$yuno_pwd" ]; then
+	yuno_pwd=$(grep "|| YUNO_PWD="  "$build_script" | cut -d '=' -f2)
+	echo -e "# YunoHost password, in the container\nYUNO_PWD=$yuno_pwd\n" >> "$pcheck_config"
+fi
+if [ -z "$lxc_name" ]; then
+	lxc_name=$(grep "|| LXC_NAME="  "$build_script" | cut -d '=' -f2)
+	echo -e "# Container name\nLXC_NAME=$lxc_name\n" >> "$pcheck_config"
+fi
+if [ -z "$lxc_bridge" ]; then
+	lxc_bridge=$(grep "|| LXC_BRIDGE="  "$build_script" | cut -d '=' -f2)
+	echo -e "# Bridge name\nLXC_BRIDGE=$lxc_bridge\n" >> "$pcheck_config"
+fi
+
+if [ -z "$main_iface" ]; then
+	# Try to determine the main iface
+	main_iface=$(sudo route | grep default | awk '{print $8;}')
+	if [ -z $main_iface ]
+	then
+		echo -e "\e[91mUnable to find the name of the main iface.\e[0m"
+		clean_exit 1
+	fi
+	# Store the main iface in the config file
+	echo -e "# Main host iface\niface=$main_iface\n" >> "$pcheck_config"
+fi
+
+#=================================================
+# Check the user who try to execute this script
+#=================================================
+
+setup_user_file="$script_dir/sub_scripts/setup_user"
+if [ -e "$setup_user_file" ]
+then
+	# Compare the current user and the user stored in $setup_user_file
+	authorised_user="$(cat "$setup_user_file")"
+	if [ "$(whoami)" != "$authorised_user" ]
+	then
+		echo -e "\e[91mThis script need to be executed by the user $setup_user_file !\nThe current user is $(whoami).\e[0m"
+		clean_exit 1
+	fi
+else
+	echo -e "\e[93mUnable to define the user who authorised to use package check. Please fill the file $setup_user_file\e[0m"
+fi
+
+#=================================================
+# Check the internet connectivity
+#=================================================
+
+# Try to ping yunohost.org
+ping -q -c 2 yunohost.org > /dev/null 2>&1
+if [ "$?" -ne 0 ]; then
+	# If fail, try to ping another domain
+	ping -q -c 2 framasoft.org > /dev/null 2>&1
+	if [ "$?" -ne 0 ]; then
+		# If ping failed twice, it's seems the internet connection is down.
+		echo "\e[91mUnable to connect to internet.\e[0m"
+		clean_exit 1
+	fi
+fi
+
+#=================================================
+# Define globals variables
+#=================================================
+
+# Complete result log. Complete log of YunoHost
 complete_log="$script_dir/Complete.log"
+# Partial YunoHost log, just the log for the current test
 temp_log="$script_dir/temp_yunohost-cli.log"
+# Temporary result log
 temp_result="$script_dir/temp_result.log"
+# Result log with warning and error only
 test_result="$script_dir/Test_results.log"
-yunohost_log="/var/lib/lxc/\$LXC_NAME/rootfs/var/log/yunohost/yunohost-cli.log"
+# Real YunoHost log
+yunohost_log="/var/lib/lxc/$lxc_name/rootfs/var/log/yunohost/yunohost-cli.log"
+
+sub_domain="sous.$main_domain"
+test_user=package_checker
+test_password=checker_pwd
+test_path=/check
 
 #=================================================
 # Load all functions
@@ -213,195 +366,110 @@ source "$script_dir/sub_scripts/testing_process.sh"
 source "$script_dir/sub_scripts/log_extractor.sh"
 source /usr/share/yunohost/helpers
 
+#=================================================
+# Check LXC
+#=================================================
 
-
-
-
-
-
-
-
-
-
-# Détermine l'environnement d'exécution de Package check
-type_exec_env=0	# Par défaut, exécution de package check seul
-if [ -e "$script_dir/../config" ]; then
-	type_exec_env=1	# Exécution en contexte de CI
-fi
-if [ -e "$script_dir/../auto_build/auto.conf" ]; then
-	type_exec_env=2	# Exécution en contexte de CI officiel
-fi
-
-# Check user
-if [ "$(whoami)" != "$(cat "$script_dir/sub_scripts/setup_user")" ] && test -e "$script_dir/sub_scripts/setup_user"; then
-	echo -e "\e[91mCe script doit être exécuté avec l'utilisateur $(cat "$script_dir/sub_scripts/setup_user") !\nL'utilisateur actuel est $(whoami)."
-	echo -en "\e[0m"
-	exit 0
-fi
-
-# Vérifie la connexion internet.
-ping -q -c 2 yunohost.org > /dev/null 2>&1
-if [ "$?" -ne 0 ]; then	# En cas d'échec de connexion, tente de pinger un autre domaine pour être sûr
-	ping -q -c 2 framasoft.org > /dev/null 2>&1
-	if [ "$?" -ne 0 ]; then	# En cas de nouvel échec de connexion. On considère que la connexion est down...
-		ECHO_FORMAT "Impossible d'établir une connexion à internet.\n" "red"
-		exit 1
-	fi
-fi
-
-if test -e "$script_dir/pcheck.lock"
-then	# Présence du lock, Package check ne peut pas continuer.
-	echo "Le fichier $script_dir/pcheck.lock est présent. Package check est déjà utilisé."
-	rep="N"
-	if [ "$bash_mode" -ne 1 ]; then
-		echo -n "Souhaitez-vous continuer quand même et ignorer le lock ? (Y/N) :"
-		read rep
-	fi
-	if [ "${rep:0:1}" != "Y" ] && [ "${rep:0:1}" != "y" ] && [ "${rep:0:1}" != "O" ] && [ "${rep:0:1}" != "o" ]
-	then	# Teste uniquement le premier caractère de la réponse pour continuer malgré le lock.
-		echo "L'exécution de Package check est annulée"
-		exit 0
-	fi
-fi
-touch "$script_dir/pcheck.lock" # Met en place le lock de Package check
-
-USER_TEST=package_checker
-PASSWORD_TEST=checker_pwd
-PATH_TEST=/check
-
-# Récupère les informations depuis le fichier de conf (Ou le complète le cas échéant)
-pcheck_config="$script_dir/config"
-# Tente de lire les informations depuis le fichier de config si il existe
-if [ -e "$pcheck_config" ]
+# Check if lxc is already installed
+if dpkg-query -W -f '${Status}' "lxc" 2>/dev/null | grep -q "ok installed"
 then
-	PLAGE_IP=$(cat "$pcheck_config" | grep PLAGE_IP= | cut -d '=' -f2)
-	DOMAIN=$(cat "$pcheck_config" | grep DOMAIN= | cut -d '=' -f2)
-	YUNO_PWD=$(cat "$pcheck_config" | grep YUNO_PWD= | cut -d '=' -f2)
-	LXC_NAME=$(cat "$pcheck_config" | grep LXC_NAME= | cut -d '=' -f2)
-	LXC_BRIDGE=$(cat "$pcheck_config" | grep LXC_BRIDGE= | cut -d '=' -f2)
-	main_iface=$(cat "$pcheck_config" | grep iface= | cut -d '=' -f2)
-fi
-# Utilise des valeurs par défaut si les variables sont vides, et génère le fichier de config
-if [ -z "$PLAGE_IP" ]; then
-	PLAGE_IP=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| PLAGE_IP=" | cut -d '"' -f4)
-	echo -e "# Plage IP du conteneur\nPLAGE_IP=$PLAGE_IP\n" >> "$pcheck_config"
-fi
-if [ -z "$DOMAIN" ]; then
-	DOMAIN=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| DOMAIN=" | cut -d '=' -f2)
-	echo -e "# Domaine de test\nDOMAIN=$DOMAIN\n" >> "$pcheck_config"
-fi
-if [ -z "$YUNO_PWD" ]; then
-	YUNO_PWD=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| YUNO_PWD=" | cut -d '=' -f2)
-	echo -e "# Mot de passe\nYUNO_PWD=$YUNO_PWD\n" >> "$pcheck_config"
-fi
-if [ -z "$LXC_NAME" ]; then
-	LXC_NAME=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| LXC_NAME=" | cut -d '=' -f2)
-	echo -e "# Nom du conteneur\nLXC_NAME=$LXC_NAME\n" >> "$pcheck_config"
-fi
-if [ -z "$LXC_BRIDGE" ]; then
-	LXC_BRIDGE=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| LXC_BRIDGE=" | cut -d '=' -f2)
-	echo -e "# Nom du bridge\nLXC_BRIDGE=$LXC_BRIDGE\n" >> "$pcheck_config"
-fi
-if [ -z "$main_iface" ]; then
-	# Tente de définir l'interface réseau principale
-	main_iface=$(sudo route | grep default | awk '{print $8;}')	# Prend l'interface réseau défini par default
-	if [ -z $main_iface ]; then
-		echo -e "\e[91mImpossible de déterminer le nom de l'interface réseau de l'hôte.\e[0m"
-		exit 1
-	fi
-	# Enregistre le nom de l'interface réseau de l'hôte dans un fichier de config
-	echo -e "# Interface réseau principale de l'hôte\niface=$main_iface\n" >> "$pcheck_config"
-fi
-
-if [ "$no_lxc" -eq 0 ]
-then
-	DOMAIN=$(sudo cat /var/lib/lxc/$LXC_NAME/rootfs/etc/yunohost/current_host)
-else
-	DOMAIN=$(sudo yunohost domain list -l 1 | cut -d" " -f 2)
-fi
-SOUS_DOMAIN="sous.$DOMAIN"
-
-if [ "$no_lxc" -eq 0 ]
-then	# Si le conteneur lxc est utilisé
-	lxc_ok=0
-	# Vérifie la présence du virtualisateur en conteneur LXC
-	if dpkg-query -W -f '${Status}' "lxc" 2>/dev/null | grep -q "ok installed"; then
-		if sudo lxc-ls | grep -q "$LXC_NAME"; then	# Si lxc est installé, vérifie la présence de la machine $LXC_NAME
-			lxc_ok=1
-		fi
-	fi
-	if [ "$lxc_ok" -eq 0 ]
+	# If lxc is installed, check if the container is already built.
+	if ! sudo lxc-ls | grep -q "$lxc_name"
 	then
-		if [ "$build_lxc" -eq 1 ]
+		if [ $build_lxc -eq 1 ]
 		then
-			"$script_dir/sub_scripts/lxc_build.sh"	# Lance la construction de la machine virtualisée.
+			# If lxc's not installed and build_lxc set. Asks to build the container.
+			build_lxc=2
 		else
-			ECHO_FORMAT "Lxc n'est pas installé, ou la machine $LXC_NAME n'est pas créée.\n" "red"
-			ECHO_FORMAT "Utilisez le script 'lxc_build.sh' pour installer lxc et créer la machine.\n" "red"
-			ECHO_FORMAT "Ou utilisez l'argument --no-lxc\n" "red"
-			sudo rm "$script_dir/pcheck.lock" # Retire le lock
-			exit 1
+			ECHO_FORMAT "LXC is not installed or the container $lxc_name doesn't exist.\n" "red"
+			ECHO_FORMAT "Use the script 'lxc_build.sh' to fix them.\n" "red"
+			clean_exit 1
 		fi
 	fi
-	# Stoppe toute activité éventuelle du conteneur, en cas d'arrêt incorrect précédemment
-	LXC_STOP
-	LXC_TURNOFF
-else	# Vérifie l'utilisateur et le domain si lxc n'est pas utilisé.
-	# Vérifie l'existence de l'utilisateur de test
-	echo -e "\nVérification de l'existence de l'utilisateur de test..."
-	if ! ynh_user_exists "$USER_TEST"
-	then	# Si il n'existe pas, il faut le créer.
-		USER_TEST_CLEAN=${USER_TEST//"_"/""}
-		sudo yunohost user create --firstname "$USER_TEST_CLEAN" --mail "$USER_TEST_CLEAN@$DOMAIN" --lastname "$USER_TEST_CLEAN" --password "$PASSWORD_TEST" "$USER_TEST"
-		if [ "$?" -ne 0 ]; then
-			ECHO_FORMAT "La création de l'utilisateur de test a échoué. Impossible de continuer.\n" "red"
-			sudo rm "$script_dir/pcheck.lock" # Retire le lock
-			exit 1
-		fi
-	fi
-
-	# Vérifie l'existence du sous-domaine de test
-	echo "Vérification de l'existence du domaine de test..."
-	if [ "$(sudo yunohost domain list | grep -c "$SOUS_DOMAIN")" -eq 0 ]; then	# Si il n'existe pas, il faut le créer.
-		sudo yunohost domain add "$SOUS_DOMAIN"
-		if [ "$?" -ne 0 ]; then
-			ECHO_FORMAT "La création du sous-domain de test a échoué. Impossible de continuer.\n" "red"
-			sudo rm "$script_dir/pcheck.lock" # Retire le lock
-			exit 1
-		fi
-	fi
-fi
-
-# Vérifie le type d'emplacement du package à tester
-echo "Récupération du package à tester."
-rm -rf "$script_dir"/*_check
-GIT_PACKAGE=0
-if echo "$arg_app" | grep -Eq "https?:\/\/"
+elif [ $build_lxc -eq 1 ]
 then
-	GIT_PACKAGE=1
-	git clone $arg_app $gitbranch "$script_dir/$(basename "$arg_app")_check"
-else
-	# Si c'est un dossier local, il est copié dans le dossier du script.
-	sudo cp -a --remove-destination "$arg_app" "$script_dir/$(basename "$arg_app")_check"
-fi
-APP_CHECK="$script_dir/$(basename "$arg_app")_check"
-if [ "$no_lxc" -eq 0 ]
-then	# En cas d'exécution dans LXC, l'app sera dans le home de l'user LXC.
-	APP_PATH_YUNO="$(basename "$arg_app")_check"
-else
-	APP_PATH_YUNO="$APP_CHECK"
+	# If lxc's not installed and build_lxc set. Asks to build the container.
+	build_lxc=2
 fi
 
-if [ ! -d "$APP_CHECK" ]; then
-	ECHO_FORMAT "Le dossier de l'application a tester est introuvable...\n" "red"
-	sudo rm "$script_dir/pcheck.lock" # Retire le lock
-	exit 1
+if [ $build_lxc -eq 2 ]
+then
+	# Install LXC and build the container before continue.
+	"$script_dir/sub_scripts/lxc_build.sh"
 fi
-sudo rm -rf "$APP_CHECK/.git"	# Purge des fichiers de git
+
+# Stop and restore the LXC container. In case of previous incomplete execution.
+LXC_STOP
+# Deactivate LXC network
+LXC_TURNOFF
+
+#=================================================
+# Determine if it's a CI environment
+#=================================================
+
+# By default, it's a standalone execution.
+type_exec_env=0
+if [ -e "$script_dir/../config" ]
+then
+	# CI environment
+	type_exec_env=1
+fi
+if [ -e "$script_dir/../auto_build/auto.conf" ]
+then
+	# Official CI environment
+	type_exec_env=2
+fi
+
+#=================================================
+# Pick up the package
+#=================================================
+
+echo "Pick up the package which will be tested."
+
+# Remove the previous package if it's still here.
+rm -rf "$script_dir"/*_check
+
+package_dir="$(basename "$other_args")_check"
+package_path="$script_dir/$package_dir"
+
+# If the package is in a git repository
+if echo "$other_args" | grep -Eq "https?:\/\/"
+then
+	# Clone the repository
+	git clone $other_args $gitbranch "$package_path"
+
+# If it's a local directory
+else
+	# Do a copy in the directory of Package check
+	cp -a "$other_args" "$package_path"
+fi
+
+# Check if the package directory is really here.
+if [ ! -d "$package_path" ]; then
+	ECHO_FORMAT "Unable to find the directory $package_path for the package...\n" "red"
+	clean_exit 1
+fi
+
+# Remove the .git directory.
+rm -rf "$package_path/.git"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Vérifie l'existence du fichier check_process
 check_file=1
-if [ ! -e "$APP_CHECK/check_process" ]; then
+if [ ! -e "$package_path/check_process" ]; then
 	ECHO_FORMAT "\nImpossible de trouver le fichier check_process pour procéder aux tests.\n" "red"
 	ECHO_FORMAT "Package check va être utilisé en mode dégradé.\n" "lyellow"
 	check_file=0
@@ -497,7 +565,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_LINTER" -eq 1 ]; then
 		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_LINTER" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+		ECHO_FORMAT "\t\t\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
 	fi
@@ -505,7 +573,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_CHECK_SETUP" -eq 1 ]; then
 		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_SETUP" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
+		ECHO_FORMAT "\t\t\t\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
 	fi
@@ -514,7 +582,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_CHECK_REMOVE" -eq 1 ]; then
 		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_REMOVE" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
+		ECHO_FORMAT "\t\t\t\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
 	fi
@@ -523,7 +591,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then
 		ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_SUB_DIR" -eq -1 ]; then
-		ECHO_FORMAT "\t\tFAIL\n" "lred"
+		ECHO_FORMAT "\t\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\t\tNot evaluated.\n" "white"
 	fi
@@ -532,7 +600,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_CHECK_REMOVE_SUBDIR" -eq 1 ]; then
 		ECHO_FORMAT "\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_REMOVE_SUBDIR" -eq -1 ]; then
-		ECHO_FORMAT "\tFAIL\n" "lred"
+		ECHO_FORMAT "\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\tNot evaluated.\n" "white"
 	fi
@@ -541,7 +609,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then
 		ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_ROOT" -eq -1 ]; then
-		ECHO_FORMAT "\t\tFAIL\n" "lred"
+		ECHO_FORMAT "\t\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\t\tNot evaluated.\n" "white"
 	fi
@@ -550,7 +618,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_CHECK_REMOVE_ROOT" -eq 1 ]; then
 		ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_REMOVE_ROOT" -eq -1 ]; then
-		ECHO_FORMAT "\t\tFAIL\n" "lred"
+		ECHO_FORMAT "\t\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\t\tNot evaluated.\n" "white"
 	fi
@@ -559,7 +627,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_CHECK_UPGRADE" -eq 1 ]; then
 		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_UPGRADE" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
+		ECHO_FORMAT "\t\t\t\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
 	fi
@@ -568,7 +636,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_CHECK_PRIVATE" -eq 1 ]; then
 		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_PRIVATE" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+		ECHO_FORMAT "\t\t\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
 	fi
@@ -577,7 +645,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_CHECK_PUBLIC" -eq 1 ]; then
 		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_PUBLIC" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+		ECHO_FORMAT "\t\t\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
 	fi
@@ -586,7 +654,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_CHECK_MULTI_INSTANCE" -eq 1 ]; then
 		ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_MULTI_INSTANCE" -eq -1 ]; then
-		ECHO_FORMAT "\t\tFAIL\n" "lred"
+		ECHO_FORMAT "\t\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\t\tNot evaluated.\n" "white"
 	fi
@@ -595,7 +663,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_CHECK_ADMIN" -eq 1 ]; then
 		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_ADMIN" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+		ECHO_FORMAT "\t\t\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
 	fi
@@ -604,7 +672,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_CHECK_DOMAIN" -eq 1 ]; then
 		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_DOMAIN" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+		ECHO_FORMAT "\t\t\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
 	fi
@@ -613,7 +681,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_CHECK_PATH" -eq 1 ]; then
 		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_PATH" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+		ECHO_FORMAT "\t\t\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
 	fi
@@ -622,7 +690,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_CHECK_PORT" -eq 1 ]; then
 		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_PORT" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+		ECHO_FORMAT "\t\t\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
 	fi
@@ -631,7 +699,7 @@ TEST_RESULTS () {
 # 	if [ "$GLOBAL_CHECK_CORRUPT" -eq 1 ]; then
 # 		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
 # 	elif [ "$GLOBAL_CHECK_CORRUPT" -eq -1 ]; then
-# 		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+# 		ECHO_FORMAT "\t\t\tFAIL\n" "red"
 # 	else
 # 		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
 # 	fi
@@ -640,7 +708,7 @@ TEST_RESULTS () {
 # 	if [ "$GLOBAL_CHECK_DL" -eq 1 ]; then
 # 		ECHO_FORMAT "\tSUCCESS\n" "lgreen"
 # 	elif [ "$GLOBAL_CHECK_DL" -eq -1 ]; then
-# 		ECHO_FORMAT "\tFAIL\n" "lred"
+# 		ECHO_FORMAT "\tFAIL\n" "red"
 # 	else
 # 		ECHO_FORMAT "\tNot evaluated.\n" "white"
 # 	fi
@@ -649,7 +717,7 @@ TEST_RESULTS () {
 # 	if [ "$GLOBAL_CHECK_FINALPATH" -eq 1 ]; then
 # 		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
 # 	elif [ "$GLOBAL_CHECK_FINALPATH" -eq -1 ]; then
-# 		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+# 		ECHO_FORMAT "\t\t\tFAIL\n" "red"
 # 	else
 # 		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
 # 	fi
@@ -658,7 +726,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_CHECK_BACKUP" -eq 1 ]; then
 		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_BACKUP" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
+		ECHO_FORMAT "\t\t\t\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
 	fi
@@ -667,7 +735,7 @@ TEST_RESULTS () {
 	if [ "$GLOBAL_CHECK_RESTORE" -eq 1 ]; then
 		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
 	elif [ "$GLOBAL_CHECK_RESTORE" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
+		ECHO_FORMAT "\t\t\t\tFAIL\n" "red"
 	else
 		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
 	fi
@@ -794,7 +862,7 @@ INIT_VAR
 INIT_LEVEL
 echo -n "" > "$complete_log"	# Initialise le fichier de log
 echo -n "" > "$test_result"	# Initialise le fichier des résulats d'analyse
-echo -n "" | sudo tee "$script_dir/lxc_boot.log"	# Initialise le fichier de log du boot du conteneur
+echo -n "" | tee "$script_dir/lxc_boot.log"	# Initialise le fichier de log du boot du conteneur
 if [ "$no_lxc" -eq 0 ]; then
 	LXC_INIT
 fi
@@ -819,7 +887,7 @@ then # Si le fichier check_process est trouvé
 				level[$(echo "$LIGNE" | cut -d '=' -f1 | cut -d ' ' -f2)]=$(echo "$LIGNE" | cut -d '=' -f2)
 			fi
 		fi
-	done 4< "$APP_CHECK/check_process"
+	done 4< "$package_path/check_process"
 	while read <&4 LIGNE
 	do
 		LIGNE=$(echo $LIGNE | sed 's/^ *"//g')	# Efface les espaces en début de ligne
@@ -868,7 +936,7 @@ then # Si le fichier check_process est trouvé
 						MANIFEST_PATH=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au path
 						parse_path=$(echo "$LIGNE" | cut -d '"' -f2)	# Lit le path du check_process
 						if [ -n "$parse_path" ]; then	# Si le path n'est pas null, utilise ce path au lieu de la valeur par défaut.
-							PATH_TEST=$(echo "$LIGNE" | cut -d '"' -f2)
+							test_path=$(echo "$LIGNE" | cut -d '"' -f2)
 						fi
 						LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
 					fi
@@ -1001,9 +1069,9 @@ then # Si le fichier check_process est trouvé
 				fi
 			fi
 		fi
-	done 4< "$APP_CHECK/check_process"	# Utilise le descripteur de fichier 4. Car le descripteur 1 est utilisé par d'autres boucles while read dans ces scripts.
+	done 4< "$package_path/check_process"	# Utilise le descripteur de fichier 4. Car le descripteur 1 est utilisé par d'autres boucles while read dans ces scripts.
 else	# Si le fichier check_process n'a pas été trouvé, fonctionne en mode dégradé.
-	python "$script_dir/sub_scripts/ci/maniackc.py" "$APP_CHECK/manifest.json" > "$script_dir/manifest_extract" # Extrait les infos du manifest avec le script de Bram
+	python "$script_dir/sub_scripts/ci/maniackc.py" "$package_path/manifest.json" > "$script_dir/manifest_extract" # Extrait les infos du manifest avec le script de Bram
 	pkg_linter=1
 	setup_sub_dir=1
 	setup_root=1
@@ -1051,7 +1119,7 @@ else	# Si le fichier check_process n'a pas été trouvé, fonctionne en mode dé
 		wrong_user=0
 		all_test=$((all_test-1))
 	fi
-	if grep multi_instance "$APP_CHECK/manifest.json" | grep -q false
+	if grep multi_instance "$package_path/manifest.json" | grep -q false
 	then	# Retire le test multi instance si la clé du manifest est à false
 		multi_instance=0
 	fi
@@ -1093,7 +1161,7 @@ then
 			message="$message descend du niveau $previous_level au niveau $level"
 		fi
 	fi
-	ci_path=$(grep "DOMAIN=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)/$(grep "CI_PATH=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)
+	ci_path=$(grep "main_domain=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)/$(grep "CI_PATH=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)
 	message="$message sur https://$ci_path$job_log"
 	if ! echo "$job" | grep -q "(testing)\|(unstable)"; then	# Notifie par xmpp seulement sur stable
 		"$script_dir/../auto_build/xmpp_bot/xmpp_post.sh" "$message"	# Notifie sur le salon apps
@@ -1102,7 +1170,7 @@ fi
 
 if [ "$level" -eq 0 ] && [ $type_exec_env -eq 1 ]
 then	# Si l'app est au niveau 0, et que le test tourne en CI, envoi un mail d'avertissement.
-	dest=$(cat "$APP_CHECK/manifest.json" | grep '\"email\": ' | cut -d '"' -f 4)	# Utilise l'adresse du mainteneur de l'application
+	dest=$(cat "$package_path/manifest.json" | grep '\"email\": ' | cut -d '"' -f 4)	# Utilise l'adresse du mainteneur de l'application
 	ci_path=$(grep "CI_URL=" "$script_dir/../config" | cut -d= -f2)
 	if [ -n "$ci_path" ]; then
 		message="$message sur $ci_path"
@@ -1112,9 +1180,3 @@ fi
 
 echo "Le log complet des installations et suppressions est disponible dans le fichier $complete_log"
 # Clean
-rm -f "$OUTPUTD" "$temp_RESULT" "$script_dir/url_output" "$script_dir/curl_print" "$script_dir/manifest_extract"
-
-if [ -n "$APP_CHECK" ]; then
-	sudo rm -rf "$APP_CHECK"
-fi
-sudo rm "$script_dir/pcheck.lock" # Retire le lock
