@@ -1,10 +1,8 @@
 # Merci a Bram pour ce code python.
 # https://github.com/YunoHost/ci
 
-import os
+import sys
 import json
-from urllib import urlretrieve
-
 
 def argument_for_question(question, all_choices=False):
     question_type = question.get("type")
@@ -51,23 +49,9 @@ def argument_for_question(question, all_choices=False):
     else:
         raise Exception("Unknow question type: %s\n" % question_type, question)
 
-def default_arguments_for_app(app_data):
-    answers = []
-    for question in app_data["manifest"]["arguments"]["install"]:
-        answers.append(argument_for_question(question))
-
-    return "&".join(["=".join([x[0], x[1]]) for x in answers])
-
-
-def main():
-    if not os.path.exists("/tmp/yunohost_official_apps_list.json"):
-        urlretrieve("https://app.yunohost.org/official.json", "/tmp/yunohost_official_apps_list.json")
-
-    app_list = json.load(open("/tmp/yunohost_official_apps_list.json"))
-
-    for name, data in sorted(app_list.items(), key=lambda x: x[0]):
-        print "%s:" % name, default_arguments_for_app(data)
-
-
 if __name__ == '__main__':
-    main()
+    manifest_path = sys.argv[1:][0]
+    manifest = json.load(open(manifest_path, "r"))
+
+    for question in manifest["arguments"]["install"]:
+        print ":".join(argument_for_question(question, all_choices=True))

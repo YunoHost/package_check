@@ -621,7 +621,7 @@ CHECK_PUBLIC_PRIVATE () {
 CHECK_MULTI_INSTANCE () {
 	# Try multi-instance installations
 
-	unit_test_title "Installation multi-instance..."
+	unit_test_title "Multi-instance installations..."
 
 	# Check if the sub path install have previously work
 	if [ $RESULT_check_sub_dir -ne 1 ] && [ $force_install_ok -ne 1 ]

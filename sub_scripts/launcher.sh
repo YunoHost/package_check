@@ -1,6 +1,6 @@
-#!/bin/bash
+# #!/bin/bash
 
-echo -e "Loads functions from lxc_launcher.sh"
+echo -e "Loads functions from launcher.sh"
 
 #=================================================
 # Globals variables
@@ -43,7 +43,7 @@ LXC_START () {
 			echo "Start the LXC container" | tee --append "$test_result"
 			sudo lxc-start --name=$lxc_name --daemon --logfile "$script_dir/lxc_boot.log" | tee --append "$test_result" 2>&1
 		else
-			echo "An LXC container is already running" | tee --append "$test_result"
+			echo "A LXC container is already running" | tee --append "$test_result"
 		fi
 
 		# Check during 20 seconds if the container has finished to start.
@@ -68,7 +68,7 @@ LXC_START () {
 				ECHO_FORMAT "Rebooting the container...\n" "red" "bold"
 			fi
 			LXC_STOP	# Stop the LXC container
-		elif ! ssh $arg_ssh $lxc_name "ping -q -c 2 security.debian.org > /dev/null 2>&1; exit \$?" >> "$test_result" 2>&1
+		elif ! ssh $arg_ssh $lxc_name "sudo ping -q -c 2 security.debian.org > /dev/null 2>&1; exit \$?" >> "$test_result" 2>&1
 		then
 			# Try to ping security.debian.org to check the connectivity from the container
 			ECHO_FORMAT "The container failed to connect to internet...\n" "red" "bold"
