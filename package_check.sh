@@ -110,7 +110,7 @@ else
 					;;
 			esac
 		else
-			other_args="$1"
+			app_arg="$1"
 		fi
 		shift
 	done
@@ -433,19 +433,19 @@ echo "Pick up the package which will be tested."
 # Remove the previous package if it's still here.
 rm -rf "$script_dir"/*_check
 
-package_dir="$(basename "$other_args")_check"
+package_dir="$(basename "$app_arg")_check"
 package_path="$script_dir/$package_dir"
 
 # If the package is in a git repository
-if echo "$other_args" | grep -Eq "https?:\/\/"
+if echo "$app_arg" | grep -Eq "https?:\/\/"
 then
 	# Clone the repository
-	git clone $other_args $gitbranch "$package_path"
+	git clone $app_arg $gitbranch "$package_path"
 
 # If it's a local directory
 else
 	# Do a copy in the directory of Package check
-	cp -a "$other_args" "$package_path"
+	cp -a "$app_arg" "$package_path"
 fi
 
 # Check if the package directory is really here.
@@ -1039,68 +1039,95 @@ else
 	TEST_RESULTS
 fi
 
+echo "You can find the complete log of these tests in $complete_log"
 
 
 
 
+#=================================================
+# Inform of the results by XMPP and/or by mail
+#=================================================
 
+# Keep only the name of the app
+app_name=${package_dir%_ynh_check}
 
-
-
-
-
-
-
-
-
-
-
-app_name=${arg_app%_ynh}	# Supprime '_ynh' à la fin du nom de l'app
-# Mail et bot xmpp pour le niveau de l'app
-if [ "$level" -eq 0 ]; then
-	message="L'application $(basename "$app_name") vient d'échouer aux tests d'intégration continue"
-fi
-
-if [ $type_exec_env -eq 2 ]
+# If the app completely failed and obtained 0
+if [ $global_level -eq 0 ]
 then
-	# Récupère le nom du job dans le CI
-	id=$(cat "$script_dir/../CI.lock")	# Récupère l'id du job en cours
-	job=$(grep "$id" "$script_dir/../work_list" | cut -d ';' -f 3)	# Et récupère le nom du job dans le work_list
-	job=${job// /%20}       # Replace all space by %20
+	message="Application $app_name has completely failed to continuous integration tests"
+
+# If the app has obtained another level than 0.
+# And if package check it's in the official CI environment
+# Check the level variation
+elif [ $type_exec_env -eq 2 ]
+
+	# Get the job name, stored in the work_list
+	job=$(head -n1 "$script_dir/../work_list" | cut -d ';' -f 3)
+
+	# Build the log path (and replace all space by %20 in the job name)
 	if [ -n "$job" ]; then
-		job_log="/job/$job/lastBuild/console"
+		job_log="/job/${job// /%20}/lastBuild/console"
 	fi
-	# Prend le niveau précédemment calculé
-	previous_level=$(grep "$(basename "$app_name")" "$script_dir/../auto_build/list_level_stable" | cut -d: -f2)
-	if [ "$level" -ne 0 ]
+
+	# Get the previous level, found in the file list_level_stable
+	previous_level=$(grep "$job" "$script_dir/../auto_build/list_level_stable" | cut -d: -f2)
+
+	# Print the variation of the level. If this level is different than 0
+	if [ $global_level -gt 0 ]
 	then
-		message="L'application $(basename "$app_name")"
+		message="Application $app_name"
+		# If non previous level was found
 		if [ -z "$previous_level" ]; then
-			message="$message vient d'atteindre le niveau $level"
+			message="$message just reach the level $level"
+		# If the level stays the same
 		elif [ $level -eq $previous_level ]; then
-			message="$message reste au niveau $level"
+			message="$message stays at level $level"
+		# If the level go up
 		elif [ $level -gt $previous_level ]; then
-			message="$message monte du niveau $previous_level au niveau $level"
+			message="$message rise from level $previous_level to level $level"
+		# If the level go down
 		elif [ $level -lt $previous_level ]; then
-			message="$message descend du niveau $previous_level au niveau $level"
+			message="$message go down from level $previous_level to level $level"
 		fi
 	fi
+fi
+
+# If the test was perform in the official CI environment
+# Add the log address
+# And inform with xmpp
+if [ $type_exec_env -eq 2 ]
+
+	# Build the address of the server from auto.conf
 	ci_path=$(grep "main_domain=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)/$(grep "CI_PATH=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)
-	message="$message sur https://$ci_path$job_log"
-	if ! echo "$job" | grep -q "(testing)\|(unstable)"; then	# Notifie par xmpp seulement sur stable
-		"$script_dir/../auto_build/xmpp_bot/xmpp_post.sh" "$message"	# Notifie sur le salon apps
+
+	# Add the log adress to the message
+	message="$message on https://$ci_path$job_log"
+
+
+	# Send a xmpp notification on the chat room "apps"
+	# Only for a test with the stable version of YunoHost
+	if ! echo "$job" | grep -q "(testing)\|(unstable)"
+	then
+		"$script_dir/../auto_build/xmpp_bot/xmpp_post.sh" "$message" > /dev/null 2>&1
 	fi
 fi
 
-if [ "$level" -eq 0 ] && [ $type_exec_env -eq 1 ]
-then	# Si l'app est au niveau 0, et que le test tourne en CI, envoi un mail d'avertissement.
-	dest=$(cat "$package_path/manifest.json" | grep '\"email\": ' | cut -d '"' -f 4)	# Utilise l'adresse du mainteneur de l'application
-	ci_path=$(grep "CI_URL=" "$script_dir/../config" | cut -d= -f2)
-	if [ -n "$ci_path" ]; then
-		message="$message sur $ci_path"
+# Send a mail to main maintainer if the app failed and obtained the level 0.
+# Only if package check is in a CI environment (Official or not)
+if [ $global_level -eq 0 ] && [ $type_exec_env -ge 1 ]
+then
+
+	# Get the maintainer email from the manifest
+	dest=$(grep '\"email\": ' "$package_path/manifest.json" | cut -d '"' -f 4)
+
+	# Send the message by mail, if a address has been find
+	if [ -n "$dest" ]; then
+		mail -s "[YunoHost] Your app $app_name has completely failed to continuous integration tests" "$dest" <<< "$message"
 	fi
-	mail -s "[YunoHost] Échec d'installation d'une application dans le CI" "$dest" <<< "$message"	# Envoi un avertissement par mail.
 fi
 
-echo "Le log complet des installations et suppressions est disponible dans le fichier $complete_log"
-# Clean
+#=================================================
+# Clean and exit
+#=================================================
+
+clean_exit 0
