@@ -15,7 +15,7 @@ if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(
 clean_exit () {
 	# Exit and remove all temp files
 	# $1 = exit code
-	
+
 	# Deactivate LXC network
 	LXC_TURNOFF
 
@@ -67,53 +67,59 @@ else
 	arguments=${arguments//--bash-mode/-y}
 
 	# Read and parse all the arguments
-	while [ $# -ne 0 ]
-	do
-		# Initialize the index of getopts
-		OPTIND=1
-		# Parse with getopts only if the argument begin by -
-		if [ ${1:0:1} = "-" ]
-		then
-			getopts ":b:fihly " parameter
-			case $parameter in
-				b)
-					# --branch=branch-name
-					gitbranch="$OPTARG"
-					;;
-				f)
-					# --force-install-ok
-					force_install_ok=1
-					;;
-				i)
-					# --interrupt
-					interrupt=1
-					;;
-				h)
-					# --help
-					notice=1
-					;;
-				l)
-					# --build-lxc
-					build_lxc=1
-					;;
-				y)
-					# --bash-mode
-					bash_mode=1
-					;;
-				\?)
-					echo "Invalid argument: -$OPTARG" >&2
-					notice=1
-					;;
-				:)
-					echo "-$OPTARG parameter requires an argument." >&2
-					notice=1
-					;;
-			esac
-		else
-			app_arg="$1"
-		fi
-		shift
-	done
+	# Use a function here, to use standart arguments $@ and use more simply getopts and shift.
+	parse_arg () {
+		while [ $# -ne 0 ]
+		do
+			# Initialize the index of getopts
+			OPTIND=1
+			# Parse with getopts only if the argument begin by -
+			if [ ${1:0:1} = "-" ]
+			then
+				getopts ":b:fihly " parameter
+				case $parameter in
+					b)
+						# --branch=branch-name
+						gitbranch="$OPTARG"
+						;;
+					f)
+						# --force-install-ok
+						force_install_ok=1
+						;;
+					i)
+						# --interrupt
+						interrupt=1
+						;;
+					h)
+						# --help
+						notice=1
+						;;
+					l)
+						# --build-lxc
+						build_lxc=1
+						;;
+					y)
+						# --bash-mode
+						bash_mode=1
+						;;
+					\?)
+						echo "Invalid argument: -$OPTARG" >&2
+						notice=1
+						;;
+					:)
+						echo "-$OPTARG parameter requires an argument." >&2
+						notice=1
+						;;
+				esac
+			else
+				app_arg="$1"
+			fi
+			shift
+		done
+	}
+
+	# Call parse_arg and pass the modified list of args.
+	parse_arg $arguments
 fi
 
 # Prevent a conflict between --interrupt and --bash-mode

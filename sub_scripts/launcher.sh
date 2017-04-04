@@ -82,7 +82,7 @@ LXC_START () {
 			break
 		fi
 
-		# Failed if the container failed to start
+		# Fail if the container failed to start
 		if [ $i -eq $max_try ] && [ $failstart -eq 1 ]
 		then
 			ECHO_FORMAT "The container failed to start $max_try times...\nIf this problem is persistent, try to fix it with lxc_check.sh." "red" "bold"
@@ -92,7 +92,7 @@ LXC_START () {
 		fi
 	done
 
-	# Count the number of line of the current yunohost log file.
+	# Count the number of lines of the current yunohost log file.
 	COPY_LOG 1
 
 	# Copy the package into the container.
@@ -142,9 +142,9 @@ LXC_STOP () {
 }
 
 LXC_TURNOFF () {
-	# Deactivate LXC network
+	# Disable LXC network
 
-	echo "Deactivate iptables rules."
+	echo "Disable iptables rules."
 	if sudo iptables --check FORWARD --in-interface $lxc_bridge --out-interface $main_iface --jump ACCEPT 2> /dev/null
 	then
 		sudo iptables --delete FORWARD --in-interface $lxc_bridge --out-interface $main_iface --jump ACCEPT >> "$test_result" 2>&1
@@ -158,7 +158,7 @@ LXC_TURNOFF () {
 		sudo iptables --table nat --delete POSTROUTING --source $ip_range.0/24 --jump MASQUERADE | tee --append "$test_result" 2>&1
 	fi
 
-	echo "Deactivate the network bridge."
+	echo "Disable the network bridge."
 	if sudo ifquery $lxc_bridge --state > /dev/null
 	then
 		sudo ifdown --force $lxc_bridge | tee --append "$test_result" 2>&1
@@ -168,7 +168,7 @@ LXC_TURNOFF () {
 LXC_CONNECT_INFO () {
 	# Print access information
 
-	echo "> For access the container:"
+	echo "> To access the container:"
 	echo "To execute one command:"
 	echo -e "\e[1msudo lxc-attach -n $lxc_name -- command\e[0m"
 
