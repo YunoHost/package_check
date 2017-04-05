@@ -1,593 +1,686 @@
 #!/bin/bash
 
-# Arguments du script
-# --bash-mode	Mode bash, le script est autonome. Il ignore la valeur de $auto_remove
-# --build-lxc	Installe lxc et créer la machine si nécessaire.
-# --branch=nom-de-la-branche	Teste une branche du dépôt, plutôt que tester master
-# --force-install-ok	Force la réussite des installations, même si elles échouent. Permet d'effectuer les tests qui suivent même si l'installation a échouée.
-# --interrupt	Force l'option auto_remove à 0.
-# --no-lxc	N'utilise pas la virtualisation en conteneur lxc. La virtualisation est utilisée par défaut si disponible.
-# --help	Affiche l'aide du script
+#=================================================
+# Grab the script directory
+#=================================================
+
+if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
+
+#=================================================
+# Starting and checking
+#=================================================
+# Generic functions
+#=================================================
+
+clean_exit () {
+	# Exit and remove all temp files
+	# $1 = exit code
+
+	# Deactivate LXC network
+	LXC_TURNOFF
+
+	# Remove temporary files
+	rm -f "$temp_log"
+	rm -f "$temp_result"
+	rm -f "$script_dir/url_output"
+	rm -f "$script_dir/curl_print"
+	rm -f "$script_dir/manifest_extract"
+
+	# Remove the application which been tested
+	if [ -n "$package_path" ]; then
+		rm -rf "$package_path"
+	fi
+
+	# Remove the lock file
+	rm -f "$lock_file"
+
+	exit $1
+}
+
+#=================================================
+# Check and read CLI arguments
+#=================================================
 
 echo ""
 
+# Init arguments value
+gitbranch=""
+force_install_ok=0
+interrupt=0
 notice=0
+build_lxc=0
+bash_mode=0
+
+# If no arguments provided
 if [ "$#" -eq 0 ]
 then
-	echo "Le script prend en argument le package à tester."
+	# Print the help and exit
+	notice=1
+else
+	# Reduce the arguments for getopts
+	arguments="$*"
+	arguments=${arguments//--branch=/-b }
+	arguments=${arguments//--force-install-ok/-f}
+	arguments=${arguments//--interrupt/-i}
+	arguments=${arguments//--help/-h}
+	arguments=${arguments//--build-lxc/-l}
+	arguments=${arguments//--bash-mode/-y}
+
+	# Read and parse all the arguments
+	# Use a function here, to use standart arguments $@ and use more simply getopts and shift.
+	parse_arg () {
+		while [ $# -ne 0 ]
+		do
+			# Initialize the index of getopts
+			OPTIND=1
+			# Parse with getopts only if the argument begin by -
+			if [ ${1:0:1} = "-" ]
+			then
+				getopts ":b:fihly " parameter
+				case $parameter in
+					b)
+						# --branch=branch-name
+						gitbranch="$OPTARG"
+						;;
+					f)
+						# --force-install-ok
+						force_install_ok=1
+						;;
+					i)
+						# --interrupt
+						interrupt=1
+						;;
+					h)
+						# --help
+						notice=1
+						;;
+					l)
+						# --build-lxc
+						build_lxc=1
+						;;
+					y)
+						# --bash-mode
+						bash_mode=1
+						;;
+					\?)
+						echo "Invalid argument: -$OPTARG" >&2
+						notice=1
+						;;
+					:)
+						echo "-$OPTARG parameter requires an argument." >&2
+						notice=1
+						;;
+				esac
+			else
+				app_arg="$1"
+			fi
+			shift
+		done
+	}
+
+	# Call parse_arg and pass the modified list of args.
+	parse_arg $arguments
+fi
+
+# Prevent a conflict between --interrupt and --bash-mode
+if [ $interrupt -eq 1 ] && [ $bash_mode -eq 1 ]
+then
+	echo "You can't use --interrupt and --bash-mode together !"
 	notice=1
 fi
 
-## Récupère les arguments
-# --bash-mode
-bash_mode=$(echo "$*" | grep -c -e "--bash-mode")	# bash_mode vaut 1 si l'argument est présent.
-# --no-lxc
-no_lxc=$(echo "$*" | grep -c -e "--no-lxc")	# no_lxc vaut 1 si l'argument est présent.
-# --build-lxc
-build_lxc=$(echo "$*" | grep -c -e "--build-lxc")	# build_lxc vaut 1 si l'argument est présent.
-# --force-install-ok
-force_install_ok=$(echo "$*" | grep -c -e "--force-install-ok")	# force-install-ok vaut 1 si l'argument est présent.
-# --branch=
-gitbranch=$(echo "$*" | grep -e "--branch")	# gitbranch prend l'ensemble des arguments à partir de --branch
-# --interrupt
-interrupt=$(echo "$*" | grep -c -e "--interrupt")	# interrupt vaut 1 si l'argument est présent.
-if test -n "$gitbranch"; then
-	if ! echo "$gitbranch" | grep -q "branch=[[:alnum:]]"; then
-		notice=1	# Renvoi vers l'aide si la syntaxe est incorrecte
-	else
-		gitbranch="--branch $(echo "$gitbranch" | cut -d'=' -f2 | cut -d' ' -f1)"	# Isole le nom de la branche entre le = et l'espace. Et ajoute l'argument de git clone
+# Print help
+if [ $notice -eq 1 ]
+then
+	cat << EOF
+
+Usage:
+package_check.sh [OPTION]... PACKAGE_TO_CHECK
+	-b, --branch=BRANCH
+		Specify a branch to check.
+	-f, --force-install-ok
+		Force following test even if all install have failed.
+	-i, --interrupt
+		Force auto_remove value, break before each remove.
+	-h, --help
+		Display this notice.
+	-l, --build-lxc
+		Install LXC and build the container if necessary.
+	-y, --bash-mode
+		Do not ask for continue check. Ignore auto_remove.
+EOF
+	exit 0
+fi
+
+#=================================================
+# Check if the lock file exist
+#=================================================
+
+lock_file="$script_dir/pcheck.lock"
+
+if test -e "$lock_file"
+then
+	# If the lock file exist
+	echo "The lock file $lock_file is present. Package check would not continue."
+	if [ $bash_mode -ne 1 ]; then
+		echo -n "Do you want to continue anymore? (y/n) :"
+		read answer
+	fi
+	# Set the answer at lowercase only
+	answer=${answer,,}
+	if [ "${answer:0:1}" != "y" ]
+	then
+		echo "Cancel Package check execution"
+		exit 0
 	fi
 fi
-# --help
-if [ "$notice" -eq 0 ]; then
-	notice=$(echo "$*" | grep -c -e "--help")	# notice vaut 1 si l'argument est présent. Il affichera alors l'aide.
-fi
-arg_app=$(echo "$*" | sed 's/--bash-mode\|--no-lxc\|--build-lxc\|--force-install-ok\|--interrupt\|--branch=[[:alnum:]-]*//g' | sed 's/^ *\| *$//g')	# Supprime les arguments déjà lu pour ne garder que l'app. Et supprime les espaces au début et à la fin
-# echo "arg_app=$arg_app."
+# Create the lock file
+touch "$lock_file"
 
-if [ "$notice" -eq 1 ]; then
-	echo -e "\nUsage:"
-	echo "package_check.sh [--bash-mode] [--branch=] [--build-lxc] [--force-install-ok] [--no-lxc] [--help] \"package to check\""
-	echo -e "\n\t--bash-mode\t\tDo not ask for continue check. Ignore auto_remove."
-	echo -e "\t--branch=branch-name\tSpecify a branch to check."
-	echo -e "\t--build-lxc\t\tInstall LXC and build the container if necessary."
-	echo -e "\t--force-install-ok\tForce following test even if all install are failed."
-	echo -e "\t--interrupt\tForce auto_remove value, break before each remove."
-	echo -e "\t--no-lxc\t\tDo not use a LXC container. You should use this option only on a test environnement."
-	echo -e "\t--help\t\t\tDisplay this notice."
-	exit 0
+#=================================================
+# Upgrade Package check
+#=================================================
+
+git_repository=https://github.com/YunoHost/package_check
+version_file="$script_dir/pcheck_version"
+
+check_version="$(git ls-remote $git_repository | cut -f 1 | head -n1)"
+
+# If the version file exist, check for an upgrade
+if [ -e "$version_file" ]
+then
+	# Check if the last commit on the repository match with the current version
+	if [ "$check_version" != "$(cat "$version_file")" ]
+	then
+		# If the versions don't matches. Do an upgrade
+		echo -e "\e[97m\e[1mUpgrade Package check...\n\e[0m"
+
+		# Build the upgrade script
+		cat > "$script_dir/upgrade_script.sh" << EOF
+
+#!/bin/bash
+# Clone in another directory
+git clone --quiet $git_repository "$script_dir/upgrade"
+cp -a "$script_dir/upgrade/." "$script_dir/."
+rm -r "$script_dir/upgrade"
+# Update the version file
+echo "$check_version" > "$version_file"
+rm "$script_dir/pcheck.lock"
+# Execute package check by replacement of this process
+exec "$script_dir/package_check.sh" "$arguments"
+EOF
+
+		# Give the execution right
+		chmod +x "$script_dir/upgrade_script.sh"
+
+		# Start the upgrade script by replacement of this process
+		exec "$script_dir/upgrade_script.sh"
+	fi
 fi
 
-# Récupère le dossier du script
-if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
+# Update the version file
+echo "$check_version" > "$version_file"
 
-# Détermine l'environnement d'exécution de Package check
-type_exec_env=0	# Par défaut, exécution de package check seul
-if [ -e "$script_dir/../config" ]; then
-	type_exec_env=1	# Exécution en contexte de CI
-fi
-if [ -e "$script_dir/../auto_build/auto.conf" ]; then
-	type_exec_env=2	# Exécution en contexte de CI officiel
+#=================================================
+# Upgrade Package linter
+#=================================================
+
+git_repository=https://github.com/YunoHost/package_linter
+version_file="$script_dir/plinter_version"
+
+check_version="$(git ls-remote $git_repository | cut -f 1 | head -n1)"
+
+# If the version file exist, check for an upgrade
+if [ -e "$version_file" ]
+then
+	# Check if the last commit on the repository match with the current version
+	if [ "$check_version" != "$(cat "$version_file")" ]
+	then
+		# If the versions don't matches. Do an upgrade
+		echo -e "\e[97m\e[1mUpgrade Package linter...\n\e[0m"
+
+		# Clone in another directory
+		git clone --quiet https://github.com/YunoHost/package_linter "$script_dir/package_linter_tmp"
+
+		# And replace
+		cp -a "$script_dir/package_linter_tmp/." "$script_dir/package_linter/."
+		rm -r "$script_dir/package_linter_tmp"
+	fi
+else
+	echo -e "\e[97mInstall Package linter.\n\e[0m"
+	git clone --quiet $git_repository "$script_dir/package_linter"
 fi
 
-# Check user
-if [ "$(whoami)" != "$(cat "$script_dir/sub_scripts/setup_user")" ] && test -e "$script_dir/sub_scripts/setup_user"; then
-	echo -e "\e[91mCe script doit être exécuté avec l'utilisateur $(cat "$script_dir/sub_scripts/setup_user") !\nL'utilisateur actuel est $(whoami)."
-	echo -en "\e[0m"
-	exit 0
+# Update the version file
+echo "$check_version" > "$version_file"
+
+#=================================================
+# Get variables from the config file
+#=================================================
+
+pcheck_config="$script_dir/config"
+build_script="$script_dir/sub_scripts/lxc_build.sh"
+
+if [ -e "$pcheck_config" ]
+then
+	# Read the config file if it exists
+	ip_range=$(grep PLAGE_IP= "$pcheck_config" | cut -d '=' -f2)
+	main_domain=$(grep DOMAIN= "$pcheck_config" | cut -d '=' -f2)
+	yuno_pwd=$(grep YUNO_PWD= "$pcheck_config" | cut -d '=' -f2)
+	lxc_name=$(grep LXC_NAME= "$pcheck_config" | cut -d '=' -f2)
+	lxc_bridge=$(grep LXC_BRIDGE= "$pcheck_config" | cut -d '=' -f2)
+	main_iface=$(grep iface= "$pcheck_config" | cut -d '=' -f2)
 fi
 
-source "$script_dir/sub_scripts/lxc_launcher.sh"
+# Use default value from the build script if needed
+if [ -z "$ip_range" ]; then
+	ip_range=$(grep "|| PLAGE_IP=" "$build_script" | cut -d '"' -f4)
+	echo -e "# Ip range for the container\nPLAGE_IP=$ip_range\n" >> "$pcheck_config"
+fi
+if [ -z "$main_domain" ]; then
+	main_domain=$(grep "|| DOMAIN="  "$build_script" | cut -d '=' -f2)
+	echo -e "# Test domain\nDOMAIN=$main_domain\n" >> "$pcheck_config"
+fi
+if [ -z "$yuno_pwd" ]; then
+	yuno_pwd=$(grep "|| YUNO_PWD="  "$build_script" | cut -d '=' -f2)
+	echo -e "# YunoHost password, in the container\nYUNO_PWD=$yuno_pwd\n" >> "$pcheck_config"
+fi
+if [ -z "$lxc_name" ]; then
+	lxc_name=$(grep "|| LXC_NAME="  "$build_script" | cut -d '=' -f2)
+	echo -e "# Container name\nLXC_NAME=$lxc_name\n" >> "$pcheck_config"
+fi
+if [ -z "$lxc_bridge" ]; then
+	lxc_bridge=$(grep "|| LXC_BRIDGE="  "$build_script" | cut -d '=' -f2)
+	echo -e "# Bridge name\nLXC_BRIDGE=$lxc_bridge\n" >> "$pcheck_config"
+fi
+
+if [ -z "$main_iface" ]; then
+	# Try to determine the main iface
+	main_iface=$(sudo route | grep default | awk '{print $8;}')
+	if [ -z $main_iface ]
+	then
+		echo -e "\e[91mUnable to find the name of the main iface.\e[0m"
+
+		# Remove the lock file
+		rm -f "$lock_file"
+		# And exit
+		exit 1
+	fi
+	# Store the main iface in the config file
+	echo -e "# Main host iface\niface=$main_iface\n" >> "$pcheck_config"
+fi
+
+#=================================================
+# Check the user who try to execute this script
+#=================================================
+
+setup_user_file="$script_dir/sub_scripts/setup_user"
+if [ -e "$setup_user_file" ]
+then
+	# Compare the current user and the user stored in $setup_user_file
+	authorised_user="$(cat "$setup_user_file")"
+	if [ "$(whoami)" != "$authorised_user" ]
+	then
+		echo -e "\e[91mThis script need to be executed by the user $setup_user_file !\nThe current user is $(whoami).\e[0m"
+		clean_exit 1
+	fi
+else
+	echo -e "\e[93mUnable to define the user who authorised to use package check. Please fill the file $setup_user_file\e[0m"
+fi
+
+#=================================================
+# Check the internet connectivity
+#=================================================
+
+# Try to ping yunohost.org
+ping -q -c 2 yunohost.org > /dev/null 2>&1
+if [ "$?" -ne 0 ]; then
+	# If fail, try to ping another domain
+	ping -q -c 2 framasoft.org > /dev/null 2>&1
+	if [ "$?" -ne 0 ]; then
+		# If ping failed twice, it's seems the internet connection is down.
+		echo "\e[91mUnable to connect to internet.\e[0m"
+
+		# Remove the lock file
+		rm -f "$lock_file"
+		# And exit
+		exit 1
+	fi
+fi
+
+#=================================================
+# Define globals variables
+#=================================================
+
+# Complete result log. Complete log of YunoHost
+complete_log="$script_dir/Complete.log"
+# Partial YunoHost log, just the log for the current test
+temp_log="$script_dir/temp_yunohost-cli.log"
+# Temporary result log
+temp_result="$script_dir/temp_result.log"
+# Result log with warning and error only
+test_result="$script_dir/Test_results.log"
+# Real YunoHost log
+yunohost_log="/var/lib/lxc/$lxc_name/rootfs/var/log/yunohost/yunohost-cli.log"
+
+sub_domain="sous.$main_domain"
+test_user=package_checker
+test_path=/check
+
+#=================================================
+# Load all functions
+#=================================================
+
+source "$script_dir/sub_scripts/launcher.sh"
 source "$script_dir/sub_scripts/testing_process.sh"
 source "$script_dir/sub_scripts/log_extractor.sh"
 source /usr/share/yunohost/helpers
 
-# Vérifie la connexion internet.
-ping -q -c 2 yunohost.org > /dev/null 2>&1
-if [ "$?" -ne 0 ]; then	# En cas d'échec de connexion, tente de pinger un autre domaine pour être sûr
-	ping -q -c 2 framasoft.org > /dev/null 2>&1
-	if [ "$?" -ne 0 ]; then	# En cas de nouvel échec de connexion. On considère que la connexion est down...
-		ECHO_FORMAT "Impossible d'établir une connexion à internet.\n" "red"
-		exit 1
-	fi
-fi
+#=================================================
+# Check LXC
+#=================================================
 
-if test -e "$script_dir/pcheck.lock"
-then	# Présence du lock, Package check ne peut pas continuer.
-	echo "Le fichier $script_dir/pcheck.lock est présent. Package check est déjà utilisé."
-	rep="N"
-	if [ "$bash_mode" -ne 1 ]; then
-		echo -n "Souhaitez-vous continuer quand même et ignorer le lock ? (Y/N) :"
-		read rep
-	fi
-	if [ "${rep:0:1}" != "Y" ] && [ "${rep:0:1}" != "y" ] && [ "${rep:0:1}" != "O" ] && [ "${rep:0:1}" != "o" ]
-	then	# Teste uniquement le premier caractère de la réponse pour continuer malgré le lock.
-		echo "L'exécution de Package check est annulée"
-		exit 0
-	fi
-fi
-touch "$script_dir/pcheck.lock" # Met en place le lock de Package check
-
-version_script="$(git ls-remote https://github.com/YunoHost/package_check | cut -f 1 | head -n1)"
-if [ -e "$script_dir/package_version" ]
+# Check if lxc is already installed
+if dpkg-query -W -f '${Status}' "lxc" 2>/dev/null | grep -q "ok installed"
 then
-	if [ "$version_script" != "$(cat "$script_dir/package_version")" ]; then	# Si le dernier commit sur github ne correspond pas au commit enregistré, il y a une mise à jour.
-		# Écrit le script de mise à jour, qui sera exécuté à la place de ce script, pour le remplacer et le relancer après.
-		ECHO_FORMAT "Mise à jour de Package check...\n" "white" "bold"
-		echo -e "#!/bin/bash\n" > "$script_dir/upgrade_script.sh"
-		echo "git clone --quiet https://github.com/YunoHost/package_check \"$script_dir/upgrade\"" >> "$script_dir/upgrade_script.sh"
-		echo "sudo cp -a \"$script_dir/upgrade/.\" \"$script_dir/.\"" >> "$script_dir/upgrade_script.sh"
-		echo "sudo rm -r \"$script_dir/upgrade\"" >> "$script_dir/upgrade_script.sh"
-		echo "echo \"$version_script\" > \"$script_dir/package_version\"" >> "$script_dir/upgrade_script.sh"
-		echo "sudo rm \"$script_dir/pcheck.lock\"" >> "$script_dir/upgrade_script.sh"
-		echo "exec \"$script_dir/package_check.sh\" \"$*\"" >> "$script_dir/upgrade_script.sh"
-		chmod +x "$script_dir/upgrade_script.sh"
-		exec "$script_dir/upgrade_script.sh"	#Exécute le script de mise à jour.
-	fi
-else
-	echo "$version_script" > "$script_dir/package_version"
-fi
-
-version_plinter="$(git ls-remote https://github.com/YunoHost/package_linter | cut -f 1 | head -n1)"
-if [ -e "$script_dir/plinter_version" ]
-then
-	if [ "$version_plinter" != "$(cat "$script_dir/plinter_version")" ]; then	# Si le dernier commit sur github ne correspond pas au commit enregistré, il y a une mise à jour.
-		ECHO_FORMAT "Mise à jour de package_linter..." "white" "bold"
-		git clone --quiet https://github.com/YunoHost/package_linter "$script_dir/package_linter_tmp"
-		sudo cp -a "$script_dir/package_linter_tmp/." "$script_dir/package_linter/."
-		sudo rm -r "$script_dir/package_linter_tmp"
-	fi
-else	# Si le fichier de version n'existe pas, il est créé.
-	echo "$version_plinter" > "$script_dir/plinter_version"
-	ECHO_FORMAT "Installation de package_linter.\n" "white"
-	git clone --quiet https://github.com/YunoHost/package_linter "$script_dir/package_linter"
-fi
-echo "$version_plinter" > "$script_dir/plinter_version"
-
-USER_TEST=package_checker
-PASSWORD_TEST=checker_pwd
-PATH_TEST=/check
-
-# Récupère les informations depuis le fichier de conf (Ou le complète le cas échéant)
-pcheck_config="$script_dir/config"
-# Tente de lire les informations depuis le fichier de config si il existe
-if [ -e "$pcheck_config" ]
-then
-	PLAGE_IP=$(cat "$pcheck_config" | grep PLAGE_IP= | cut -d '=' -f2)
-	DOMAIN=$(cat "$pcheck_config" | grep DOMAIN= | cut -d '=' -f2)
-	YUNO_PWD=$(cat "$pcheck_config" | grep YUNO_PWD= | cut -d '=' -f2)
-	LXC_NAME=$(cat "$pcheck_config" | grep LXC_NAME= | cut -d '=' -f2)
-	LXC_BRIDGE=$(cat "$pcheck_config" | grep LXC_BRIDGE= | cut -d '=' -f2)
-	main_iface=$(cat "$pcheck_config" | grep iface= | cut -d '=' -f2)
-fi
-# Utilise des valeurs par défaut si les variables sont vides, et génère le fichier de config
-if [ -z "$PLAGE_IP" ]; then
-	PLAGE_IP=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| PLAGE_IP=" | cut -d '"' -f4)
-	echo -e "# Plage IP du conteneur\nPLAGE_IP=$PLAGE_IP\n" >> "$pcheck_config"
-fi
-if [ -z "$DOMAIN" ]; then
-	DOMAIN=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| DOMAIN=" | cut -d '=' -f2)
-	echo -e "# Domaine de test\nDOMAIN=$DOMAIN\n" >> "$pcheck_config"
-fi
-if [ -z "$YUNO_PWD" ]; then
-	YUNO_PWD=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| YUNO_PWD=" | cut -d '=' -f2)
-	echo -e "# Mot de passe\nYUNO_PWD=$YUNO_PWD\n" >> "$pcheck_config"
-fi
-if [ -z "$LXC_NAME" ]; then
-	LXC_NAME=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| LXC_NAME=" | cut -d '=' -f2)
-	echo -e "# Nom du conteneur\nLXC_NAME=$LXC_NAME\n" >> "$pcheck_config"
-fi
-if [ -z "$LXC_BRIDGE" ]; then
-	LXC_BRIDGE=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| LXC_BRIDGE=" | cut -d '=' -f2)
-	echo -e "# Nom du bridge\nLXC_BRIDGE=$LXC_BRIDGE\n" >> "$pcheck_config"
-fi
-if [ -z "$main_iface" ]; then
-	# Tente de définir l'interface réseau principale
-	main_iface=$(sudo route | grep default | awk '{print $8;}')	# Prend l'interface réseau défini par default
-	if [ -z $main_iface ]; then
-		echo -e "\e[91mImpossible de déterminer le nom de l'interface réseau de l'hôte.\e[0m"
-		exit 1
-	fi
-	# Enregistre le nom de l'interface réseau de l'hôte dans un fichier de config
-	echo -e "# Interface réseau principale de l'hôte\niface=$main_iface\n" >> "$pcheck_config"
-fi
-
-if [ "$no_lxc" -eq 0 ]
-then
-	DOMAIN=$(sudo cat /var/lib/lxc/$LXC_NAME/rootfs/etc/yunohost/current_host)
-else
-	DOMAIN=$(sudo yunohost domain list -l 1 | cut -d" " -f 2)
-fi
-SOUS_DOMAIN="sous.$DOMAIN"
-
-if [ "$no_lxc" -eq 0 ]
-then	# Si le conteneur lxc est utilisé
-	lxc_ok=0
-	# Vérifie la présence du virtualisateur en conteneur LXC
-	if dpkg-query -W -f '${Status}' "lxc" 2>/dev/null | grep -q "ok installed"; then
-		if sudo lxc-ls | grep -q "$LXC_NAME"; then	# Si lxc est installé, vérifie la présence de la machine $LXC_NAME
-			lxc_ok=1
-		fi
-	fi
-	if [ "$lxc_ok" -eq 0 ]
+	# If lxc is installed, check if the container is already built.
+	if ! sudo lxc-ls | grep -q "$lxc_name"
 	then
-		if [ "$build_lxc" -eq 1 ]
+		if [ $build_lxc -eq 1 ]
 		then
-			"$script_dir/sub_scripts/lxc_build.sh"	# Lance la construction de la machine virtualisée.
+			# If lxc's not installed and build_lxc set. Asks to build the container.
+			build_lxc=2
 		else
-			ECHO_FORMAT "Lxc n'est pas installé, ou la machine $LXC_NAME n'est pas créée.\n" "red"
-			ECHO_FORMAT "Utilisez le script 'lxc_build.sh' pour installer lxc et créer la machine.\n" "red"
-			ECHO_FORMAT "Ou utilisez l'argument --no-lxc\n" "red"
-			sudo rm "$script_dir/pcheck.lock" # Retire le lock
-			exit 1
+			ECHO_FORMAT "LXC is not installed or the container $lxc_name doesn't exist.\n" "red"
+			ECHO_FORMAT "Use the script 'lxc_build.sh' to fix them.\n" "red"
+			clean_exit 1
 		fi
 	fi
-	# Stoppe toute activité éventuelle du conteneur, en cas d'arrêt incorrect précédemment
-	LXC_STOP
-	LXC_TURNOFF
-else	# Vérifie l'utilisateur et le domain si lxc n'est pas utilisé.
-	# Vérifie l'existence de l'utilisateur de test
-	echo -e "\nVérification de l'existence de l'utilisateur de test..."
-	if ! ynh_user_exists "$USER_TEST"
-	then	# Si il n'existe pas, il faut le créer.
-		USER_TEST_CLEAN=${USER_TEST//"_"/""}
-		sudo yunohost user create --firstname "$USER_TEST_CLEAN" --mail "$USER_TEST_CLEAN@$DOMAIN" --lastname "$USER_TEST_CLEAN" --password "$PASSWORD_TEST" "$USER_TEST"
-		if [ "$?" -ne 0 ]; then
-			ECHO_FORMAT "La création de l'utilisateur de test a échoué. Impossible de continuer.\n" "red"
-			sudo rm "$script_dir/pcheck.lock" # Retire le lock
-			exit 1
-		fi
-	fi
-
-	# Vérifie l'existence du sous-domaine de test
-	echo "Vérification de l'existence du domaine de test..."
-	if [ "$(sudo yunohost domain list | grep -c "$SOUS_DOMAIN")" -eq 0 ]; then	# Si il n'existe pas, il faut le créer.
-		sudo yunohost domain add "$SOUS_DOMAIN"
-		if [ "$?" -ne 0 ]; then
-			ECHO_FORMAT "La création du sous-domain de test a échoué. Impossible de continuer.\n" "red"
-			sudo rm "$script_dir/pcheck.lock" # Retire le lock
-			exit 1
-		fi
-	fi
-fi
-
-# Vérifie le type d'emplacement du package à tester
-echo "Récupération du package à tester."
-rm -rf "$script_dir"/*_check
-GIT_PACKAGE=0
-if echo "$arg_app" | grep -Eq "https?:\/\/"
+elif [ $build_lxc -eq 1 ]
 then
-	GIT_PACKAGE=1
-	git clone $arg_app $gitbranch "$script_dir/$(basename "$arg_app")_check"
+	# If lxc's not installed and build_lxc set. Asks to build the container.
+	build_lxc=2
+fi
+
+if [ $build_lxc -eq 2 ]
+then
+	# Install LXC and build the container before continue.
+	"$script_dir/sub_scripts/lxc_build.sh"
+fi
+
+# Stop and restore the LXC container. In case of previous incomplete execution.
+LXC_STOP
+# Deactivate LXC network
+LXC_TURNOFF
+
+#=================================================
+# Determine if it's a CI environment
+#=================================================
+
+# By default, it's a standalone execution.
+type_exec_env=0
+if [ -e "$script_dir/../config" ]
+then
+	# CI environment
+	type_exec_env=1
+fi
+if [ -e "$script_dir/../auto_build/auto.conf" ]
+then
+	# Official CI environment
+	type_exec_env=2
+fi
+
+#=================================================
+# Pick up the package
+#=================================================
+
+echo "Pick up the package which will be tested."
+
+# Remove the previous package if it's still here.
+rm -rf "$script_dir"/*_check
+
+package_dir="$(basename "$app_arg")_check"
+package_path="$script_dir/$package_dir"
+
+# If the package is in a git repository
+if echo "$app_arg" | grep -Eq "https?:\/\/"
+then
+	# Clone the repository
+	git clone $app_arg $gitbranch "$package_path"
+
+# If it's a local directory
 else
-	# Si c'est un dossier local, il est copié dans le dossier du script.
-	sudo cp -a --remove-destination "$arg_app" "$script_dir/$(basename "$arg_app")_check"
-fi
-APP_CHECK="$script_dir/$(basename "$arg_app")_check"
-if [ "$no_lxc" -eq 0 ]
-then	# En cas d'exécution dans LXC, l'app sera dans le home de l'user LXC.
-	APP_PATH_YUNO="$(basename "$arg_app")_check"
-else
-	APP_PATH_YUNO="$APP_CHECK"
+	# Do a copy in the directory of Package check
+	cp -a "$app_arg" "$package_path"
 fi
 
-if [ ! -d "$APP_CHECK" ]; then
-	ECHO_FORMAT "Le dossier de l'application a tester est introuvable...\n" "red"
-	sudo rm "$script_dir/pcheck.lock" # Retire le lock
-	exit 1
-fi
-sudo rm -rf "$APP_CHECK/.git"	# Purge des fichiers de git
-
-# Vérifie l'existence du fichier check_process
-check_file=1
-if [ ! -e "$APP_CHECK/check_process" ]; then
-	ECHO_FORMAT "\nImpossible de trouver le fichier check_process pour procéder aux tests.\n" "red"
-	ECHO_FORMAT "Package check va être utilisé en mode dégradé.\n" "lyellow"
-	check_file=0
+# Check if the package directory is really here.
+if [ ! -d "$package_path" ]; then
+	ECHO_FORMAT "Unable to find the directory $package_path for the package...\n" "red"
+	clean_exit 1
 fi
 
+# Remove the .git directory.
+rm -rf "$package_path/.git"
 
 
-# Cette fonctionne détermine le niveau final de l'application, en prenant en compte d'éventuels forçages
-APP_LEVEL () {
-	level=0 	# Initialise le niveau final à 0
-	# Niveau 1: L'application ne s'installe pas ou ne fonctionne pas après installation.
-	if [ "${level[1]}" == "auto" ] || [ "${level[1]}" -eq 2 ]; then
-		if [ "$GLOBAL_CHECK_SETUP" -eq 1 ] && [ "$GLOBAL_CHECK_REMOVE" -eq 1 ]
-		then level[1]=2 ; else level[1]=0 ; fi
-	fi
 
-	# Niveau 2: L'application s'installe et se désinstalle dans toutes les configurations communes.
-	if [ "${level[2]}" == "auto" ] || [ "${level[2]}" -eq 2 ]; then
-		if 	[ "$GLOBAL_CHECK_SUB_DIR" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_REMOVE_SUBDIR" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_ROOT" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_REMOVE_ROOT" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_PRIVATE" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_PUBLIC" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_MULTI_INSTANCE" -ne -1 ]
-		then level[2]=2 ; else level[2]=0 ; fi
-	fi
 
-	# Niveau 3: L'application supporte l'upgrade depuis une ancienne version du package.
-	if [ "${level[3]}" == "auto" ] || [ "${level[3]}" == "2" ]; then
-		if [ "$GLOBAL_CHECK_UPGRADE" -eq 1 ] || ( [ "${level[3]}" == "2" ] && [ "$GLOBAL_CHECK_UPGRADE" -ne -1 ] )
-		then level[3]=2 ; else level[3]=0 ; fi
-	fi
-
-	# Niveau 4: L'application prend en charge de LDAP et/ou HTTP Auth. -- Doit être vérifié manuellement
-
-	# Niveau 5: Aucune erreur dans package_linter.
-	if [ "${level[5]}" == "auto" ] || [ "${level[5]}" == "2" ]; then
-		if [ "$GLOBAL_LINTER" -eq 1 ] || ( [ "${level[5]}" == "2" ] && [ "$GLOBAL_LINTER" -ne -1 ] )
-		then level[5]=2 ; else level[5]=0 ; fi
-	fi
-
-	# Niveau 6: L'application peut-être sauvegardée et restaurée sans erreurs sur la même machine ou une autre.
-	if [ "${level[6]}" == "auto" ] || [ "${level[6]}" == "2" ]; then
-		if [ "$GLOBAL_CHECK_BACKUP" -eq 1 ] && [ "$GLOBAL_CHECK_RESTORE" -eq 1 ] || ( [ "${level[6]}" == "2" ] && [ "$GLOBAL_CHECK_BACKUP" -ne -1 ] && [ "$GLOBAL_CHECK_RESTORE" -ne -1 ] )
-		then level[6]=2 ; else level[6]=0 ; fi
-	fi
-
-	# Niveau 7: Aucune erreur dans package check.
-	if [ "${level[7]}" == "auto" ] || [ "${level[7]}" == "2" ]; then
-		if 	[ "$GLOBAL_CHECK_SETUP" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_REMOVE" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_SUB_DIR" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_REMOVE_SUBDIR" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_REMOVE_ROOT" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_UPGRADE" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_PRIVATE" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_PUBLIC" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_MULTI_INSTANCE" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_ADMIN" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_DOMAIN" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_PATH" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_PORT" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_BACKUP" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_RESTORE" -ne -1 ] && \
-			[ "${level[5]}" -ge -1 ]	# Si tout les tests sont validés. Et si le level 5 est validé ou forcé.
-		then level[7]=2 ; else level[7]=0 ; fi
-	fi
-
-	# Niveau 8: L'application respecte toutes les YEP recommandées. -- Doit être vérifié manuellement
-
-	# Niveau 9: L'application respecte toutes les YEP optionnelles. -- Doit être vérifié manuellement
-
-	# Niveau 10: L'application est jugée parfaite. -- Doit être vérifié manuellement
-
-	# Calcule le niveau final
-	for i in {1..10}; do
-		if [ "${level[i]}" == "auto" ]; then
-			level[i]=0	# Si des niveaux sont encore à auto, c'est une erreur de syntaxe dans le check_process, ils sont fixé à 0.
-		elif [ "${level[i]}" == "na" ]; then
-			continue	# Si le niveau est "non applicable" (na), il est ignoré dans le niveau final
-		elif [ "${level[i]}" -ge 1 ]; then
-			level=$i	# Si le niveau est validé, il est pris en compte dans le niveau final
-		else
-			break		# Dans les autres cas (niveau ni validé, ni ignoré), la boucle est stoppée. Le niveau final est donc le niveau précédemment validé
-		fi
-	done
-}
+#=================================================
+# Determine and print the results
+#=================================================
 
 TEST_RESULTS () {
-	APP_LEVEL
-	ECHO_FORMAT "\n\nPackage linter: "
-	if [ "$GLOBAL_LINTER" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_LINTER" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-	fi
-	ECHO_FORMAT "Installation: "
-	if [ "$GLOBAL_CHECK_SETUP" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_SETUP" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
-	fi
 
-	ECHO_FORMAT "Suppression: "
-	if [ "$GLOBAL_CHECK_REMOVE" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_REMOVE" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
-	fi
+	# Print the test result
+	print_result () {
+		# Print the name of the test
+		ECHO_FORMAT "$1: "
 
-	ECHO_FORMAT "Installation en sous-dossier: "
-	if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then
-		ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_SUB_DIR" -eq -1 ]; then
-		ECHO_FORMAT "\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\tNot evaluated.\n" "white"
-	fi
+		# Complete with spaces according to the lenght of the previous string. To align the results
+		local i=0
+		for i in `seq ${#1} 30`
+		do
+			echo -n " "
+		done
 
-	ECHO_FORMAT "Suppression depuis sous-dossier: "
-	if [ "$GLOBAL_CHECK_REMOVE_SUBDIR" -eq 1 ]; then
-		ECHO_FORMAT "\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_REMOVE_SUBDIR" -eq -1 ]; then
-		ECHO_FORMAT "\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\tNot evaluated.\n" "white"
-	fi
+		# Print the result of this test
+		if [ $2 -eq 1 ]
+		then
+			ECHO_FORMAT "SUCCESS\n" "lgreen"
+		elif [ $2 -eq -1 ]
+		then
+			ECHO_FORMAT "FAIL\n" "red"
+		else
+			ECHO_FORMAT "Not evaluated.\n" "white"
+		fi
+	}
 
-	ECHO_FORMAT "Installation à la racine: "
-	if [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then
-		ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_ROOT" -eq -1 ]; then
-		ECHO_FORMAT "\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\tNot evaluated.\n" "white"
-	fi
+	# Print the result for each test
+	echo -e "\n\n"
+	print_result "Package linter" $RESULT_linter
+	print_result "Installation" $RESULT_global_setup
+	print_result "Deleting" $RESULT_global_remove
+	print_result "Installation in a sub path" $RESULT_check_sub_dir
+	print_result "Deleting from a sub path" $RESULT_check_remove_sub_dir
+	print_result "Installation on the root" $RESULT_check_root
+	print_result "Deleting from root" $RESULT_check_remove_root
+	print_result "Upgrade" $RESULT_check_upgrade
+	print_result "Installation in private mode" $RESULT_check_private
+	print_result "Installation in public mode" $RESULT_check_public
+	print_result "Multi-instance installations" $RESULT_check_multi_instance
+	print_result "Malformed path" $RESULT_check_path
+	print_result "Port already used" $RESULT_check_port
+	print_result "Backup" $RESULT_check_backup
+	print_result "Restore" $RESULT_check_restore
 
-	ECHO_FORMAT "Suppression depuis racine: "
-	if [ "$GLOBAL_CHECK_REMOVE_ROOT" -eq 1 ]; then
-		ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_REMOVE_ROOT" -eq -1 ]; then
-		ECHO_FORMAT "\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\tNot evaluated.\n" "white"
-	fi
 
-	ECHO_FORMAT "Upgrade: "
-	if [ "$GLOBAL_CHECK_UPGRADE" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_UPGRADE" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
-	fi
 
-	ECHO_FORMAT "Installation privée: "
-	if [ "$GLOBAL_CHECK_PRIVATE" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_PRIVATE" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-	fi
+	# Determine the level for this app
 
-	ECHO_FORMAT "Installation publique: "
-	if [ "$GLOBAL_CHECK_PUBLIC" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_PUBLIC" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-	fi
+	# Each level can has 5 different values
+	# 0    -> If this level can't be validated
+	# 1    -> If this level is forced. Even if the tests fails
+	# 2    -> Indicates the tests had previously validated this level
+	# auto -> This level has not a value yet.
+	# na   -> This level will not checked, but it'll be ignored in the final sum
 
-	ECHO_FORMAT "Installation multi-instance: "
-	if [ "$GLOBAL_CHECK_MULTI_INSTANCE" -eq 1 ]; then
-		ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_MULTI_INSTANCE" -eq -1 ]; then
-		ECHO_FORMAT "\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\tNot evaluated.\n" "white"
-	fi
+	# Set default values for level, if they're empty.
+	test -n "${level[1]}" || level[1]=auto
+	test -n "${level[2]}" || level[2]=auto
+	test -n "${level[3]}" || level[3]=auto
+	test -n "${level[4]}" || level[4]=0
+	test -n "${level[5]}" || level[5]=auto
+	test -n "${level[6]}" || level[6]=auto
+	test -n "${level[7]}" || level[7]=auto
+	test -n "${level[8]}" || level[8]=0
+	test -n "${level[9]}" || level[9]=0
+	test -n "${level[10]}" || level[10]=0
 
-	ECHO_FORMAT "Mauvais utilisateur: "
-	if [ "$GLOBAL_CHECK_ADMIN" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_ADMIN" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-	fi
+	# Check if the level can be changed
+	level_can_change () {
+		# If the level is set at auto, it's waiting for a change
+		# And if it's set at 2, its value can be modified by a new result
+		if [ "${level[$1]}" == "auto" ] || [ "${level[$1]}" -eq 2 ]
+		then
+			return 0
+		fi
+	}
 
-	ECHO_FORMAT "Erreur de domaine: "
-	if [ "$GLOBAL_CHECK_DOMAIN" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_DOMAIN" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Correction de path: "
-	if [ "$GLOBAL_CHECK_PATH" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_PATH" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Port déjà utilisé: "
-	if [ "$GLOBAL_CHECK_PORT" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_PORT" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-	fi
-
-# 	ECHO_FORMAT "Source corrompue: "
-# 	if [ "$GLOBAL_CHECK_CORRUPT" -eq 1 ]; then
-# 		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-# 	elif [ "$GLOBAL_CHECK_CORRUPT" -eq -1 ]; then
-# 		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-# 	else
-# 		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-# 	fi
-
-# 	ECHO_FORMAT "Erreur de téléchargement de la source: "
-# 	if [ "$GLOBAL_CHECK_DL" -eq 1 ]; then
-# 		ECHO_FORMAT "\tSUCCESS\n" "lgreen"
-# 	elif [ "$GLOBAL_CHECK_DL" -eq -1 ]; then
-# 		ECHO_FORMAT "\tFAIL\n" "lred"
-# 	else
-# 		ECHO_FORMAT "\tNot evaluated.\n" "white"
-# 	fi
-
-# 	ECHO_FORMAT "Dossier déjà utilisé: "
-# 	if [ "$GLOBAL_CHECK_FINALPATH" -eq 1 ]; then
-# 		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-# 	elif [ "$GLOBAL_CHECK_FINALPATH" -eq -1 ]; then
-# 		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-# 	else
-# 		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-# 	fi
-
-	ECHO_FORMAT "Backup: "
-	if [ "$GLOBAL_CHECK_BACKUP" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_BACKUP" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Restore: "
-	if [ "$GLOBAL_CHECK_RESTORE" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_RESTORE" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
-	fi
-	ECHO_FORMAT "\t\t    Notes de résultats: $note/$tnote - " "white" "bold"
-	if [ "$note" -gt 0 ]
+	# Evaluate the first level
+	# -> The package can be install and remove.
+	if level_can_change 1
 	then
-		note=$(( note * 20 / tnote ))
+		# Validated if at least one install and remove work fine
+		if	[ $RESULT_global_setup -eq 1 ] && \
+			[ $RESULT_global_remove -eq 1 ]
+		then level[1]=2
+		else level[1]=0
+		fi
 	fi
-		if [ "$note" -le 5 ]; then
-			color_note="red"
-			typo_note="bold"
-			smiley=":'("	# La contribution à Shasha. Qui m'a forcé à ajouté les smiley sous la contrainte ;)
-		elif [ "$note" -le 10 ]; then
-			color_note="red"
-			typo_note=""
-			smiley=":("
-		elif [ "$note" -le 15 ]; then
-			color_note="lyellow"
-			typo_note=""
-			smiley=":s"
-		elif [ "$note" -gt 15 ]; then
-			color_note="lgreen"
-			typo_note=""
-			smiley=":)"
-		fi
-		if [ "$note" -ge 20 ]; then
-			color_note="lgreen"
-			typo_note="bold"
-			smiley="\o/"
-		fi
-	ECHO_FORMAT "$note/20 $smiley\n" "$color_note" "$typo_note"
-	ECHO_FORMAT "\t   Ensemble de tests effectués: $tnote/21\n\n" "white" "bold"
 
-	# Affiche le niveau final
-	ECHO_FORMAT "Niveau de l'application: $level\n" "white" "bold"
-	for i in {1..10}
+	# Evaluate the second level
+	# -> The package can be install and remove in all tested configurations.
+	if level_can_change 2
+	then
+		# Validated if none install failed
+		if 	[ $RESULT_check_sub_dir -ne -1 ] && \
+			[ $RESULT_check_remove_sub_dir -ne -1 ] && \
+			[ $RESULT_check_root -ne -1 ] && \
+			[ $RESULT_check_remove_root -ne -1 ] && \
+			[ $RESULT_check_private -ne -1 ] && \
+			[ $RESULT_check_public -ne -1 ] && \
+			[ $RESULT_check_multi_instance -ne -1 ]
+		then level[2]=2
+		else level[2]=0
+		fi
+	fi
+
+	# Evaluate the third level
+	# -> The package can be upgraded from the same version.
+	if level_can_change 3
+	then
+		# Validated if the upgrade is ok. Or if the upgrade has been not tested but already validated before.
+		if 	[ $RESULT_check_upgrade -eq 1 ] || \
+			( [ $RESULT_check_upgrade -ne -1 ] && \
+			[ "${level[3]}" == "2" ] )
+		then level[3]=2
+		else level[3]=0
+		fi
+	fi
+
+	# Evaluate the fifth level
+	# -> The package have no error with package linter
+	if level_can_change 5
+	then
+		# Validated if Linter is ok. Or if Linter has been not tested but already validated before.
+		if 	[ $RESULT_linter -eq 1 ] || \
+			( [ $RESULT_linter -ne -1 ] && \
+			[ "${level[5]}" == "2" ] )
+		then level[5]=2
+		else level[5]=0
+		fi
+	fi
+
+	# Evaluate the sixth level
+	# -> The package can be backup and restore without error
+	if level_can_change 6
+	then
+		# Validated if backup and restore are ok. Or if backup and restore have been not tested but already validated before.
+		if 	( [ $RESULT_check_backup -eq 1 ] && \
+			[ $RESULT_check_restore -eq 1 ] ) || \
+			( [ $RESULT_check_backup -ne -1 ] && \
+			[ $RESULT_check_restore -ne -1 ] && \
+			[ "${level[6]}" == "2" ] )
+		then level[6]=2
+		else level[6]=0
+		fi
+	fi
+
+	# Evaluate the seventh level
+	# -> None errors in all tests performed
+	if level_can_change 7
+	then
+		# Validated if none errors is happened.
+		if 	[ $RESULT_global_setup -ne -1 ] && \
+			[ $RESULT_global_remove -ne -1 ] && \
+			[ $RESULT_check_sub_dir -ne -1 ] && \
+			[ $RESULT_check_remove_sub_dir -ne -1 ] && \
+			[ $RESULT_check_remove_root -ne -1 ] && \
+			[ $RESULT_check_upgrade -ne -1 ] && \
+			[ $RESULT_check_private -ne -1 ] && \
+			[ $RESULT_check_public -ne -1 ] && \
+			[ $RESULT_check_multi_instance -ne -1 ] && \
+			[ $RESULT_check_path -ne -1 ] && \
+			[ $RESULT_check_port -ne -1 ] && \
+			[ $RESULT_check_backup -ne -1 ] && \
+			[ $RESULT_check_restore -ne -1 ]
+		then level[7]=2
+		else level[7]=0
+		fi
+	fi
+
+	# Initialize the global level
+	global_level=0
+
+	# Calculate the final level
+	for i in `seq 1 10`
 	do
-		ECHO_FORMAT "\t   Niveau $i: "
-		if [ "${level[i]}" == "na" ]; then
+
+		# If there is a level still at 'auto', it's a mistake.
+		if [ "${level[i]}" == "auto" ]
+		then
+			# So this level will set at 0.
+			level[i]=0
+
+		# If the level is at 'na', it will be ignored
+		elif [ "${level[i]}" == "na" ]
+		then
+			continue
+
+		# If the level is at 1 or 2. The global level will be set at this level
+		elif [ "${level[i]}" -ge 1 ]
+		then
+			global_level=$i
+
+		# But, if the level is at 0, the loop stop here
+		# Like that, the global level rise while none level have failed
+		else
+			break
+		fi
+	done
+
+	# Then, print the levels
+	# Print the global level
+	ECHO_FORMAT "Level of this application: $global_level\n" "white" "bold"
+
+	# And print the value for each level
+	for i in `seq 1 10`
+	do
+		ECHO_FORMAT "\t   Level $i: "
+		if [ "${level[$i]}" == "na" ]; then
 			ECHO_FORMAT "N/A\n"
-		elif [ "${level[i]}" -ge 1 ]; then
+		elif [ "${level[$i]}" -ge 1 ]; then
 			ECHO_FORMAT "1\n" "white" "bold"
 		else
 			ECHO_FORMAT "0\n"
@@ -595,405 +688,454 @@ TEST_RESULTS () {
 	done
 }
 
-INIT_VAR() {
-	GLOBAL_LINTER=0
-	GLOBAL_CHECK_SETUP=0
-	GLOBAL_CHECK_SUB_DIR=0
-	GLOBAL_CHECK_ROOT=0
-	GLOBAL_CHECK_REMOVE=0
-	GLOBAL_CHECK_REMOVE_SUBDIR=0
-	GLOBAL_CHECK_REMOVE_ROOT=0
-	GLOBAL_CHECK_UPGRADE=0
-	GLOBAL_CHECK_BACKUP=0
-	GLOBAL_CHECK_RESTORE=0
-	GLOBAL_CHECK_PRIVATE=0
-	GLOBAL_CHECK_PUBLIC=0
-	GLOBAL_CHECK_MULTI_INSTANCE=0
-	GLOBAL_CHECK_ADMIN=0
-	GLOBAL_CHECK_DOMAIN=0
-	GLOBAL_CHECK_PATH=0
-	GLOBAL_CHECK_CORRUPT=0
-	GLOBAL_CHECK_DL=0
-	GLOBAL_CHECK_PORT=0
-	GLOBAL_CHECK_FINALPATH=0
-	IN_PROCESS=0
-	MANIFEST=0
-	CHECKS=0
+#=================================================
+# Parsing and performing tests
+#=================================================
+# Check if a check_process file exist
+#=================================================
+
+check_file=1
+check_process="$package_path/check_process"
+
+if [ ! -e "$check_process" ]
+then
+	ECHO_FORMAT "\nUnable to find a check_process file.\n" "red"
+	ECHO_FORMAT "Package check will be used in lower mode.\n" "lyellow"
+	check_file=0
+fi
+
+#=================================================
+# Initialize tests
+#=================================================
+
+# Purge some log files
+> "$complete_log"
+> "$test_result"
+> "$script_dir/lxc_boot.log"
+
+# Initialize LXC network
+LXC_INIT
+
+# Default values for check_process and TESTING_PROCESS
+initialize_values() {
+	# Test results
+	RESULT_linter=0
+	RESULT_global_setup=0
+	RESULT_global_remove=0
+	RESULT_check_sub_dir=0
+	RESULT_check_root=0
+	RESULT_check_remove_sub_dir=0
+	RESULT_check_remove_root=0
+	RESULT_check_upgrade=0
+	RESULT_check_backup=0
+	RESULT_check_restore=0
+	RESULT_check_private=0
+	RESULT_check_public=0
+	RESULT_check_multi_instance=0
+	RESULT_check_path=0
+	RESULT_check_port=0
+
+	# auto_remove parameter
 	if [ $interrupt -eq 1 ]; then
 		auto_remove=0
 	else
 		auto_remove=1
 	fi
-	install_pass=0
-	note=0
-	tnote=0
+
+	# Number of tests to proceed
 	all_test=0
-
-	MANIFEST_DOMAIN="null"
-	MANIFEST_PATH="null"
-	MANIFEST_USER="null"
-	MANIFEST_PUBLIC="null"
-	MANIFEST_PUBLIC_public="null"
-	MANIFEST_PUBLIC_private="null"
-	MANIFEST_PASSWORD="null"
-	MANIFEST_PORT="null"
-
-	pkg_linter=0
-	setup_sub_dir=0
-	setup_root=0
-	setup_nourl=0
-	setup_private=0
-	setup_public=0
-	upgrade=0
-	backup_restore=0
-	multi_instance=0
-	wrong_user=0
-	wrong_path=0
-	incorrect_path=0
-	corrupt_source=0
-	fail_download_source=0
-	port_already_use=0
-	final_path_already_use=0
 }
 
-INIT_LEVEL() {
-	level[1]="auto"		# L'application s'installe et se désinstalle correctement. -- Peut être vérifié par package_check
-	level[2]="auto"		# L'application s'installe et se désinstalle dans toutes les configurations communes. -- Peut être vérifié par package_check
-	level[3]="auto"		# L'application supporte l'upgrade depuis une ancienne version du package. -- Peut être vérifié par package_check
-	level[4]=0			# L'application prend en charge de LDAP et/ou HTTP Auth. -- Doit être vérifié manuellement
-	level[5]="auto"		# Aucune erreur dans package_linter. -- Peut être vérifié par package_check
-	level[6]="auto"		# L'application peut-être sauvegardée et restaurée sans erreurs sur la même machine ou une autre. -- Peut être vérifié par package_check
-	level[7]="auto"		# Aucune erreur dans package check. -- Peut être vérifié par package_check
-	level[8]=0			# L'application respecte toutes les YEP recommandées. -- Doit être vérifié manuellement
-	level[9]=0			# L'application respecte toutes les YEP optionnelles. -- Doit être vérifié manuellement
-	level[10]=0			# L'application est jugée parfaite. -- Doit être vérifié manuellement
-}
+#=================================================
+# Parse the check_process
+#=================================================
 
-INIT_VAR
-INIT_LEVEL
-echo -n "" > "$complete_log"	# Initialise le fichier de log
-echo -n "" > "$test_result"	# Initialise le fichier des résulats d'analyse
-echo -n "" | sudo tee "$script_dir/lxc_boot.log"	# Initialise le fichier de log du boot du conteneur
-if [ "$no_lxc" -eq 0 ]; then
-	LXC_INIT
-fi
+# Parse the check_process only if it's exist
+if [ $check_file -eq 1 ]
+then
+	ECHO_FORMAT "Parsing of check_process file\n"
 
-if [ "$check_file" -eq 1 ]
-then # Si le fichier check_process est trouvé
-	## Parsing du fichier check_process de manière séquentielle.
-	echo "Parsing du fichier check_process"
-	IN_LEVELS=0
-	while read <&4 LIGNE
-	do	# Parse les indications de niveaux d'app avant de parser les tests
-		LIGNE=$(echo $LIGNE | sed 's/^ *"//g')	# Efface les espaces en début de ligne
-		if [ "${LIGNE:0:1}" == "#" ]; then
-			continue	# Ligne de commentaire, ignorée.
-		fi
-		if echo "$LIGNE" | grep -q "^;;; Levels"; then	# Définition des variables de niveaux
-			IN_LEVELS=1
-		fi
-		if [ "$IN_LEVELS" -eq 1 ]
-		then
-			if echo "$LIGNE" | grep -q "Level "; then	# Définition d'un niveau
-				level[$(echo "$LIGNE" | cut -d '=' -f1 | cut -d ' ' -f2)]=$(echo "$LIGNE" | cut -d '=' -f2)
+	# Remove all commented lines in the check_process
+	sed --in-place '/^#/d' "$check_process"
+	# Remove all spaces at the beginning of the lines
+	sed --in-place 's/^[ \t]*//g' "$check_process"
+
+	# Check if a string can be find in the current line
+	check_line () {
+		return $(echo "$line" | grep -q "$1")
+	}
+
+	# Search a string in the partial check_process
+	find_string () {
+		echo $(grep "$1" "$partial_check_process")
+	}
+
+	# Extract a section found between $1 and $2 from the file $3
+	extract_section () {
+		# Erase the partial check_process
+		> "$partial_check_process"
+		local source_file="$3"
+		local extract=0
+		local line=""
+		while read line
+		do
+			# Extract the line
+			if [ $extract -eq 1 ]
+			then
+				# Check if the line is the second line to found
+				if check_line "$2"; then
+					# Break the loop to finish the extract process
+					break;
+				fi
+				# Copy the line in the partial check_process
+				echo $line >> "$partial_check_process"
 			fi
-		fi
-	done 4< "$APP_CHECK/check_process"
-	while read <&4 LIGNE
+
+			# Search for the first line
+			if check_line "$1"; then
+				# Activate the extract process
+				extract=1
+			fi
+		done < "$source_file"
+	}
+
+	# Use 2 partial files, to keep one for a whole tests serie
+	partial1="${check_process}_part1"
+	partial2="${check_process}_part2"
+
+	# Extract the level section
+	partial_check_process=$partial1
+	extract_section "^;;; Levels" "^;; " "$check_process"
+
+	# Get the value associated to each level
+	for i in `seq 1 10`
 	do
-		LIGNE=$(echo $LIGNE | sed 's/^ *"//g')	# Efface les espaces en début de ligne
-		if [ "${LIGNE:0:1}" == "#" ]; then
-			# Ligne de commentaire, ignorée.
-			continue
+		# Find the line for this level
+		line=$(find_string "^Level $i=")
+		# And get the value
+		level[$i]=$(echo "$line" | cut -d'=' -f2)
+	done
+
+	# Parse each tests serie
+	while read tests_serie
+	do
+
+		# Initialize the values for this serie of tests
+		initialize_values
+
+		# Break after the first tests serie
+		if [ $all_test -ne 0 ] && [ $bash_mode -ne 1 ]; then
+			read -p "Press a key to start the next tests serie..." < /dev/tty
 		fi
-		if echo "$LIGNE" | grep -q "^auto_remove="; then	# Indication d'auto remove
-			if [ $interrupt -eq 0 ]; then	# Si interrupt est à 1, la valeur du check_process est ignorée.
-				auto_remove=$(echo "$LIGNE" | cut -d '=' -f2)
+
+		# Use the second file to extract the whole section of a tests serie
+		partial_check_process=$partial2
+
+		# Extract the section of the current tests serie
+		extract_section "^$tests_serie" "^;;" "$check_process"
+		# Parse all infos about arguments of manifest
+		# Extract the manifest arguments section from the second partial file
+		partial_check_process=$partial1
+		extract_section "^; Manifest" "^; " "$partial2"
+
+		# Initialize the arguments list
+		manifest_arguments=""
+
+		# Read each arguments and store them
+		while read line
+		do
+			# Extract each argument by removing spaces or tabulations before a parenthesis
+			add_arg="$(echo $line | sed 's/[ *|\t*](.*//')"
+			# Then add this argument and follow it by &
+			manifest_arguments="${manifest_arguments}${add_arg}&"
+		done < "$partial_check_process"
+
+		# Try to find all specific arguments needed for the tests
+		keep_name_arg_only () {
+			# Find the line for the given argument
+			local argument=$(find_string "($1")
+			# If a line exist for this argument
+			if [ -n "$argument" ]; then
+				# Keep only the name of the argument
+				echo "$(echo "$argument" | cut -d '=' -f1)"
 			fi
+		}
+		domain_arg=$(keep_name_arg_only "DOMAIN")
+		path_arg=$(keep_name_arg_only "PATH")
+		user_arg=$(keep_name_arg_only "USER")
+		port_arg=$(keep_name_arg_only "PORT")
+		public_arg=$(keep_name_arg_only "PUBLIC")
+		# Find the values for public and private
+		if [ -n "$public_arg" ]
+		then
+			line=$(find_string "(PUBLIC")
+			public_public_arg=$(echo "$line" | grep -o "|public=[[:alnum:]]*" | cut -d "=" -f2)
+			public_private_arg=$(echo "$line" | grep -o "|private=[[:alnum:]]*" | cut -d "=" -f2)
 		fi
-		if echo "$LIGNE" | grep -q "^;;" && ! echo "$LIGNE" | grep -q "^;;;"; then	# Début d'un scénario de test
-			if [ "$IN_PROCESS" -eq 1 ]; then	# Un scénario est déjà en cours. Donc on a atteind la fin du scénario.
-				TESTING_PROCESS
-				TEST_RESULTS
-				INIT_VAR
-				if [ "$bash_mode" -ne 1 ]; then
-					read -p "Appuyer sur une touche pour démarrer le scénario de test suivant..." < /dev/tty
-				fi
+
+
+		# Parse all tests to perform
+		# Extract the checks options section from the second partial file
+		extract_section "^; Checks" "^; " "$partial2"
+
+		read_check_option () {
+			# Find the line for the given check option
+			local line=$(find_string "^$1=")
+			# Get only the value
+			local value=$(echo "$line" | cut -d '=' -f2)
+			# And return this value
+			if [ "${value:0:1}" = "1" ]
+			then
+				echo 1
+			else
+				echo 0
 			fi
-			PROCESS_NAME=${LIGNE#;; }
-			IN_PROCESS=1
-			MANIFEST=0
-			CHECKS=0
-			IN_LEVELS=0
-		fi
-		if [ "$IN_PROCESS" -eq 1 ]
-		then	# Analyse des arguments du scenario de test
-			if echo "$LIGNE" | grep -q "^; Manifest"; then	# Arguments du manifest
-				MANIFEST=1
-				MANIFEST_ARGS=""	# Initialise la chaine des arguments d'installation
-			fi
-			if echo "$LIGNE" | grep -q "^; Checks"; then	# Tests à effectuer
-				MANIFEST=0
-				CHECKS=1
-			fi
-			if [ "$MANIFEST" -eq 1 ]
-			then	# Analyse des arguments du manifest
-				if echo "$LIGNE" | grep -q "="; then
-					if echo "$LIGNE" | grep -q "(DOMAIN)"; then	# Domaine dans le manifest
-						MANIFEST_DOMAIN=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au domaine
-						LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
-					fi
-					if echo "$LIGNE" | grep -q "(PATH)"; then	# Path dans le manifest
-						MANIFEST_PATH=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au path
-						parse_path=$(echo "$LIGNE" | cut -d '"' -f2)	# Lit le path du check_process
-						if [ -n "$parse_path" ]; then	# Si le path n'est pas null, utilise ce path au lieu de la valeur par défaut.
-							PATH_TEST=$(echo "$LIGNE" | cut -d '"' -f2)
-						fi
-						LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
-					fi
-					if echo "$LIGNE" | grep -q "(USER)"; then	# User dans le manifest
-						MANIFEST_USER=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant à l'utilisateur
-						LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
-					fi
-					if echo "$LIGNE" | grep -q "(PUBLIC"; then	# Accès public/privé dans le manifest
-						MANIFEST_PUBLIC=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant à l'accès public ou privé
-						MANIFEST_PUBLIC_public=$(echo "$LIGNE" | grep -o "|public=[[:alnum:]]*" | cut -d "=" -f2)	# Récupère la valeur pour un accès public.
-						MANIFEST_PUBLIC_private=$(echo "$LIGNE" | grep -o "|private=[[:alnum:]]*" | cut -d "=" -f2)	# Récupère la valeur pour un accès privé.
-						LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
-					fi
-					if echo "$LIGNE" | grep -q "(PASSWORD)"; then	# Password dans le manifest
-						MANIFEST_PASSWORD=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au mot de passe
-						LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
-					fi
-					if echo "$LIGNE" | grep -q "(PORT)"; then	# Port dans le manifest
-						MANIFEST_PORT=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au port
-						LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
-					fi
-# 					if [ "${#MANIFEST_ARGS}" -gt 0 ]; then	# Si il y a déjà des arguments
-# 						MANIFEST_ARGS="$MANIFEST_ARGS&"	#, précède de &
-# 					fi
-					MANIFEST_ARGS="$MANIFEST_ARGS$(echo $LIGNE | sed 's/^ *\| *$\|\"//g')&"	# Ajoute l'argument du manifest, en retirant les espaces de début et de fin ainsi que les guillemets.
-				fi
-			fi
-			if [ "$CHECKS" -eq 1 ]
-			then	# Analyse des tests à effectuer sur ce scenario.
-				if echo "$LIGNE" | grep -q "^pkg_linter="; then	# Test d'installation en sous-dossier
-					pkg_linter=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$pkg_linter" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^setup_sub_dir="; then	# Test d'installation en sous-dossier
-					setup_sub_dir=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$setup_sub_dir" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^setup_root="; then	# Test d'installation à la racine
-					setup_root=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$setup_root" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^setup_nourl="; then	# Test d'installation sans accès par url
-					setup_nourl=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$setup_nourl" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^setup_private="; then	# Test d'installation en privé
-					setup_private=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$setup_private" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^setup_public="; then	# Test d'installation en public
-					setup_public=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$setup_public" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^upgrade="; then	# Test d'upgrade
-					upgrade=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$upgrade" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^backup_restore="; then	# Test de backup et restore
-					backup_restore=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$backup_restore" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^multi_instance="; then	# Test d'installation multiple
-					multi_instance=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$multi_instance" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^wrong_user="; then	# Test d'erreur d'utilisateur
-					wrong_user=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$wrong_user" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^wrong_path="; then	# Test d'erreur de path ou de domaine
-					wrong_path=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$wrong_path" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^incorrect_path="; then	# Test d'erreur de forme de path
-					incorrect_path=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$incorrect_path" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^corrupt_source="; then	# Test d'erreur sur source corrompue
-					corrupt_source=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$corrupt_source" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^fail_download_source="; then	# Test d'erreur de téléchargement de la source
-					fail_download_source=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$fail_download_source" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^port_already_use="; then	# Test d'erreur de port
-					port_already_use=$(echo "$LIGNE" | cut -d '=' -f2)
-					if echo "$LIGNE" | grep -q "([0-9]*)"
-					then	# Le port est mentionné ici.
-						MANIFEST_PORT="$(echo "$LIGNE" | cut -d '(' -f2 | cut -d ')' -f1)"	# Récupère le numéro du port; Le numéro de port est précédé de # pour indiquer son absence du manifest.
-						port_already_use=${port_already_use:0:1}	# Garde uniquement la valeur de port_already_use
-					fi
-					if [ "$port_already_use" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^final_path_already_use="; then	# Test sur final path déjà utilisé.
-					final_path_already_use=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$final_path_already_use" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
+		}
+
+		count_test () {
+			# Increase the number of test, if this test is set at 1.
+			test "$1" -eq 1 && all_test=$((all_test+1))
+		}
+
+		pkg_linter=$(read_check_option pkg_linter)
+		count_test $pkg_linter
+		setup_sub_dir=$(read_check_option setup_sub_dir)
+		count_test $setup_sub_dir
+		setup_root=$(read_check_option setup_root)
+		count_test $setup_root
+		setup_nourl=$(read_check_option setup_nourl)
+		count_test $setup_nourl
+		setup_private=$(read_check_option setup_private)
+		count_test $setup_private
+		setup_public=$(read_check_option setup_public)
+		count_test $setup_public
+		upgrade=$(read_check_option upgrade)
+		count_test $upgrade
+		backup_restore=$(read_check_option backup_restore)
+		count_test $backup_restore
+		multi_instance=$(read_check_option multi_instance)
+		count_test $multi_instance
+		incorrect_path=$(read_check_option incorrect_path)
+		count_test $incorrect_path
+		port_already_use=$(read_check_option port_already_use)
+		count_test $port_already_use
+
+		# For port_already_use, check if there is also a port number
+		if [ $port_already_use -eq 1 ]
+		then
+			line=$(find_string "^port_already_use=")
+			# If there is port number
+			if echo "$line" | grep -q "([0-9]*)"
+			then
+				# Store the port number in port_arg and prefix it by # to means that not really a manifest arg
+				port_arg="#$(echo "$line" | cut -d '(' -f2 | cut -d ')' -f1)"
 			fi
 		fi
-	done 4< "$APP_CHECK/check_process"	# Utilise le descripteur de fichier 4. Car le descripteur 1 est utilisé par d'autres boucles while read dans ces scripts.
-else	# Si le fichier check_process n'a pas été trouvé, fonctionne en mode dégradé.
-	python "$script_dir/sub_scripts/ci/maniackc.py" "$APP_CHECK/manifest.json" > "$script_dir/manifest_extract" # Extrait les infos du manifest avec le script de Bram
+
+		# Launch all tests successively
+		TESTING_PROCESS
+		# Print the final results of the tests
+		TEST_RESULTS
+
+	done <<< "$(grep "^;; " "$check_process")"
+
+# No check_process file. Try to parse the manifest.
+else
+	# Initialize the values for this serie of tests
+	initialize_values
+
+	manifest_extract="$script_dir/manifest_extract"
+
+	# Extract the informations from the manifest with the Bram's sly snake script.
+	python "$script_dir/sub_scripts/manifest_parsing.py" "$package_path/manifest.json" > "$manifest_extract"
+
+	# Default tests
 	pkg_linter=1
 	setup_sub_dir=1
 	setup_root=1
+	setup_nourl=0
 	upgrade=1
+	setup_private=1
+	setup_public=1
 	backup_restore=1
 	multi_instance=1
-	wrong_user=1
-	wrong_path=1
 	incorrect_path=1
+	port_already_use=0
 	all_test=$((all_test+9))
-	while read LIGNE
+
+
+	# Read each arguments and store them
+	while read line
 	do
-		if echo "$LIGNE" | grep -q ":ynh.local"; then
-			MANIFEST_DOMAIN=$(echo "$LIGNE" | grep ":ynh.local" | cut -d ':' -f1)	# Garde uniquement le nom de la clé.
+		# Read each argument and pick up the first value. Then replace : by =
+		add_arg="$(echo $line | cut -d ':' -f1,2 | sed s/:/=/)"
+		# Then add this argument and follow it by &
+		manifest_arguments="${manifest_arguments}${add_arg}&"
+	done < "$manifest_extract"
+
+	# Search a string in the partial check_process
+	find_string () {
+		echo $(grep "$1" "$manifest_extract")
+	}
+
+	# Try to find all specific arguments needed for the tests
+	keep_name_arg_only () {
+		# Find the line for the given argument
+		local argument=$(find_string "$1")
+		# If a line exist for this argument
+		if [ -n "$argument" ]; then
+			# Keep only the name of the argument
+			echo "$(echo "$argument" | cut -d ':' -f1)"
 		fi
-		if echo "$LIGNE" | grep -q "path:"; then
-			MANIFEST_PATH=$(echo "$LIGNE" | grep "path:" | cut -d ':' -f1)	# Garde uniquement le nom de la clé.
-		fi
-		if echo "$LIGNE" | grep -q "user:\|admin:"; then
-			MANIFEST_USER=$(echo "$LIGNE" | grep "user:\|admin:" | cut -d ':' -f1)	# Garde uniquement le nom de la clé.
-		fi
-		MANIFEST_ARGS="$MANIFEST_ARGS$(echo "$LIGNE" | cut -d ':' -f1,2 | sed s/:/=/)&"	# Ajoute l'argument du manifest
-	done < "$script_dir/manifest_extract"
-	if [ "$MANIFEST_DOMAIN" == "null" ]
+	}
+	domain_arg=$(keep_name_arg_only ":ynh.local")
+	path_arg=$(keep_name_arg_only "path:")
+	user_arg=$(keep_name_arg_only "user:\|admin:")
+	public_arg=$(keep_name_arg_only "is_public:")
+	# Find the values for public and private
+	if [ -n "$public_arg" ]
 	then
-		ECHO_FORMAT "La clé de manifest du domaine n'a pas été trouvée.\n" "lyellow"
+		line=$(find_string "is_public:")
+		# Assume the first value is public and the second is private.
+		public_public_arg=$(echo "$line" | cut -d ":" -f2)
+		public_private_arg=$(echo "$line" | cut -d ":" -f3)
+	fi
+
+	count_test () {
+		# Decrease the number of test, if this test is not already removed.
+		if [ $1 -eq 1 ]; then
+			all_test=$((all_test-1))
+			return 1
+		fi
+	}
+
+	# Disable some tests if the manifest key doesn't be found
+	if [ -z "$domain_arg" ]
+	then
+		ECHO_FORMAT "The manifest key for domain didn't be find.\n" "lyellow"
 		setup_sub_dir=0
-		setup_root=0
-		multi_instance=0
-		wrong_user=0
-		incorrect_path=0
-		all_test=$((all_test-5))
+		count_test "$setup_root" || setup_root=0
+		count_test "$multi_instance" || multi_instance=0
+		count_test "$incorrect_path" || incorrect_path=0
+		setup_nourl=1
 	fi
-	if [ "$MANIFEST_PATH" == "null" ]
+	if [ -z "$path_arg" ]
 	then
-		ECHO_FORMAT "La clé de manifest du path n'a pas été trouvée.\n" "lyellow"
-		setup_root=0
-		multi_instance=0
-		incorrect_path=0
-		all_test=$((all_test-3))
+		ECHO_FORMAT "The manifest key for path didn't be find.\n" "lyellow"
+		count_test "$setup_root" || setup_root=0
+		count_test "$multi_instance" || multi_instance=0
+		count_test "$incorrect_path" || incorrect_path=0
 	fi
-	if [ "$MANIFEST_USER" == "null" ]
+	if [ -z "$public_arg" ]
 	then
-		ECHO_FORMAT "La clé de manifest de l'user admin n'a pas été trouvée.\n" "lyellow"
-		wrong_user=0
-		all_test=$((all_test-1))
+		ECHO_FORMAT "The manifest key for public didn't be find.\n" "lyellow"
+		setup_private=0
+		setup_public=0
+		all_test=$((all_test-2))
 	fi
-	if grep multi_instance "$APP_CHECK/manifest.json" | grep -q false
-	then	# Retire le test multi instance si la clé du manifest est à false
-		multi_instance=0
+	# Remove the multi-instance test if this parameter is set at false in the manifest.
+	if grep multi_instance "$package_path/manifest.json" | grep -q false
+	then
+		count_test "$multi_instance" || multi_instance=0
+	fi
+
+	# Launch all tests successively
+	TESTING_PROCESS
+	# Print the final results of the tests
+	TEST_RESULTS
+fi
+
+echo "You can find the complete log of these tests in $complete_log"
+
+
+
+
+#=================================================
+# Inform of the results by XMPP and/or by mail
+#=================================================
+
+# Keep only the name of the app
+app_name=${package_dir%_ynh_check}
+
+# If the app completely failed and obtained 0
+if [ $global_level -eq 0 ]
+then
+	message="Application $app_name has completely failed to continuous integration tests"
+
+# If the app has obtained another level than 0.
+# And if package check it's in the official CI environment
+# Check the level variation
+elif [ $type_exec_env -eq 2 ]
+then
+
+	# Get the job name, stored in the work_list
+	job=$(head -n1 "$script_dir/../work_list" | cut -d ';' -f 3)
+
+	# Build the log path (and replace all space by %20 in the job name)
+	if [ -n "$job" ]; then
+		job_log="/job/${job// /%20}/lastBuild/console"
+	fi
+
+	# Get the previous level, found in the file list_level_stable
+	previous_level=$(grep "$job" "$script_dir/../auto_build/list_level_stable" | cut -d: -f2)
+
+	# Print the variation of the level. If this level is different than 0
+	if [ $global_level -gt 0 ]
+	then
+		message="Application $app_name"
+		# If non previous level was found
+		if [ -z "$previous_level" ]; then
+			message="$message just reach the level $global_level"
+		# If the level stays the same
+		elif [ $global_level -eq $previous_level ]; then
+			message="$message stays at level $global_level"
+		# If the level go up
+		elif [ $global_level -gt $previous_level ]; then
+			message="$message rise from level $previous_level to level $global_level"
+		# If the level go down
+		elif [ $global_level -lt $previous_level ]; then
+			message="$message go down from level $previous_level to level $global_level"
+		fi
 	fi
 fi
 
-TESTING_PROCESS
-if [ "$no_lxc" -eq 0 ]; then
-	LXC_TURNOFF
-fi
-TEST_RESULTS
-
-app_name=${arg_app%_ynh}	# Supprime '_ynh' à la fin du nom de l'app
-# Mail et bot xmpp pour le niveau de l'app
-if [ "$level" -eq 0 ]; then
-	message="L'application $(basename "$app_name") vient d'échouer aux tests d'intégration continue"
-fi
-
+# If the test was perform in the official CI environment
+# Add the log address
+# And inform with xmpp
 if [ $type_exec_env -eq 2 ]
 then
-	# Récupère le nom du job dans le CI
-	id=$(cat "$script_dir/../CI.lock")	# Récupère l'id du job en cours
-	job=$(grep "$id" "$script_dir/../work_list" | cut -d ';' -f 3)	# Et récupère le nom du job dans le work_list
-	job=${job// /%20}       # Replace all space by %20
-	if [ -n "$job" ]; then
-		job_log="/job/$job/lastBuild/console"
-	fi
-	# Prend le niveau précédemment calculé
-	previous_level=$(grep "$(basename "$app_name")" "$script_dir/../auto_build/list_level_stable" | cut -d: -f2)
-	if [ "$level" -ne 0 ]
-	then
-		message="L'application $(basename "$app_name")"
-		if [ -z "$previous_level" ]; then
-			message="$message vient d'atteindre le niveau $level"
-		elif [ $level -eq $previous_level ]; then
-			message="$message reste au niveau $level"
-		elif [ $level -gt $previous_level ]; then
-			message="$message monte du niveau $previous_level au niveau $level"
-		elif [ $level -lt $previous_level ]; then
-			message="$message descend du niveau $previous_level au niveau $level"
-		fi
-	fi
+
+	# Build the address of the server from auto.conf
 	ci_path=$(grep "DOMAIN=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)/$(grep "CI_PATH=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)
-	message="$message sur https://$ci_path$job_log"
-	if ! echo "$job" | grep -q "(testing)\|(unstable)"; then	# Notifie par xmpp seulement sur stable
-		"$script_dir/../auto_build/xmpp_bot/xmpp_post.sh" "$message"	# Notifie sur le salon apps
+
+	# Add the log adress to the message
+	message="$message on https://$ci_path$job_log"
+
+
+	# Send a xmpp notification on the chat room "apps"
+	# Only for a test with the stable version of YunoHost
+	if ! echo "$job" | grep -q "(testing)\|(unstable)"
+	then
+		"$script_dir/../auto_build/xmpp_bot/xmpp_post.sh" "$message" > /dev/null 2>&1
 	fi
 fi
 
-if [ "$level" -eq 0 ] && [ $type_exec_env -eq 1 ]
-then	# Si l'app est au niveau 0, et que le test tourne en CI, envoi un mail d'avertissement.
-	dest=$(cat "$APP_CHECK/manifest.json" | grep '\"email\": ' | cut -d '"' -f 4)	# Utilise l'adresse du mainteneur de l'application
-	ci_path=$(grep "CI_URL=" "$script_dir/../config" | cut -d= -f2)
-	if [ -n "$ci_path" ]; then
-		message="$message sur $ci_path"
+# Send a mail to main maintainer if the app failed and obtained the level 0.
+# Only if package check is in a CI environment (Official or not)
+if [ $global_level -eq 0 ] && [ $type_exec_env -ge 1 ]
+then
+
+	# Get the maintainer email from the manifest
+	dest=$(grep '\"email\": ' "$package_path/manifest.json" | cut -d '"' -f 4)
+
+	# Send the message by mail, if a address has been find
+	if [ -n "$dest" ]; then
+		mail -s "[YunoHost] Your app $app_name has completely failed to continuous integration tests" "$dest" <<< "$message"
 	fi
-	mail -s "[YunoHost] Échec d'installation d'une application dans le CI" "$dest" <<< "$message"	# Envoi un avertissement par mail.
 fi
 
-echo "Le log complet des installations et suppressions est disponible dans le fichier $complete_log"
-# Clean
-rm -f "$OUTPUTD" "$temp_RESULT" "$script_dir/url_output" "$script_dir/curl_print" "$script_dir/manifest_extract"
+#=================================================
+# Clean and exit
+#=================================================
 
-if [ -n "$APP_CHECK" ]; then
-	sudo rm -rf "$APP_CHECK"
-fi
-sudo rm "$script_dir/pcheck.lock" # Retire le lock
+clean_exit 0
