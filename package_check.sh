@@ -44,7 +44,7 @@ clean_exit () {
 echo ""
 
 # Init arguments value
-gitbranch=0
+gitbranch=""
 force_install_ok=0
 interrupt=0
 notice=0
@@ -525,6 +525,18 @@ TEST_RESULTS () {
 	# auto -> This level has not a value yet.
 	# na   -> This level will not checked, but it'll be ignored in the final sum
 
+	# Set default values for level, if they're empty.
+	test -n "${level[1]}" || level[1]=auto
+	test -n "${level[2]}" || level[2]=auto
+	test -n "${level[3]}" || level[3]=auto
+	test -n "${level[4]}" || level[4]=0
+	test -n "${level[5]}" || level[5]=auto
+	test -n "${level[6]}" || level[6]=auto
+	test -n "${level[7]}" || level[7]=auto
+	test -n "${level[8]}" || level[8]=0
+	test -n "${level[9]}" || level[9]=0
+	test -n "${level[10]}" || level[10]=0
+
 	# Check if the level can be changed
 	level_can_change () {
 		# If the level is set at auto, it's waiting for a change
@@ -666,9 +678,9 @@ TEST_RESULTS () {
 	for i in `seq 1 10`
 	do
 		ECHO_FORMAT "\t   Level $i: "
-		if [ "${level[i]}" == "na" ]; then
+		if [ "${level[$i]}" == "na" ]; then
 			ECHO_FORMAT "N/A\n"
-		elif [ "${level[i]}" -ge 1 ]; then
+		elif [ "${level[$i]}" -ge 1 ]; then
 			ECHO_FORMAT "1\n" "white" "bold"
 		else
 			ECHO_FORMAT "0\n"
@@ -695,18 +707,6 @@ fi
 #=================================================
 # Initialize tests
 #=================================================
-
-# Default values for level
-level[1]=auto
-level[2]=auto
-level[3]=auto
-level[4]=0
-level[5]=auto
-level[6]=auto
-level[7]=auto
-level[8]=0
-level[9]=0
-level[10]=0
 
 # Purge some log files
 > "$complete_log"
@@ -1066,6 +1066,7 @@ then
 # And if package check it's in the official CI environment
 # Check the level variation
 elif [ $type_exec_env -eq 2 ]
+then
 
 	# Get the job name, stored in the work_list
 	job=$(head -n1 "$script_dir/../work_list" | cut -d ';' -f 3)
@@ -1084,16 +1085,16 @@ elif [ $type_exec_env -eq 2 ]
 		message="Application $app_name"
 		# If non previous level was found
 		if [ -z "$previous_level" ]; then
-			message="$message just reach the level $level"
+			message="$message just reach the level $global_level"
 		# If the level stays the same
-		elif [ $level -eq $previous_level ]; then
-			message="$message stays at level $level"
+		elif [ $global_level -eq $previous_level ]; then
+			message="$message stays at level $global_level"
 		# If the level go up
-		elif [ $level -gt $previous_level ]; then
-			message="$message rise from level $previous_level to level $level"
+		elif [ $global_level -gt $previous_level ]; then
+			message="$message rise from level $previous_level to level $global_level"
 		# If the level go down
-		elif [ $level -lt $previous_level ]; then
-			message="$message go down from level $previous_level to level $level"
+		elif [ $global_level -lt $previous_level ]; then
+			message="$message go down from level $previous_level to level $global_level"
 		fi
 	fi
 fi
@@ -1102,9 +1103,10 @@ fi
 # Add the log address
 # And inform with xmpp
 if [ $type_exec_env -eq 2 ]
+then
 
 	# Build the address of the server from auto.conf
-	ci_path=$(grep "main_domain=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)/$(grep "CI_PATH=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)
+	ci_path=$(grep "DOMAIN=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)/$(grep "CI_PATH=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)
 
 	# Add the log adress to the message
 	message="$message on https://$ci_path$job_log"

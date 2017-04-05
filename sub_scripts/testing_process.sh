@@ -275,8 +275,6 @@ replace_manifest_key () {
 	if [ -n "$manifest_key" ]
 	then
 		manifest_args_mod=$(echo $manifest_args_mod | sed "s@$manifest_key=[^&]*\&@${manifest_key}=${2}\&@")
-	else
-		ECHO_FORMAT "The manifest key $manifest_key doesn't found in the check_process\n" "red" clog
 	fi
 }
 
@@ -1044,7 +1042,7 @@ TEST_LAUNCHER () {
 TESTING_PROCESS () {
 	# Launch all tests successively
 
-	ECHO_FORMAT "\nTests serie: $tests_serie\n" "white" "underlined" clog
+	ECHO_FORMAT "\nTests serie: ${tests_serie#;; }\n" "white" "underlined" clog
 
 	# Init the value for the current test
 	cur_test=1
