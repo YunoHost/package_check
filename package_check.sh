@@ -544,6 +544,7 @@ TEST_RESULTS () {
 		then
 			return 0
 		fi
+		return 1
 	}
 
 	# Evaluate the first level
