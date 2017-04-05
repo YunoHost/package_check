@@ -244,7 +244,7 @@ then
 
 		# And replace
 		cp -a "$script_dir/package_linter_tmp/." "$script_dir/package_linter/."
-		rm -r "$script_dir/package_linter_tmp"
+		sudo rm -r "$script_dir/package_linter_tmp"
 	fi
 else
 	echo -e "\e[97mInstall Package linter.\n\e[0m"
@@ -365,7 +365,6 @@ yunohost_log="/var/lib/lxc/$lxc_name/rootfs/var/log/yunohost/yunohost-cli.log"
 
 sub_domain="sous.$main_domain"
 test_user=package_checker
-test_path=/check
 
 #=================================================
 # Load all functions
@@ -744,6 +743,9 @@ initialize_values() {
 
 	# Number of tests to proceed
 	all_test=0
+
+	# Default path
+	test_path=/check
 }
 
 #=================================================
@@ -861,9 +863,22 @@ then
 			fi
 		}
 		domain_arg=$(keep_name_arg_only "DOMAIN")
-		path_arg=$(keep_name_arg_only "PATH")
 		user_arg=$(keep_name_arg_only "USER")
 		port_arg=$(keep_name_arg_only "PORT")
+		path_arg=$(keep_name_arg_only "PATH")
+		# Get the path value
+		if [ -n "$path_arg" ]
+		then
+			line="$(find_string "(PATH")"
+			# Keep only the part after the =
+			line="$(echo "$line" | grep -o "path=.* " | cut -d "=" -f2)"
+			# And remove " et spaces to keep only the path.
+			line="${line//[\" ]/}"
+			# If this path is not empty or equal to /. It's become the new default path value.
+			if [ ${#line} -gt 1 ]; then
+				test_path="$line"
+			fi
+		fi
 		public_arg=$(keep_name_arg_only "PUBLIC")
 		# Find the values for public and private
 		if [ -n "$public_arg" ]
@@ -873,6 +888,14 @@ then
 			public_private_arg=$(echo "$line" | grep -o "|private=[[:alnum:]]*" | cut -d "=" -f2)
 		fi
 
+if echo "$LIGNE" | grep -q "(PATH)"; then	# Path dans le manifest
+	MANIFEST_PATH=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au path
+	parse_path=$(echo "$LIGNE" | cut -d '"' -f2)	# Lit le path du check_process
+	if [ -n "$parse_path" ]; then	# Si le path n'est pas null, utilise ce path au lieu de la valeur par défaut.
+		PATH_TEST=$(echo "$LIGNE" | cut -d '"' -f2)
+	fi
+	LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
+fi
 
 		# Parse all tests to perform
 		# Extract the checks options section from the second partial file

@@ -171,7 +171,7 @@ CHECK_URL () {
 				curl_error=1
 
 				# 401 is "Unauthorized", so is a answer of the server. So, it works!
-				test [ "${http_code}" = "401" ] && curl_error=0
+				test "${http_code}" = "401" && curl_error=0
 
 				# 503 is Service Unavailable, it's a temporary error.
 				if [ "${http_code}" = "503" ]
