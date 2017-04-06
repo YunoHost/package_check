@@ -1154,7 +1154,7 @@ then
 
 	# Send the message by mail, if a address has been find
 	if [ -n "$dest" ]; then
-		mail -s "[YunoHost] Your app $app_name has completely failed the continuous integration tests" "$dest" <<< "$message"
+		mail -a "From: yunohost@yunohost.org" -s "[YunoHost] Your app $app_name has completely failed the continuous integration tests" "$dest" <<< "$message"
 	fi
 fi
 
