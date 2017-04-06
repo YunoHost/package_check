@@ -1084,7 +1084,7 @@ app_name=${package_dir%_ynh_check}
 # If the app completely failed and obtained 0
 if [ $global_level -eq 0 ]
 then
-	message="Application $app_name has completely failed to continuous integration tests"
+	message="Application $app_name has completely failed the continuous integration tests"
 
 # If the app has obtained another level than 0.
 # And if package check it's in the official CI environment
@@ -1154,7 +1154,7 @@ then
 
 	# Send the message by mail, if a address has been find
 	if [ -n "$dest" ]; then
-		mail -s "[YunoHost] Your app $app_name has completely failed to continuous integration tests" "$dest" <<< "$message"
+		mail -s "[YunoHost] Your app $app_name has completely failed the continuous integration tests" "$dest" <<< "$message"
 	fi
 fi
 
