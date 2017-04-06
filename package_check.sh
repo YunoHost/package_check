@@ -1081,13 +1081,7 @@ echo "You can find the complete log of these tests in $complete_log"
 # Keep only the name of the app
 app_name=${package_dir%_ynh_check}
 
-# If the app completely failed and obtained 0
-if [ $global_level -eq 0 ]
-then
-	message="Application $app_name has completely failed the continuous integration tests"
-
-# If the app has obtained another level than 0.
-# And if package check it's in the official CI environment
+# If package check it's in the official CI environment
 # Check the level variation
 elif [ $type_exec_env -eq 2 ]
 then
@@ -1095,9 +1089,30 @@ then
 	# Get the job name, stored in the work_list
 	job=$(head -n1 "$script_dir/../work_list" | cut -d ';' -f 3)
 
+	# Identify the type of test, stable (0), testing (1) or unstable (2)
+	# Default stable
+	test_type=0
+	message=""
+	if echo "$job" | grep -q "(testing)"
+	then
+		message="(TESTING) "
+		test_type=1
+	elif echo "$job" | grep -q "(unstable)"
+	then
+		message="(UNSTABLE) "
+		test_type=2
+	fi
+
 	# Build the log path (and replace all space by %20 in the job name)
 	if [ -n "$job" ]; then
 		job_log="/job/${job// /%20}/lastBuild/console"
+	fi
+
+	# If it's a test on testing or unstable
+	if [ $test_type -gt 0 ]
+	then
+		# Remove unstable or testing of the job name to find its stable version in the level list
+		job="${job% (*)}"
 	fi
 
 	# Get the previous level, found in the file list_level_stable
@@ -1106,7 +1121,7 @@ then
 	# Print the variation of the level. If this level is different than 0
 	if [ $global_level -gt 0 ]
 	then
-		message="Application $app_name"
+		message="${message}Application $app_name"
 		# If non previous level was found
 		if [ -z "$previous_level" ]; then
 			message="$message just reach the level $global_level"
@@ -1123,6 +1138,12 @@ then
 	fi
 fi
 
+# If the app completely failed and obtained 0
+if [ $global_level -eq 0 ]
+then
+        message="${message}Application $app_name has completely failed the continuous integration tests"
+fi
+
 # If the test was perform in the official CI environment
 # Add the log address
 # And inform with xmpp
@@ -1135,10 +1156,9 @@ then
 	# Add the log adress to the message
 	message="$message on https://$ci_path$job_log"
 
-
 	# Send a xmpp notification on the chat room "apps"
 	# Only for a test with the stable version of YunoHost
-	if ! echo "$job" | grep -q "(testing)\|(unstable)"
+	if [ $test_type -eq 0 ]
 	then
 		"$script_dir/../auto_build/xmpp_bot/xmpp_post.sh" "$message" > /dev/null 2>&1
 	fi
