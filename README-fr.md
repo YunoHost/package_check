@@ -80,6 +80,9 @@ package_check/package_check.sh APP_ynh
 	Level 8=0
 	Level 9=0
 	Level 10=0
+;;; Options
+Email=
+Notification=none
 ```
 ### `;; Nom du test`
 Nom du scénario de test qui sera effectué.  
@@ -127,6 +130,16 @@ Il est à noter que les niveaux 4, 8, 9 et 10 ne peuvent être fixés à *auto* 
 - Niveau 8 : L'application respecte toutes les YEP recommandées. -- Doit être vérifié manuellement
 - Niveau 9 : L'application respecte toutes les YEP optionnelles. -- Doit être vérifié manuellement
 - Niveau 10 : L'application est jugée parfaite. -- Doit être vérifié manuellement
+
+### `;;; Options`
+Options supplémentaires disponible dans le check_process.  
+Ces options sont facultatives.  
+
+- `Email` : Permet d'indiquer un email alternatif à celui qui est présent dans le manifest pour les notifications de package check, lorsque celui-ci s'exécute en contexte d'intégration continue.
+- `Notification` : Degré de notification souhaité pour l'application. Il y a 3 niveaux de notification disponible.
+  - `down` : Envoi un mail seulement si le niveau de l'application a baissé.
+  - `change` : Envoi un mail seulement si le niveau de l'application a changé.
+  - `all` : Envoi un mail pour chaque test de l'application, quel que ce soit le résultat.
 
 ---
 Le script `package_check.sh` accepte 6 arguments en plus du package à tester.

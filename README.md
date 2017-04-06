@@ -80,6 +80,9 @@ package_check/package_check.sh APP_ynh
 	Level 8=0
 	Level 9=0
 	Level 10=0
+;;; Options
+Email=
+Notification=none
 ```
 ### `;; Test name`
 Name of tests series that will be perform.  
@@ -127,6 +130,16 @@ The level 4, 8, 9 and 10 shouldn't be fixed at *auto*, because they don't be tes
 - Level 8 : The application respects all recommended YEP. -- Must be validated manually
 - Level 9 : The application respects all optionnal YEP. -- Must be validated manually
 - Level 10 : The application has judged as perfect. -- Must be validated manually
+
+### `;;; Options`
+Supplementary options available in the check_process.  
+These options are facultative.  
+
+- `Email` : Allow to specify an alternative email than this is in the manifest for notification by package check, when it's in a context of continuous integration.
+- `Notification` : Grade of notification for this application. There are 3 available levels.
+  - `down` : Send an email only if the level of this application has decreased.
+  - `change` : Send an email if the level of this application has changed.
+  - `all` : Send an email for each test on this application, whiech ever the result.
 
 ---
 The `package_check.sh` script accept 6 arguments in addition of package to be checked.

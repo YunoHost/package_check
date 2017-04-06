@@ -806,9 +806,10 @@ then
 	partial1="${check_process}_part1"
 	partial2="${check_process}_part2"
 
+
 	# Extract the level section
 	partial_check_process=$partial1
-	extract_section "^;;; Levels" "^;; " "$check_process"
+	extract_section "^;;; Levels" ";; " "$check_process"
 
 	# Get the value associated to each level
 	for i in `seq 1 10`
@@ -818,6 +819,19 @@ then
 		# And get the value
 		level[$i]=$(echo "$line" | cut -d'=' -f2)
 	done
+
+
+	# Extract the Options section
+	partial_check_process=$partial1
+	extract_section "^;;; Options" ";; " "$check_process"
+
+	# Try to find a optionnal email address to notify the maintainer
+	# In this case, this email will be used instead of the email from the manifest.
+	dest="$(echo $(find_string "^Email=") | cut -d '=' -f2)"
+
+	# Try to find a optionnal option for the grade of notification
+	notification_grade="$(echo $(find_string "^Notification=") | cut -d '=' -f2)"
+
 
 	# Parse each tests serie
 	while read tests_serie
@@ -1073,17 +1087,54 @@ echo "You can find the complete log of these tests in $complete_log"
 
 
 
+#=================================================
+# Notification grade
+#=================================================
+
+notif_grade () {
+	# Check the level of notification from the check_process.
+	# Echo 1 if the grade is reached
+
+	compare_grade ()
+	{
+		if echo "$notification_grade" | grep -q "$1"; then
+			echo 1
+		else
+			echo 0
+		fi
+	}
+
+	case "$1" in
+		all)
+			# If 'all' is needed, only a grade of notification at 'all' can match
+			compare_grade "^all$"
+			;;
+		change)
+			# If 'change' is needed, notification at 'all' or 'change' can match
+			compare_grade "^all$\|^change$"
+			;;
+		down)
+			# If 'down' is needed, notification at 'all', 'change' or 'down' match
+			compare_grade "^all$\|^change$\|^down$"
+			;;
+		*)
+			echo 0
+			;;
+	esac
+}
 
 #=================================================
 # Inform of the results by XMPP and/or by mail
 #=================================================
+
+send_mail=0
 
 # Keep only the name of the app
 app_name=${package_dir%_ynh_check}
 
 # If package check it's in the official CI environment
 # Check the level variation
-elif [ $type_exec_env -eq 2 ]
+if [ $type_exec_env -eq 2 ]
 then
 
 	# Get the job name, stored in the work_list
@@ -1125,15 +1176,22 @@ then
 		# If non previous level was found
 		if [ -z "$previous_level" ]; then
 			message="$message just reach the level $global_level"
+			send_mail=$(notif_grade all)
 		# If the level stays the same
 		elif [ $global_level -eq $previous_level ]; then
 			message="$message stays at level $global_level"
+			# Need notification at 'all' to notify by email
+			send_mail=$(notif_grade all)
 		# If the level go up
 		elif [ $global_level -gt $previous_level ]; then
 			message="$message rise from level $previous_level to level $global_level"
+			# Need notification at 'change' to notify by email
+			send_mail=$(notif_grade change)
 		# If the level go down
 		elif [ $global_level -lt $previous_level ]; then
 			message="$message go down from level $previous_level to level $global_level"
+			# Need notification at 'down' to notify by email
+			send_mail=$(notif_grade down)
 		fi
 	fi
 fi
@@ -1141,8 +1199,14 @@ fi
 # If the app completely failed and obtained 0
 if [ $global_level -eq 0 ]
 then
-        message="${message}Application $app_name has completely failed the continuous integration tests"
+	message="${message}Application $app_name has completely failed the continuous integration tests"
+
+	# Always send an email if the app failed
+	send_mail=1
 fi
+
+# The mail subject is the message to send, before any logs informations
+subject="[YunoHost] $message"
 
 # If the test was perform in the official CI environment
 # Add the log address
@@ -1164,17 +1228,24 @@ then
 	fi
 fi
 
-# Send a mail to main maintainer if the app failed and obtained the level 0.
+# Send a mail to main maintainer according to notification option in the check_process.
 # Only if package check is in a CI environment (Official or not)
-if [ $global_level -eq 0 ] && [ $type_exec_env -ge 1 ]
+if [ $type_exec_env -ge 1 ] && [ $send_mail -eq 1 ]
 then
 
-	# Get the maintainer email from the manifest
-	dest=$(grep '\"email\": ' "$package_path/manifest.json" | cut -d '"' -f 4)
+	# Add a 'from' header for the official CI only.
+	if [ $type_exec_env -eq 2 ]; then
+		from_yuno="-a \"From: yunohost@yunohost.org\""
+	fi
+
+	# Get the maintainer email from the manifest. If it doesn't found if the check_process
+	if [ -z "$dest" ]; then
+		dest=$(grep '\"email\": ' "$package_path/manifest.json" | cut -d '"' -f 4)
+	fi
 
 	# Send the message by mail, if a address has been find
 	if [ -n "$dest" ]; then
-		mail -a "From: yunohost@yunohost.org" -s "[YunoHost] Your app $app_name has completely failed the continuous integration tests" "$dest" <<< "$message"
+		mail $from_yuno -s "$subject" "$dest" <<< "$message"
 	fi
 fi
 
