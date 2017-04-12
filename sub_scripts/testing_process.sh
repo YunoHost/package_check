@@ -355,7 +355,7 @@ CHECK_SETUP () {
 	fi
 
 	# Copy original arguments
-	local manifest_args_mod=$manifest_arguments
+	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
 	replace_manifest_key "domain" "$sub_domain"
@@ -431,7 +431,7 @@ CHECK_UPGRADE () {
 	[ "$previous_install" = "1" ] && return
 
 	# Copy original arguments
-	local manifest_args_mod=$manifest_arguments
+	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
 	replace_manifest_key "domain" "$sub_domain"
@@ -513,7 +513,7 @@ CHECK_PUBLIC_PRIVATE () {
 	[ "$previous_install" = "1" ] && return
 
 	# Copy original arguments
-	local manifest_args_mod=$manifest_arguments
+	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
 	replace_manifest_key "domain" "$sub_domain"
@@ -630,7 +630,7 @@ CHECK_MULTI_INSTANCE () {
 	fi
 
 	# Copy original arguments
-	local manifest_args_mod=$manifest_arguments
+	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
 	replace_manifest_key "domain" "$sub_domain"
@@ -758,7 +758,7 @@ CHECK_COMMON_ERROR () {
 	[ "$previous_install" = "1" ] && return
 
 	# Copy original arguments
-	local manifest_args_mod=$manifest_arguments
+	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
 	replace_manifest_key "domain" "$sub_domain"
@@ -843,7 +843,7 @@ CHECK_BACKUP_RESTORE () {
 	[ "$previous_install" = "1" ] && return
 
 	# Copy original arguments
-	local manifest_args_mod=$manifest_arguments
+	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
 	replace_manifest_key "domain" "$sub_domain"

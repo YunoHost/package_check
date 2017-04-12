@@ -12,7 +12,10 @@ LXC_BRIDGE=$(cat "$pcheck_config" | grep LXC_BRIDGE= | cut -d '=' -f2)
 main_iface=$(cat "$pcheck_config" | grep iface= | cut -d '=' -f2)
 
 echo "> Arrêt du conteneur"
-sudo lxc-stop -n $LXC_NAME
+if [ $(sudo lxc-info --name $LXC_NAME | grep -c "STOPPED") -eq 0 ]; then
+	echo "Arrêt du conteneur $LXC_NAME"
+	sudo lxc-stop -n $LXC_NAME
+fi
 
 echo "> Suppression des règles de parefeu"
 if sudo iptables -C FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT 2> /dev/null
