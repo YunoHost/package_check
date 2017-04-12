@@ -863,6 +863,8 @@ then
 		do
 			# Extract each argument by removing spaces or tabulations before a parenthesis
 			add_arg="$(echo $line | sed 's/[ *|\t*](.*//')"
+			# Remove all double quotes
+			add_arg="${add_arg//\"/}"
 			# Then add this argument and follow it by &
 			manifest_arguments="${manifest_arguments}${add_arg}&"
 		done < "$partial_check_process"
