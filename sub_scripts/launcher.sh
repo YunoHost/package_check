@@ -58,6 +58,7 @@ LXC_START () {
 			fi
 			sleep 1
 		done
+		echo ""
 
 		local failstart=0
 		# Check if the container is running

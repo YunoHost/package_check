@@ -109,6 +109,8 @@ CHECK_URL () {
 		curl_error=0
 		# 503 Service Unavailable can would have some time to work.
 		local http503=0
+		# yuno_portal equal 1 if the test fall on the portal
+		yuno_portal=0
 
 		# Try to access to the url in 2 times, with a final / and without
 		i=1; while [ $i -ne 3 ]
