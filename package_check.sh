@@ -606,12 +606,24 @@ TEST_RESULTS () {
 	# -> The package can be backup and restore without error
 	if level_can_change 6
 	then
+		# Check the YEP 1.7 (https://github.com/YunoHost/doc/blob/master/packaging_apps_guidelines_fr.md#yep-17---ajouter-lapp-%C3%A0-lorganisation-yunohost-apps---valid%C3%A9--manuel--official-)
+		# Default value, YEP 1.7 not checked
+		YEP17=-1
+		if echo "$app_arg" | grep --extended-regexp --quiet "https?:\/\/"
+		then
+			# If the app have been picked from github, check if this app was under the YunoHost-Apps organisation
+			# YEP17 will be equal to 1 if the app was under the YunoHost-Apps organisation
+			YEP17=$(echo "$app_arg" | grep --count "github.com/YunoHost-Apps/")
+			[ $YEP17 -eq 1 ] || ECHO_FORMAT "This app doesn't respect the YEP 1.7 ! (https://yunohost.org/#/packaging_apps_guidelines_fr)\n" "red"
+		fi
+
 		# Validated if backup and restore are ok. Or if backup and restore have been not tested but already validated before.
 		if 	( [ $RESULT_check_backup -eq 1 ] && \
 			[ $RESULT_check_restore -eq 1 ] ) || \
 			( [ $RESULT_check_backup -ne -1 ] && \
 			[ $RESULT_check_restore -ne -1 ] && \
-			[ "${level[6]}" == "2" ] )
+			[ "${level[6]}" == "2" ] ) && \
+			[ $YEP17 -ne 0 ]
 		then level[6]=2
 		else level[6]=0
 		fi
