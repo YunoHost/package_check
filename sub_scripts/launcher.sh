@@ -42,8 +42,10 @@ LXC_START () {
 		if ! is_lxc_running; then
 			echo -n "Start the LXC container" | tee --append "$test_result"
 			sudo lxc-start --name=$lxc_name --daemon --logfile "$script_dir/lxc_boot.log" | tee --append "$test_result" 2>&1
+			local avoid_witness=0
 		else
 			echo -n "A LXC container is already running" | tee --append "$test_result"
+			local avoid_witness=1
 		fi
 
 		# Check during 20 seconds if the container has finished to start.
@@ -79,6 +81,9 @@ LXC_START () {
 			fi
 			LXC_STOP	# Stop the LXC container
 		else
+			# Create files to check if the remove script does not remove them accidentally
+			[ $avoid_witness -eq 0 ] && set_witness_files
+
 			# Break the for loop if the container is ready.
 			break
 		fi
@@ -86,7 +91,7 @@ LXC_START () {
 		# Fail if the container failed to start
 		if [ $i -eq $max_try ] && [ $failstart -eq 1 ]
 		then
-			ECHO_FORMAT "The container failed to start $max_try times...\nIf this problem is persistent, try to fix it with lxc_check.sh." "red" "bold"
+			ECHO_FORMAT "The container failed to start $max_try times...\nIf this problem is persistent, try to fix it with lxc_check.sh.\n" "red" "bold"
 			ECHO_FORMAT "Boot log:\n" clog
 			cat "$script_dir/lxc_boot.log" | tee --append "$test_result"
 			return 1

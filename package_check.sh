@@ -178,6 +178,26 @@ fi
 touch "$lock_file"
 
 #=================================================
+# Check the internet connectivity
+#=================================================
+
+# Try to ping yunohost.org
+ping -q -c 2 yunohost.org > /dev/null 2>&1
+if [ "$?" -ne 0 ]; then
+	# If fail, try to ping another domain
+	ping -q -c 2 framasoft.org > /dev/null 2>&1
+	if [ "$?" -ne 0 ]; then
+		# If ping failed twice, it's seems the internet connection is down.
+		echo "\e[91mUnable to connect to internet.\e[0m"
+
+		# Remove the lock file
+		rm -f "$lock_file"
+		# And exit
+		exit 1
+	fi
+fi
+
+#=================================================
 # Upgrade Package check
 #=================================================
 
@@ -326,26 +346,6 @@ then
 	fi
 else
 	echo -e "\e[93mUnable to define the user who authorised to use package check. Please fill the file $setup_user_file\e[0m"
-fi
-
-#=================================================
-# Check the internet connectivity
-#=================================================
-
-# Try to ping yunohost.org
-ping -q -c 2 yunohost.org > /dev/null 2>&1
-if [ "$?" -ne 0 ]; then
-	# If fail, try to ping another domain
-	ping -q -c 2 framasoft.org > /dev/null 2>&1
-	if [ "$?" -ne 0 ]; then
-		# If ping failed twice, it's seems the internet connection is down.
-		echo "\e[91mUnable to connect to internet.\e[0m"
-
-		# Remove the lock file
-		rm -f "$lock_file"
-		# And exit
-		exit 1
-	fi
 fi
 
 #=================================================
@@ -682,6 +682,14 @@ TEST_RESULTS () {
 		fi
 	done
 
+	# If some witness files was missing, it's a big error ! So, the level fall immediately at 0.
+	if [ $RESULT_witness -eq 1 ]
+	then
+		ECHO_FORMAT "Some witness files has been deleted during those tests ! It's a very bad thing !\n" "red" "bold"
+		global_level=0
+	fi
+
+
 	# Then, print the levels
 	# Print the global level
 	ECHO_FORMAT "Level of this application: $global_level\n" "white" "bold"
@@ -731,6 +739,7 @@ LXC_INIT
 # Default values for check_process and TESTING_PROCESS
 initialize_values() {
 	# Test results
+	RESULT_witness=0
 	RESULT_linter=0
 	RESULT_global_setup=0
 	RESULT_global_remove=0

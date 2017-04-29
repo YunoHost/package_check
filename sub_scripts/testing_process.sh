@@ -41,6 +41,9 @@ SETUP_APP () {
 		ECHO_FORMAT "Installation failed. ($yunohost_result)\n" "white" clog
 	fi
 
+	# Check all the witness files, to verify if them still here
+	check_witness_files
+
 	# Retrieve the app id in the log. To manage the app after
 	ynh_app_id=$(sudo tac "$yunohost_log" | grep --only-matching --max-count=1 "YNH_APP_INSTANCE_NAME=[^ ]*" | cut --delimiter='=' --fields=2)
 }
@@ -65,6 +68,9 @@ REMOVE_APP () {
 	else
 		ECHO_FORMAT "Deleting failed. ($yunohost_remove)\n" "white" clog
 	fi
+
+	# Check all the witness files, to verify if them still here
+	check_witness_files
 }
 
 #=================================================
@@ -473,6 +479,9 @@ CHECK_UPGRADE () {
 		else
 			ECHO_FORMAT "Upgrade failed. ($yunohost_result)\n" "white" clog
 		fi
+
+		# Check all the witness files, to verify if them still here
+		check_witness_files
 
 		# Analyse the log to extract "warning" and "error" lines
 		LOG_EXTRACTOR
@@ -916,6 +925,9 @@ CHECK_BACKUP_RESTORE () {
 				ECHO_FORMAT "Backup failed. ($yunohost_result)\n" "white" clog
 			fi
 
+			# Check all the witness files, to verify if them still here
+			check_witness_files
+
 			# Analyse the log to extract "warning" and "error" lines
 			LOG_EXTRACTOR
 		fi
@@ -973,6 +985,9 @@ CHECK_BACKUP_RESTORE () {
 			else
 				ECHO_FORMAT "Restore failed. ($yunohost_result)\n" "white" clog
 			fi
+
+			# Check all the witness files, to verify if them still here
+			check_witness_files
 
 			# Analyse the log to extract "warning" and "error" lines
 			LOG_EXTRACTOR
@@ -1039,6 +1054,109 @@ TEST_LAUNCHER () {
 
 	# Stop and restore the LXC container
 	LXC_STOP
+}
+
+set_witness_files () {
+	# Create files to check if the remove script does not remove them accidentally
+	echo -n "Create witness files" | tee --append "$test_result"
+
+	lxc_dir="/var/lib/lxc/$lxc_name/rootfs"
+
+	create_witness_file () {
+		[ "$2" = "file" ] && local action="touch" || local action="mkdir -p"
+		sudo $action "${lxc_dir}${1}"
+	}
+
+	# Nginx conf
+	create_witness_file "/etc/nginx/conf.d/$main_domain.d/witnessfile.conf" file
+	create_witness_file "/etc/nginx/conf.d/$sub_domain.d/witnessfile.conf" file
+
+	# /etc
+	create_witness_file "/etc/witnessfile" file
+
+	# /opt directory
+	create_witness_file "/opt/witnessdir" directory
+
+	# /var/www directory
+	create_witness_file "/var/www/witnessdir" directory
+
+	# /home/yunohost.app/
+	create_witness_file "/home/yunohost.app/witnessdir" directory
+
+	# /var/log
+	create_witness_file "/var/log/witnessfile" file
+
+	# Config fpm
+	create_witness_file "/etc/php5/fpm/pool.d/witnessfile.conf" file
+
+	# Config logrotate
+	create_witness_file "/etc/logrotate.d/witnessfile" file
+
+	# Config systemd
+	create_witness_file "/etc/systemd/system/witnessfile.service" file
+
+	# Database
+	for timeout in `seq 1 10`
+	do
+		sudo lxc-attach --name=$lxc_name -- mysql --user=root --password=$(sudo cat "$lxc_dir/etc/yunohost/mysql") --wait --execute="CREATE DATABASE witnessdb" > /dev/null 2>&1 && break
+		echo -n "."
+		sleep 1
+	done
+	echo ""
+}
+
+check_witness_files () {
+	# Check all the witness files, to verify if them still here
+
+	lxc_dir="/var/lib/lxc/$lxc_name/rootfs"
+
+	check_file_exist () {
+		if sudo test ! -e "${lxc_dir}${1}"
+		then
+			ECHO_FORMAT "The file $1 is missing ! Something gone wrong !\n" "red" "bold"
+			RESULT_witness=1
+		fi
+	}
+
+	# Nginx conf
+	check_file_exist "/etc/nginx/conf.d/$main_domain.d/witnessfile.conf"
+	check_file_exist "/etc/nginx/conf.d/$sub_domain.d/witnessfile.conf"
+
+	# /etc
+	check_file_exist "/etc/witnessfile"
+
+	# /opt directory
+	check_file_exist "/opt/witnessdir"
+
+	# /var/www directory
+	check_file_exist "/var/www/witnessdir"
+
+	# /home/yunohost.app/
+	check_file_exist "/home/yunohost.app/witnessdir"
+
+	# /var/log
+	check_file_exist "/var/log/witnessfile"
+
+	# Config fpm
+	check_file_exist "/etc/php5/fpm/pool.d/witnessfile.conf"
+
+	# Config logrotate
+	check_file_exist "/etc/logrotate.d/witnessfile"
+
+	# Config systemd
+	check_file_exist "/etc/systemd/system/witnessfile.service"
+
+	# Database
+	if ! sudo lxc-attach --name=$lxc_name -- mysqlshow --user=root --password=$(sudo cat "$lxc_dir/etc/yunohost/mysql") | grep --quiet '^| witnessdb' > /dev/null 2>&1
+	then
+		ECHO_FORMAT "The database witnessdb is missing ! Something gone wrong !\n" "red" "bold"
+		RESULT_witness=1
+	fi
+	if [ $RESULT_witness -eq 1 ]
+	then
+		yunohost_result=1
+		yunohost_remove=1
+	fi
 }
 
 TESTING_PROCESS () {
