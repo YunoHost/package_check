@@ -103,27 +103,11 @@ LOG_EXTRACTOR () {
 	> "$temp_result"
 	# Duplicate the part of the yunohost log into the complete log.
 	cat "$temp_log" >> "$complete_log"
-	while read log_read_line
-	do
-		if echo "$log_read_line" | grep --quiet " ERROR    "
-		then
-			# Copy in the temporary result file all logged error
-			echo -n ">ERROR: " >> "$temp_result"
-			echo "$log_read_line" | sed 's/^.* ERROR *//' >> "$temp_result"
-		fi
-		if echo "$log_read_line" | grep --quiet "yunohost.*: error:"
-		then
-			# Also copy the moulinette errors
-			echo -n ">ERROR: " >> "$temp_result"
-			echo "$log_read_line" >> "$temp_result"
-		fi
-		if echo "$log_read_line" | grep --quiet " WARNING  "
-		then
-			# And all logged warning
-			echo -n ">WARNING: " >> "$temp_result"
-			echo "$log_read_line" | sed 's/^.* WARNING *//' >> "$temp_result"
-		fi
-	done < "$temp_log"
+	# Find all errors and warnings in the log file
+	grep --extended-regexp " ERROR    | WARNING  |yunohost.*: error:" "$temp_log" >> "$temp_result"
+	sed -i 's/^.* ERROR */>ERROR: /' "$temp_result"
+	sed -i 's/^.* WARNING */>WARNING: /' "$temp_result"
+
 	CLEAR_LOG	# Remove all knew useless warning lines.
 	PARSE_LOG	# Print all errors and warning found in the log.
 }

@@ -613,7 +613,7 @@ TEST_RESULTS () {
 		then
 			# If the app have been picked from github, check if this app was under the YunoHost-Apps organisation
 			# YEP17 will be equal to 1 if the app was under the YunoHost-Apps organisation
-			YEP17=$(echo "$app_arg" | grep --count "github.com/YunoHost-Apps/")
+			YEP17=$(echo "$app_arg" | grep --ignore-case --count "github.com/YunoHost-Apps/")
 			[ $YEP17 -eq 1 ] || ECHO_FORMAT "This app doesn't respect the YEP 1.7 ! (https://yunohost.org/#/packaging_apps_guidelines_fr)\n" "red"
 		fi
 
