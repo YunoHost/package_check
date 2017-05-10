@@ -512,6 +512,7 @@ TEST_RESULTS () {
 	print_result "Port already used" $RESULT_check_port
 	print_result "Backup" $RESULT_check_backup
 	print_result "Restore" $RESULT_check_restore
+	print_result "Change URL" $RESULT_change_url
 
 
 
@@ -646,7 +647,8 @@ TEST_RESULTS () {
 			[ $RESULT_check_path -ne -1 ] && \
 			[ $RESULT_check_port -ne -1 ] && \
 			[ $RESULT_check_backup -ne -1 ] && \
-			[ $RESULT_check_restore -ne -1 ]
+			[ $RESULT_check_restore -ne -1 ] && \
+			[ $RESULT_change_url -ne -1 ]
 		then level[7]=2
 		else level[7]=0
 		fi
@@ -755,6 +757,7 @@ initialize_values() {
 	RESULT_check_multi_instance=0
 	RESULT_check_path=0
 	RESULT_check_port=0
+	RESULT_change_url=0
 
 	# auto_remove parameter
 	if [ $interrupt -eq 1 ]; then
@@ -980,6 +983,8 @@ fi
 		count_test $incorrect_path
 		port_already_use=$(read_check_option port_already_use)
 		count_test $port_already_use
+		change_url=$(read_check_option change_url)
+		count_test $change_url
 
 		# For port_already_use, check if there is also a port number
 		if [ $port_already_use -eq 1 ]
@@ -1022,6 +1027,7 @@ else
 	multi_instance=1
 	incorrect_path=1
 	port_already_use=0
+	change_url=0
 	all_test=$((all_test+9))
 
 

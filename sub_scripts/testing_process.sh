@@ -96,12 +96,12 @@ CHECK_URL () {
 
 		# Inform /etc/hosts with the IP of LXC to resolve the domain.
 		# This is set only here and not before to prevent to help the app's scripts
-		echo -e "$ip_range.2 $main_domain #package_check\n$ip_range.2 $sub_domain #package_check" | sudo tee --append /etc/hosts > /dev/null
+		echo -e "$ip_range.2 $check_domain #package_check" | sudo tee --append /etc/hosts > /dev/null
 
 		# Try to resolv the domain during 10 seconds maximum.
 		local i=0
 		for i in `seq 1 10`; do
-			curl --location --insecure $sub_domain > /dev/null 2>&1
+			curl --location --insecure $check_domain > /dev/null 2>&1
 			# If curl return 6, it's an error "Could not resolve host"
 			if [ $? -ne 6 ]; then
 				# If not, curl is ready to work.
@@ -157,7 +157,7 @@ CHECK_URL () {
 			rm -f "$script_dir/url_output"
 
 			# Call curl to try to access to the url of the app
-			curl --location --insecure --silent --show-error --write-out "%{http_code};%{url_effective}\n" $sub_domain$curl_check_path --output "$script_dir/url_output" > "$script_dir/curl_print"
+			curl --location --insecure --silent --show-error --write-out "%{http_code};%{url_effective}\n" $check_domain$curl_check_path --output "$script_dir/url_output" > "$script_dir/curl_print"
 
 			# Analyze the result of curl command
 			if [ $? -ne 0 ]
@@ -167,7 +167,7 @@ CHECK_URL () {
 			fi
 
 			# Print informations about the connection
-			ECHO_FORMAT "Test url: $sub_domain$curl_check_path\n" "white"
+			ECHO_FORMAT "Test url: $check_domain$curl_check_path\n" "white"
 			ECHO_FORMAT "Real url: $(cat "$script_dir/curl_print" | cut --delimiter=';' --fields=2)\n" "white"
 			local http_code=$(cat "$script_dir/curl_print" | cut -d ';' -f1)
 			ECHO_FORMAT "HTTP code: $http_code\n" "white"
@@ -327,7 +327,7 @@ is_install_failed () {
 	then
 		# If root installation worked, return root.
 		echo root
-	elif [ $RESULT_check_sub_dir -eq 1 ] || [ $force_install_ok -eq 1 ]
+	elif [ $RESULT_check_sub_dir -eq 1 ] && [ $force_install_ok -ne 1 ]
 	then
 		# If subdir installation worked or force_install_ok setted, return subdir.
 		echo subdir
@@ -366,7 +366,8 @@ CHECK_SETUP () {
 	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
-	replace_manifest_key "domain" "$sub_domain"
+	check_domain=$sub_domain
+	replace_manifest_key "domain" "$check_domain"
 	if [ "$install_type" = "subdir" ]; then
 		local check_path=$test_path
 	elif [ "$install_type" = "root" ]; then
@@ -442,7 +443,8 @@ CHECK_UPGRADE () {
 	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
-	replace_manifest_key "domain" "$sub_domain"
+	check_domain=$sub_domain
+	replace_manifest_key "domain" "$check_domain"
 	# Use a path according to previous succeeded installs
 	if [ "$previous_install" = "subdir" ]; then
 		local check_path=$test_path
@@ -527,7 +529,8 @@ CHECK_PUBLIC_PRIVATE () {
 	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
-	replace_manifest_key "domain" "$sub_domain"
+	check_domain=$sub_domain
+	replace_manifest_key "domain" "$check_domain"
 	replace_manifest_key "user" "$test_user"
 	# Set public or private according to type of test requested
 	if [ "$install_type" = "private" ]; then
@@ -547,7 +550,7 @@ CHECK_PUBLIC_PRIVATE () {
 		if [ $i -eq 0 ]
 		then
 			# Check if root installation worked, or if force_install_ok is setted.
-			if [ $RESULT_check_root -eq 1 ] || [ $force_install_ok -eq 1 ]
+			if [ $RESULT_check_root -eq 1 ] && [ $force_install_ok -ne 1 ]
 			then
 				# Replace manifest key for path
 				local check_path=/
@@ -562,7 +565,7 @@ CHECK_PUBLIC_PRIVATE () {
 		elif [ $i -eq 1 ]
 		then
 			# Check if sub path installation worked, or if force_install_ok is setted.
-			if [ $RESULT_check_sub_dir -eq 1 ] || [ $force_install_ok -eq 1 ]
+			if [ $RESULT_check_sub_dir -eq 1 ] && [ $force_install_ok -ne 1 ]
 			then
 				# Replace manifest key for path
 				local check_path=$test_path
@@ -644,7 +647,8 @@ CHECK_MULTI_INSTANCE () {
 	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
-	replace_manifest_key "domain" "$sub_domain"
+	check_domain=$sub_domain
+	replace_manifest_key "domain" "$check_domain"
 	replace_manifest_key "user" "$test_user"
 	replace_manifest_key "public" "$public_public_arg"
 
@@ -772,7 +776,8 @@ CHECK_COMMON_ERROR () {
 	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
-	replace_manifest_key "domain" "$sub_domain"
+	check_domain=$sub_domain
+	replace_manifest_key "domain" "$check_domain"
 	replace_manifest_key "user" "$test_user"
 	replace_manifest_key "public" "$public_public_arg"
 
@@ -857,7 +862,8 @@ CHECK_BACKUP_RESTORE () {
 	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
-	replace_manifest_key "domain" "$sub_domain"
+	check_domain=$sub_domain
+	replace_manifest_key "domain" "$check_domain"
 	replace_manifest_key "user" "$test_user"
 	replace_manifest_key "public" "$public_public_arg"
 
@@ -869,7 +875,7 @@ CHECK_BACKUP_RESTORE () {
 		if [ $i -eq 0 ]
 		then
 			# Check if root installation worked, or if force_install_ok is setted.
-			if [ $RESULT_check_root -eq 1 ] || [ $force_install_ok -eq 1 ]
+			if [ $RESULT_check_root -eq 1 ] && [ $force_install_ok -ne 1 ]
 			then
 				# Replace manifest key for path
 				local check_path=/
@@ -885,7 +891,7 @@ CHECK_BACKUP_RESTORE () {
 		elif [ $i -eq 1 ]
 		then
 			# Check if sub path installation worked, or if force_install_ok is setted.
-			if [ $RESULT_check_sub_dir -eq 1 ] || [ $force_install_ok -eq 1 ]
+			if [ $RESULT_check_sub_dir -eq 1 ] && [ $force_install_ok -ne 1 ]
 			then
 				# Replace manifest key for path
 				local check_path=$test_path
@@ -1012,6 +1018,149 @@ CHECK_BACKUP_RESTORE () {
 			# Stop and restore the LXC container
 			LXC_STOP
 		done
+	done
+}
+
+CHECK_CHANGE_URL () {
+	# Try the change_url script
+
+	unit_test_title "Change URL..."
+
+	# Check if the needed manifest key are set or abort the test
+	check_manifest_key "domain" || return
+
+	# Check if an install have previously work
+	local previous_install=$(is_install_failed)
+	# Abort if none install worked
+	[ "$previous_install" = "1" ] && return
+
+	# Copy original arguments
+	local manifest_args_mod="$manifest_arguments"
+
+	# Replace manifest key for the test
+	check_domain=$sub_domain
+	replace_manifest_key "domain" "$check_domain"
+	replace_manifest_key "user" "$test_user"
+	replace_manifest_key "public" "$public_public_arg"
+
+	# Try in 6 times !
+	# Without modify the domain, root to path, path to path and path to root.
+	# And then, same with a domain change
+	local i=0
+	for i in ` seq 1 6`
+	do
+		if [ $i -eq 1 ]; then
+			# Same domain, root to path
+			check_path=/
+			local new_path=$test_path
+			local new_domain=$sub_domain
+		elif [ $i -eq 2 ]; then
+			# Same domain, path to path
+			check_path=$test_path
+			local new_path=${test_path}_2
+			local new_domain=$sub_domain
+		elif [ $i -eq 3 ]; then
+			# Same domain, path to root
+			check_path=$test_path
+			local new_path=/
+			local new_domain=$sub_domain
+
+		elif [ $i -eq 4 ]; then
+			# Other domain, root to path
+			check_path=/
+			local new_path=$test_path
+			local new_domain=$main_domain
+		elif [ $i -eq 5 ]; then
+			# Other domain, path to path
+			check_path=$test_path
+			local new_path=${test_path}_2
+			local new_domain=$main_domain
+		elif [ $i -eq 6 ]; then
+			# Other domain, path to root
+			check_path=$test_path
+			local new_path=/
+			local new_domain=$main_domain
+		fi
+		replace_manifest_key "path" "$check_path"
+
+		# Check if root or subpath installation worked, or if force_install_ok is setted.
+		if [ $force_install_ok -eq 1 ]
+		then
+			# Try with a sub path install
+			if [ "$check_path" = "/" ]
+			then
+				if [ $RESULT_check_root -ne 1 ] && [ $force_install_ok -ne 1 ]
+				then
+					# Jump this test
+					ECHO_FORMAT "Root install failed, impossible to perform this test...\n" "lyellow" clog
+					continue
+				fi
+			# And with a sub path install
+			else
+				if [ $RESULT_check_sub_dir -ne 1 ] && [ $force_install_ok -ne 1 ]
+				then
+					# Jump this test
+					ECHO_FORMAT "Sub path install failed, impossible to perform this test...\n" "lyellow" clog
+					continue
+				fi
+			fi
+		fi
+
+		# Install the application in a LXC container
+		ECHO_FORMAT "\nPreliminary install...\n" "white" "bold" clog
+		SETUP_APP
+
+		# Analyse the log to extract "warning" and "error" lines
+		LOG_EXTRACTOR
+
+		# Check if the install had work
+		if [ $yunohost_result -ne 0 ]
+		then
+			ECHO_FORMAT "\nInstallation failed...\n" "red" "bold"
+		else
+			ECHO_FORMAT "\nChange the url from $sub_domain$check_path to $new_domain$new_path...\n" "white" "bold" clog
+
+			# Change the url
+			LXC_START "sudo yunohost --debug app change-url $ynh_app_id -d \"$new_domain\" -p \"$new_path\""
+
+			# yunohost_result gets the return code of the upgrade
+			yunohost_result=$?
+
+			# Print the result of the change_url command
+			if [ $yunohost_result -eq 0 ]; then
+				ECHO_FORMAT "Change_url script successful. ($yunohost_result)\n" "white" clog
+			else
+				ECHO_FORMAT "Change_url script failed. ($yunohost_result)\n" "white" clog
+			fi
+
+			# Check all the witness files, to verify if them still here
+			check_witness_files
+
+			# Analyse the log to extract "warning" and "error" lines
+			LOG_EXTRACTOR
+
+			# Try to access the app by its url
+			check_path=$new_path
+			check_domain=$new_domain
+			CHECK_URL
+		fi
+
+		# Check the result and print SUCCESS or FAIL
+		if check_test_result
+		then	# Success
+			# The global success for a change_url can't be a success if another change_url failed
+			if [ $RESULT_change_url -ne -1 ]; then
+				RESULT_change_url=1	# Change_url succeed
+			fi
+		else	# Fail
+			RESULT_change_url=-1	# Change_url failed
+		fi
+
+		# Make a break if auto_remove is set
+		break_before_continue
+
+		# Stop and restore the LXC container
+		LXC_STOP
 	done
 }
 
@@ -1223,5 +1372,10 @@ TESTING_PROCESS () {
 	# Try to backup then restore the app
 	if [ $backup_restore -eq 1 ]; then
 		TEST_LAUNCHER CHECK_BACKUP_RESTORE
+	fi
+
+	# Try the change_url script
+	if [ $change_url -eq 1 ]; then
+		TEST_LAUNCHER CHECK_CHANGE_URL
 	fi
 }

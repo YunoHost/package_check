@@ -23,6 +23,7 @@ The script is able to perform following tests:
 - Multi-instances installation
 - Test malformed path (path/ instead od /path)
 - Test port already use
+- Test of change_url script
 
 Package_check script use an LXC container to manipulate the package in a non parasited environnement by previous installs.
 
@@ -69,6 +70,7 @@ package_check/package_check.sh APP_ynh
 		multi_instance=1
 		incorrect_path=1
 		port_already_use=1 (XXXX)
+		change_url=1
 ;;; Levels
 	Level 1=auto
 	Level 2=auto
@@ -114,6 +116,7 @@ If a test is not in the list, it will be ignored. It's similar to marked at 0.
 - `port_already_use`: Causes an error on the port by opening before.  
         The `port_already_use` test may eventually take in argument the port number.  
         The port number must be written into parentheses, it will serve to test port.  
+- `change_url`: Try to change the url by 6 different way. Root to path, path to another path and path to root. And the same thing, with another domain.
 
 ### `;;; Levels`
 Allow to choose how [each level](https://yunohost.org/#/packaging_apps_levels_fr) is determined  
