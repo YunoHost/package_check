@@ -929,14 +929,14 @@ then
 			public_private_arg=$(echo "$line" | grep -o "|private=[[:alnum:]]*" | cut -d "=" -f2)
 		fi
 
-if echo "$LIGNE" | grep -q "(PATH)"; then	# Path dans le manifest
-	MANIFEST_PATH=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au path
-	parse_path=$(echo "$LIGNE" | cut -d '"' -f2)	# Lit le path du check_process
-	if [ -n "$parse_path" ]; then	# Si le path n'est pas null, utilise ce path au lieu de la valeur par défaut.
-		PATH_TEST=$(echo "$LIGNE" | cut -d '"' -f2)
-	fi
-	LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
-fi
+		if echo "$LIGNE" | grep -q "(PATH)"; then	# Path dans le manifest
+			MANIFEST_PATH=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au path
+			parse_path=$(echo "$LIGNE" | cut -d '"' -f2)	# Lit le path du check_process
+			if [ -n "$parse_path" ]; then	# Si le path n'est pas null, utilise ce path au lieu de la valeur par défaut.
+				PATH_TEST=$(echo "$LIGNE" | cut -d '"' -f2)
+			fi
+			LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
+		fi
 
 		# Parse all tests to perform
 		# Extract the checks options section from the second partial file
@@ -1002,6 +1002,9 @@ fi
 		TESTING_PROCESS
 		# Print the final results of the tests
 		TEST_RESULTS
+
+		# Destroy all snapshots other than snap0
+		destroy_temporary_snapshot
 
 	done <<< "$(grep "^;; " "$check_process")"
 

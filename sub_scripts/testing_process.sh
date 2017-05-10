@@ -46,6 +46,47 @@ SETUP_APP () {
 
 	# Retrieve the app id in the log. To manage the app after
 	ynh_app_id=$(sudo tac "$yunohost_log" | grep --only-matching --max-count=1 "YNH_APP_INSTANCE_NAME=[^ ]*" | cut --delimiter='=' --fields=2)
+
+	# Analyse the log to extract "warning" and "error" lines
+	LOG_EXTRACTOR
+}
+
+STANDARD_SETUP_APP () {
+	# Try to find an existing snapshot for this install, or make an install
+
+	# If it's a root install
+	if [ "$check_path" = "/" ]
+	then
+		# Check if a snapshot already exist for this install
+		if [ -z "$root_snapshot" ]
+		then
+			# Make an installation
+			SETUP_APP
+			# Then create a snapshot
+			ECHO_FORMAT "Create a snapshot for root installation.\n" "white" clog
+			root_snapshot=$(create_temp_backup)
+		else
+			# Or uses an existing snapshot
+			ECHO_FORMAT "Uses an existing snapshot for root installation.\n" "white" clog
+			use_temp_snapshot $root_snapshot
+		fi
+
+	# In case of sub path install, use another snapshot
+	else
+		# Check if a snapshot already exist for this install
+		if [ -z "$subpath_snapshot" ]
+		then
+			# Make an installation
+			SETUP_APP
+			# Then create a snapshot
+			ECHO_FORMAT "Create a snapshot for sub path installation.\n" "white" clog
+			subpath_snapshot=$(create_temp_backup)
+		else
+			# Or uses an existing snapshot
+			ECHO_FORMAT "Uses an existing snapshot for sub path installation.\n" "white" clog
+			use_temp_snapshot $subpath_snapshot
+		fi
+	fi
 }
 
 REMOVE_APP () {
@@ -96,7 +137,7 @@ CHECK_URL () {
 
 		# Inform /etc/hosts with the IP of LXC to resolve the domain.
 		# This is set only here and not before to prevent to help the app's scripts
-		echo -e "$ip_range.2 $check_domain #package_check" | sudo tee --append /etc/hosts > /dev/null
+		echo -e "$ip_range.2 $main_domain #package_check\n$ip_range.2 $sub_domain #package_check" | sudo tee --append /etc/hosts > /dev/null
 
 		# Try to resolv the domain during 10 seconds maximum.
 		local i=0
@@ -378,10 +419,7 @@ CHECK_SETUP () {
 	replace_manifest_key "public" "$public_public_arg"
 
 	# Install the application in a LXC container
-	SETUP_APP
-
-	# Analyse the log to extract "warning" and "error" lines
-	LOG_EXTRACTOR
+	STANDARD_SETUP_APP
 
 	# Try to access the app by its url
 	CHECK_URL
@@ -457,10 +495,7 @@ CHECK_UPGRADE () {
 
 	# Install the application in a LXC container
 	ECHO_FORMAT "\nPreliminary install...\n" "white" "bold" clog
-	SETUP_APP
-
-	# Analyse the log to extract "warning" and "error" lines
-	LOG_EXTRACTOR
+	STANDARD_SETUP_APP
 
 	# Check if the install had work
 	if [ $yunohost_result -ne 0 ]
@@ -580,9 +615,6 @@ CHECK_PUBLIC_PRIVATE () {
 		# Install the application in a LXC container
 		SETUP_APP
 
-		# Analyse the log to extract "warning" and "error" lines
-		LOG_EXTRACTOR
-
 		# Try to access the app by its url
 		CHECK_URL
 
@@ -680,9 +712,6 @@ CHECK_MULTI_INSTANCE () {
 
 		# Install the application in a LXC container
 		SETUP_APP
-
-		# Analyse the log to extract "warning" and "error" lines
-		LOG_EXTRACTOR
 
 		# Store the result in the correct variable
 		# First installation
@@ -822,9 +851,6 @@ CHECK_COMMON_ERROR () {
 	# Install the application in a LXC container
 	SETUP_APP
 
-	# Analyse the log to extract "warning" and "error" lines
-	LOG_EXTRACTOR
-
 	# Try to access the app by its url
 	CHECK_URL
 
@@ -905,10 +931,7 @@ CHECK_BACKUP_RESTORE () {
 		fi
 
 		# Install the application in a LXC container
-		SETUP_APP
-
-		# Analyse the log to extract "warning" and "error" lines
-		LOG_EXTRACTOR
+		STANDARD_SETUP_APP
 
 		# BACKUP
 		# Made a backup if the installation succeed
@@ -1108,22 +1131,29 @@ CHECK_CHANGE_URL () {
 
 		# Install the application in a LXC container
 		ECHO_FORMAT "\nPreliminary install...\n" "white" "bold" clog
-		SETUP_APP
+		STANDARD_SETUP_APP
 
-		# Analyse the log to extract "warning" and "error" lines
-		LOG_EXTRACTOR
+# Wait for next release...
+LXC_START "yunohost app --help | grep --quiet change-url"
+if [ $? -ne 0 ]
+then
+	ECHO_FORMAT "change-url is only available on testing or unstable...\n" "red" "bold"
+	RESULT_change_url=0
+	return 0
+fi
+# ...
 
 		# Check if the install had work
 		if [ $yunohost_result -ne 0 ]
 		then
-			ECHO_FORMAT "\nInstallation failed...\n" "red" "bold"
+			ECHO_FORMAT "Installation failed...\n" "red" "bold"
 		else
-			ECHO_FORMAT "\nChange the url from $sub_domain$check_path to $new_domain$new_path...\n" "white" "bold" clog
+			ECHO_FORMAT "Change the url from $sub_domain$check_path to $new_domain$new_path...\n" "white" "bold" clog
 
 			# Change the url
 			LXC_START "sudo yunohost --debug app change-url $ynh_app_id -d \"$new_domain\" -p \"$new_path\""
 
-			# yunohost_result gets the return code of the upgrade
+			# yunohost_result gets the return code of the change-url script
 			yunohost_result=$?
 
 			# Print the result of the change_url command
@@ -1207,7 +1237,7 @@ TEST_LAUNCHER () {
 
 set_witness_files () {
 	# Create files to check if the remove script does not remove them accidentally
-	echo -n "Create witness files" | tee --append "$test_result"
+	echo "Create witness files..." | tee --append "$test_result"
 
 	lxc_dir="/var/lib/lxc/$lxc_name/rootfs"
 
@@ -1245,13 +1275,8 @@ set_witness_files () {
 	create_witness_file "/etc/systemd/system/witnessfile.service" file
 
 	# Database
-	for timeout in `seq 1 10`
-	do
-		sudo lxc-attach --name=$lxc_name -- mysql --user=root --password=$(sudo cat "$lxc_dir/etc/yunohost/mysql") --wait --execute="CREATE DATABASE witnessdb" > /dev/null 2>&1 && break
-		echo -n "."
-		sleep 1
-	done
-	echo ""
+	sudo lxc-attach --name=$lxc_name -- mysqladmin --user=root --password=$(sudo cat "$lxc_dir/etc/yunohost/mysql") --wait status > /dev/null 2>&1
+	sudo lxc-attach --name=$lxc_name -- mysql --user=root --password=$(sudo cat "$lxc_dir/etc/yunohost/mysql") --wait --execute="CREATE DATABASE witnessdb" > /dev/null 2>&1
 }
 
 check_witness_files () {
