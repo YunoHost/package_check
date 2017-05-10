@@ -19,16 +19,16 @@ create_temp_backup () {
 	# Create a temporary snapshot
 
 	# Check all the witness files, to verify if them still here
-	check_witness_files
+	check_witness_files >&2
 
 	# Stop the container, before its snapshot
-	sudo lxc-stop --name $lxc_name
+	sudo lxc-stop --name $lxc_name >&2
 
 	# Create the snapshot.
 	sudo lxc-snapshot --name $lxc_name >> "$test_result" 2>&1
 
 	# Get the last created snapshot and return it
-	echo "$(sudo lxc-snapshot --name $lxc_name --list | head --lines=1 | cut --delimiter=' ' --fields=1)"
+	sudo lxc-snapshot --name $lxc_name --list | sort | tail --lines=1 | cut --delimiter=' ' --fields=1
 
 	# Restart the container, after the snapshot
 	LXC_START "true" >&2
@@ -38,6 +38,9 @@ use_temp_snapshot () {
 	# Use a temporary snapshot, if it already exists
 	# $1 = Name of the snapshot to use
 	local snapshot_name=$1
+
+	# Fix the missing hostname in the hosts file...
+	echo "127.0.0.1 $lxc_name" | sudo tee --append "$snapshot_path/$snapshot_name/rootfs/etc/hosts" > /dev/null
 
 	# Restore this snapshot.
 	sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$snapshot_path/$snapshot_name/rootfs/" "/var/lib/lxc/$lxc_name/rootfs/" > /dev/null 2>> "$test_result"
@@ -51,7 +54,7 @@ destroy_temporary_snapshot () {
 
 	while true
 	do
-		local snapshot=$(sudo lxc-snapshot --name $lxc_name --list | head --lines=1 | cut --delimiter=' ' --fields=1)
+		local snapshot=$(sudo lxc-snapshot --name $lxc_name --list | sort | tail --lines=1 | cut --delimiter=' ' --fields=1)
 		if [ -n "$snapshot" ] && [ "$snapshot" != "snap0" ]
 		then
 			echo "Destroy temporary snapshot $snapshot."
