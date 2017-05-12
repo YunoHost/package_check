@@ -80,7 +80,9 @@ STANDARD_SETUP_APP () {
 			SETUP_APP
 			# Then create a snapshot
 			ECHO_FORMAT "Create a snapshot for sub path installation.\n" "white" clog
-			subpath_snapshot=$(create_temp_backup)
+			if [ $yunohost_result -eq 0 ]; then
+				subpath_snapshot=$(create_temp_backup)
+			fi
 		else
 			# Or uses an existing snapshot
 			ECHO_FORMAT "Uses an existing snapshot for sub path installation.\n" "white" clog
