@@ -844,8 +844,14 @@ CHECK_COMMON_ERROR () {
 			replace_manifest_key "port" "$check_port"
 		fi
 
-		# Open the port before the installation
-		LXC_START "sudo yunohost firewall allow Both $check_port"
+		# Build a service with netcat for use this port before the app.
+		echo -e "[Service]\nExecStart=/bin/netcat -l -k -p $check_port\n
+				[Install]\nWantedBy=multi-user.target" | \
+				sudo tee "/var/lib/lxc/$lxc_name/rootfs/etc/systemd/system/netcat.service" \
+				> /dev/null
+
+		# Then start this service to block this port.
+		LXC_START "sudo systemctl enable netcat & sudo systemctl start netcat"
 	fi
 
 	# Install the application in a LXC container
