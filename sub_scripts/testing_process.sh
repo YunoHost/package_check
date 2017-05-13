@@ -62,9 +62,6 @@ STANDARD_SETUP_APP () {
 		then
 			# Make an installation
 			SETUP_APP
-			# Then create a snapshot
-			ECHO_FORMAT "Create a snapshot for root installation.\n" "white" clog
-			root_snapshot=$(create_temp_backup)
 		else
 			# Or uses an existing snapshot
 			ECHO_FORMAT "Uses an existing snapshot for root installation.\n" "white" clog
@@ -78,11 +75,6 @@ STANDARD_SETUP_APP () {
 		then
 			# Make an installation
 			SETUP_APP
-			# Then create a snapshot
-			ECHO_FORMAT "Create a snapshot for sub path installation.\n" "white" clog
-			if [ $yunohost_result -eq 0 ]; then
-				subpath_snapshot=$(create_temp_backup)
-			fi
 		else
 			# Or uses an existing snapshot
 			ECHO_FORMAT "Uses an existing snapshot for sub path installation.\n" "white" clog
@@ -421,7 +413,7 @@ CHECK_SETUP () {
 	replace_manifest_key "public" "$public_public_arg"
 
 	# Install the application in a LXC container
-	STANDARD_SETUP_APP
+	SETUP_APP
 
 	# Try to access the app by its url
 	CHECK_URL
@@ -430,13 +422,35 @@ CHECK_SETUP () {
 	if check_test_result
 	then	# Success
 		RESULT_global_setup=1	# Installation succeed
-		local check_result_setup=1	# Installation in a sub path succeed
+		local check_result_setup=1	# Installation succeed
 	else	# Fail
 		# The global success for a installation can't be failed if another installation succeed
 		if [ $RESULT_global_setup -ne 1 ]; then
 			RESULT_global_setup=-1	# Installation failed
 		fi
-		local check_result_setup=-1	# Installation in a sub path failed
+		local check_result_setup=-1	# Installation failed
+	fi
+
+	# Create a snapshot for this installation, to be able to reuse it instead of a new installation.
+	# But only if this installation has worked fine
+	if [ $check_result_setup -eq 1 ]; then
+		if [ "$check_path" = "/" ]
+		then
+			# Check if a snapshot already exist for a root install
+			if [ -z "$root_snapshot" ]
+			then
+				ECHO_FORMAT "Create a snapshot for root installation.\n" "white" clog
+				root_snapshot=$(create_temp_backup)
+			fi
+		else
+			# Check if a snapshot already exist for a subpath (or no_url) install
+			if [ -z "$subpath_snapshot" ]
+			then
+				# Then create a snapshot
+				ECHO_FORMAT "Create a snapshot for sub path installation.\n" "white" clog
+				subpath_snapshot=$(create_temp_backup)
+			fi
+		fi
 	fi
 
 	# Remove the application
