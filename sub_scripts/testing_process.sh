@@ -28,6 +28,9 @@ break_before_continue () {
 SETUP_APP () {
 	# Install an application in a LXC container
 
+	# Uses the default snapshot
+	current_snapshot=snap0
+
 	# Install the application in a LXC container
 	LXC_START "sudo yunohost --debug app install \"$package_dir\" -a \"$manifest_args_mod\""
 
@@ -1015,6 +1018,8 @@ CHECK_BACKUP_RESTORE () {
 			# Second, restore the whole container to remove completely the application
 			elif [ $j -eq 1 ]
 			then
+				# Uses the default snapshot
+				current_snapshot=snap0
 				# Stop and restore the LXC container
 				LXC_STOP
 
@@ -1252,6 +1257,9 @@ TEST_LAUNCHER () {
 
 	# Execute the test
 	$1 $2
+
+	# Uses the default snapshot
+	current_snapshot=snap0
 
 	# Stop and restore the LXC container
 	LXC_STOP

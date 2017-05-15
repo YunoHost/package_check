@@ -8,6 +8,7 @@ echo -e "Loads functions from launcher.sh"
 
 arg_ssh="-tt"
 snapshot_path="/var/lib/lxcsnaps/$lxc_name"
+current_snapshot=snap0
 
 #=================================================
 
@@ -27,8 +28,10 @@ create_temp_backup () {
 	# Create the snapshot.
 	sudo lxc-snapshot --name $lxc_name >> "$test_result" 2>&1
 
-	# Get the last created snapshot and return it
-	sudo lxc-snapshot --name $lxc_name --list | sort | tail --lines=1 | cut --delimiter=' ' --fields=1
+	# Get the last created snapshot, and set it as the new current snapshot.
+	current_snapshot=$(sudo lxc-snapshot --name $lxc_name --list | sort | tail --lines=1 | cut --delimiter=' ' --fields=1)
+	# And return it
+	echo "$current_snapshot"
 
 	# Restart the container, after the snapshot
 	LXC_START "true" >&2
@@ -37,13 +40,13 @@ create_temp_backup () {
 use_temp_snapshot () {
 	# Use a temporary snapshot, if it already exists
 	# $1 = Name of the snapshot to use
-	local snapshot_name=$1
+	current_snapshot=$1
 
 	# Fix the missing hostname in the hosts file...
-	echo "127.0.0.1 $lxc_name" | sudo tee --append "$snapshot_path/$snapshot_name/rootfs/etc/hosts" > /dev/null
+	echo "127.0.0.1 $lxc_name" | sudo tee --append "$snapshot_path/$current_snapshot/rootfs/etc/hosts" > /dev/null
 
 	# Restore this snapshot.
-	sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$snapshot_path/$snapshot_name/rootfs/" "/var/lib/lxc/$lxc_name/rootfs/" > /dev/null 2>> "$test_result"
+	sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$snapshot_path/$current_snapshot/rootfs/" "/var/lib/lxc/$lxc_name/rootfs/" > /dev/null 2>> "$test_result"
 
 	# Fake the yunohost_result return code of the installation
 	yunohost_result=0
@@ -67,6 +70,7 @@ destroy_temporary_snapshot () {
 	# Clear the variables which contains the snapshot names
 	unset root_snapshot
 	unset subpath_snapshot
+	current_snapshot=snap0
 }
 
 LXC_INIT () {
@@ -182,22 +186,22 @@ LXC_STOP () {
 
 	# Fix the missing hostname in the hosts file
 	# If the hostname is missing in /etc/hosts inside the snapshot
-	if ! sudo grep --quiet "$lxc_name" "$snapshot_path/snap0/rootfs/etc/hosts"
+	if ! sudo grep --quiet "$lxc_name" "$snapshot_path/$current_snapshot/rootfs/etc/hosts"
 	then
-		# If the hostname was replaced by snap0, fix it
-		if sudo grep --quiet "snap0" "$snapshot_path/snap0/rootfs/etc/hosts"
+		# If the hostname was replaced by name of the snapshot, fix it
+		if sudo grep --quiet "$current_snapshot" "$snapshot_path/$current_snapshot/rootfs/etc/hosts"
 		then
-			# Replace snap0 by the real hostname
-			sudo sed --in-place "s/snap0/$lxc_name/" "$snapshot_path/snap0/rootfs/etc/hosts"
+			# Replace snapX by the real hostname
+			sudo sed --in-place "s/$current_snapshot/$lxc_name/" "$snapshot_path/$current_snapshot/rootfs/etc/hosts"
 		else
 			# Otherwise, simply add the hostname
-			echo "127.0.0.1 $lxc_name" | sudo tee --append "$snapshot_path/snap0/rootfs/etc/hosts" > /dev/null
+			echo "127.0.0.1 $lxc_name" | sudo tee --append "$snapshot_path/$current_snapshot/rootfs/etc/hosts" > /dev/null
 		fi
 	fi
 
 	# Restore the snapshot.
 	echo "Restore the previous snapshot." | tee --append "$test_result"
-	sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$snapshot_path/snap0/rootfs/" "/var/lib/lxc/$lxc_name/rootfs/" > /dev/null 2>> "$test_result"
+	sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$snapshot_path/$current_snapshot/rootfs/" "/var/lib/lxc/$lxc_name/rootfs/" > /dev/null 2>> "$test_result"
 }
 
 LXC_TURNOFF () {
