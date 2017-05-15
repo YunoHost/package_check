@@ -362,7 +362,7 @@ is_install_failed () {
 	then
 		# If root installation worked, return root.
 		echo root
-	elif [ $RESULT_check_sub_dir -eq 1 ] && [ $force_install_ok -ne 1 ]
+	elif [ $RESULT_check_sub_dir -eq 1 ] || [ $force_install_ok -eq 1 ]
 	then
 		# If subdir installation worked or force_install_ok setted, return subdir.
 		echo subdir
@@ -601,7 +601,7 @@ CHECK_PUBLIC_PRIVATE () {
 		if [ $i -eq 0 ]
 		then
 			# Check if root installation worked, or if force_install_ok is setted.
-			if [ $RESULT_check_root -eq 1 ] && [ $force_install_ok -ne 1 ]
+			if [ $RESULT_check_root -eq 1 ] || [ $force_install_ok -eq 1 ]
 			then
 				# Replace manifest key for path
 				local check_path=/
@@ -616,7 +616,7 @@ CHECK_PUBLIC_PRIVATE () {
 		elif [ $i -eq 1 ]
 		then
 			# Check if sub path installation worked, or if force_install_ok is setted.
-			if [ $RESULT_check_sub_dir -eq 1 ] && [ $force_install_ok -ne 1 ]
+			if [ $RESULT_check_sub_dir -eq 1 ] || [ $force_install_ok -eq 1 ]
 			then
 				# Replace manifest key for path
 				local check_path=$test_path
@@ -837,7 +837,7 @@ CHECK_COMMON_ERROR () {
 		# Use a path according to previous succeeded installs
 		if [ "$previous_install" = "subdir" ]; then
 			local check_path=$test_path
-		elif [ "$previous_install" = "root" ]; then
+		else
 			local check_path=/
 		fi
 		replace_manifest_key "path" "$check_path"
@@ -923,7 +923,7 @@ CHECK_BACKUP_RESTORE () {
 		if [ $i -eq 0 ]
 		then
 			# Check if root installation worked, or if force_install_ok is setted.
-			if [ $RESULT_check_root -eq 1 ] && [ $force_install_ok -ne 1 ]
+			if [ $RESULT_check_root -eq 1 ] || [ $force_install_ok -eq 1 ]
 			then
 				# Replace manifest key for path
 				local check_path=/
@@ -939,7 +939,7 @@ CHECK_BACKUP_RESTORE () {
 		elif [ $i -eq 1 ]
 		then
 			# Check if sub path installation worked, or if force_install_ok is setted.
-			if [ $RESULT_check_sub_dir -eq 1 ] && [ $force_install_ok -ne 1 ]
+			if [ $RESULT_check_sub_dir -eq 1 ] || [ $force_install_ok -eq 1 ]
 			then
 				# Replace manifest key for path
 				local check_path=$test_path
