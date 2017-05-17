@@ -11,14 +11,52 @@ snapshot_path="/var/lib/lxcsnaps/$lxc_name"
 current_snapshot=snap0
 
 #=================================================
+# TIMER
+#=================================================
 
-is_lxc_running () {
-	sudo lxc-info --name=$lxc_name | grep --quiet "RUNNING"
+start_timer () {
+	# Set the beginning of the timer
+	starttime=$(date +%s)
 }
+
+stop_timer () {
+	# Ending the timer
+	local finishtime=$(date +%s)
+	# Calculate the gap between the starting and the ending of the timer
+	local elapsedtime=$(echo $(( $finishtime - $starttime )))
+	# Extract the number of hour
+	local hours=$(echo $(( $elapsedtime / 3600 )))
+	local elapsedtime=$(echo $(( $elapsedtime - ( 3600 * $hours) )))
+	# Minutes
+	local minutes=$(echo $(( $elapsedtime / 60 )))
+	# And seconds
+	local seconds=$(echo $(( $elapsedtime - ( 60 * $minutes) )))
+
+	local phours=""
+	local pminutes=""
+	local pseconds=""
+
+	# Avoid null values
+	[ $hours -eq 0 ] || phours="$hours hour"
+	[ $minutes -eq 0 ] || pminutes="$minutes minute"
+	[ $seconds -eq 0 ] || pseconds="$seconds second"
+
+	# Add a 's' for plural values
+	[ $hours -eq 1 ] && phours="${phours}, " || test -z "$phours" || phours="${phours}s, "
+	[ $minutes -eq 1 ] && pminutes="${pminutes}, " || test -z "$pminutes" || pminutes="${pminutes}s, "
+	[ $seconds -gt 1 ] && pseconds="${pseconds}s"
+
+	ECHO_FORMAT "Working time: ${phours}${pminutes}${pseconds}.\n" "blue"
+}
+
+#=================================================
+# RUNNING SNAPSHOT
+#=================================================
 
 create_temp_backup () {
 	# Create a temporary snapshot
 
+	start_timer
 	# Check all the witness files, to verify if them still here
 	check_witness_files >&2
 
@@ -32,6 +70,7 @@ create_temp_backup () {
 	current_snapshot=$(sudo lxc-snapshot --name $lxc_name --list | sort | tail --lines=1 | cut --delimiter=' ' --fields=1)
 	# And return it
 	echo "$current_snapshot"
+	stop_timer >&2
 
 	# Restart the container, after the snapshot
 	LXC_START "true" >&2
@@ -42,12 +81,14 @@ use_temp_snapshot () {
 	# $1 = Name of the snapshot to use
 	current_snapshot=$1
 
+	start_timer
 	# Fix the missing hostname in the hosts file...
 	echo "127.0.0.1 $lxc_name" | sudo tee --append "$snapshot_path/$current_snapshot/rootfs/etc/hosts" > /dev/null
 
 	# Restore this snapshot.
 	sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$snapshot_path/$current_snapshot/rootfs/" "/var/lib/lxc/$lxc_name/rootfs/" > /dev/null 2>> "$test_result"
 
+	stop_timer
 	# Fake the yunohost_result return code of the installation
 	yunohost_result=0
 }
@@ -73,6 +114,12 @@ destroy_temporary_snapshot () {
 	current_snapshot=snap0
 }
 
+#=================================================
+
+is_lxc_running () {
+	sudo lxc-info --name=$lxc_name | grep --quiet "RUNNING"
+}
+
 LXC_INIT () {
 	# Initialize LXC network
 
@@ -91,6 +138,7 @@ LXC_START () {
 	# Start the lxc container and execute the given command in it
 	# $1 = Command to execute in the container
 
+	start_timer
 	# Try to start the container 3 times.
 	local max_try=3
 	local i=0
@@ -153,6 +201,7 @@ LXC_START () {
 			ECHO_FORMAT "The container failed to start $max_try times...\nIf this problem is persistent, try to fix it with lxc_check.sh.\n" "red" "bold"
 			ECHO_FORMAT "Boot log:\n" clog
 			cat "$script_dir/lxc_boot.log" | tee --append "$test_result"
+			stop_timer
 			return 1
 		fi
 	done
@@ -171,6 +220,7 @@ LXC_START () {
 	# Retrieve the log of the previous command and copy its content in the temporary log
 	sudo cat "/var/lib/lxc/$lxc_name/rootfs/home/pchecker/temp_yunohost-cli.log" >> "$temp_log"
 
+	stop_timer
 	# Return the exit code of the ssh command
 	return $returncode
 }
@@ -178,6 +228,7 @@ LXC_START () {
 LXC_STOP () {
 	# Stop and restore the LXC container
 
+	start_timer
 	# Stop the LXC container
 	if is_lxc_running; then
 		echo "Stop the LXC container" | tee --append "$test_result"
@@ -202,6 +253,7 @@ LXC_STOP () {
 	# Restore the snapshot.
 	echo "Restore the previous snapshot." | tee --append "$test_result"
 	sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$snapshot_path/$current_snapshot/rootfs/" "/var/lib/lxc/$lxc_name/rootfs/" > /dev/null 2>> "$test_result"
+	stop_timer
 }
 
 LXC_TURNOFF () {

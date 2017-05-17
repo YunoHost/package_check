@@ -17,6 +17,9 @@ ECHO_FORMAT () {
 	if [ "$2" == "lgreen" ]; then
 		echo -en "\e[92m"
 	fi
+	if [ "$2" == "blue" ]; then
+		echo -en "\e[94m"
+	fi
 	if [ "$2" == "white" ]; then
 		echo -en "\e[97m"
 	fi
