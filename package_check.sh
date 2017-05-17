@@ -727,6 +727,15 @@ then
 fi
 
 #=================================================
+# Set the timer for all tests
+#=================================================
+
+# Start the timer for this test
+start_timer
+# And keep this value separately
+complete_start_timer=$starttime
+
+#=================================================
 # Initialize tests
 #=================================================
 
@@ -1117,7 +1126,14 @@ fi
 
 echo "You can find the complete log of these tests in $complete_log"
 
+#=================================================
+# Ending the timer
+#=================================================
 
+# Restore the started time for the timer
+starttime=$complete_start_timer
+# End the timer for the test
+stop_timer 3
 
 #=================================================
 # Notification grade

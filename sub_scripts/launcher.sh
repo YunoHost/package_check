@@ -21,6 +21,8 @@ start_timer () {
 
 stop_timer () {
 	# Ending the timer
+	# $1 = Type of querying
+
 	local finishtime=$(date +%s)
 	# Calculate the gap between the starting and the ending of the timer
 	local elapsedtime=$(echo $(( $finishtime - $starttime )))
@@ -46,7 +48,14 @@ stop_timer () {
 	[ $minutes -eq 1 ] && pminutes="${pminutes}, " || test -z "$pminutes" || pminutes="${pminutes}s, "
 	[ $seconds -gt 1 ] && pseconds="${pseconds}s"
 
-	ECHO_FORMAT "Working time: ${phours}${pminutes}${pseconds}.\n" "blue"
+	if [ $1 -eq 2 ]; then
+		ECHO_FORMAT "Working time for this test: " "blue"
+	elif [ $1 -eq 3 ]; then
+		ECHO_FORMAT "Global working time for all tests: " "blue"
+	else
+		ECHO_FORMAT "Working time: " "blue"
+	fi
+	ECHO_FORMAT "${phours}${pminutes}${pseconds}.\n" "blue"
 }
 
 #=================================================
@@ -70,7 +79,7 @@ create_temp_backup () {
 	current_snapshot=$(sudo lxc-snapshot --name $lxc_name --list | sort | tail --lines=1 | cut --delimiter=' ' --fields=1)
 	# And return it
 	echo "$current_snapshot"
-	stop_timer >&2
+	stop_timer 1 >&2
 
 	# Restart the container, after the snapshot
 	LXC_START "true" >&2
@@ -88,7 +97,7 @@ use_temp_snapshot () {
 	# Restore this snapshot.
 	sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$snapshot_path/$current_snapshot/rootfs/" "/var/lib/lxc/$lxc_name/rootfs/" > /dev/null 2>> "$test_result"
 
-	stop_timer
+	stop_timer 1
 	# Fake the yunohost_result return code of the installation
 	yunohost_result=0
 }
@@ -201,7 +210,7 @@ LXC_START () {
 			ECHO_FORMAT "The container failed to start $max_try times...\nIf this problem is persistent, try to fix it with lxc_check.sh.\n" "red" "bold"
 			ECHO_FORMAT "Boot log:\n" clog
 			cat "$script_dir/lxc_boot.log" | tee --append "$test_result"
-			stop_timer
+			stop_timer 1
 			return 1
 		fi
 	done
@@ -220,7 +229,7 @@ LXC_START () {
 	# Retrieve the log of the previous command and copy its content in the temporary log
 	sudo cat "/var/lib/lxc/$lxc_name/rootfs/home/pchecker/temp_yunohost-cli.log" >> "$temp_log"
 
-	stop_timer
+	stop_timer 1
 	# Return the exit code of the ssh command
 	return $returncode
 }
@@ -253,7 +262,7 @@ LXC_STOP () {
 	# Restore the snapshot.
 	echo "Restore the previous snapshot." | tee --append "$test_result"
 	sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$snapshot_path/$current_snapshot/rootfs/" "/var/lib/lxc/$lxc_name/rootfs/" > /dev/null 2>> "$test_result"
-	stop_timer
+	stop_timer 1
 }
 
 LXC_TURNOFF () {

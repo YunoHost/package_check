@@ -1255,6 +1255,11 @@ TEST_LAUNCHER () {
 	yunohost_result=-1
 	yunohost_remove=-1
 
+	# Start the timer for this test
+	start_timer
+	# And keep this value separately
+	local global_start_timer=$starttime
+
 	# Execute the test
 	$1 $2
 
@@ -1263,6 +1268,11 @@ TEST_LAUNCHER () {
 
 	# Stop and restore the LXC container
 	LXC_STOP
+
+	# Restore the started time for the timer
+	starttime=$global_start_timer
+	# End the timer for the test
+	stop_timer 2
 }
 
 set_witness_files () {
