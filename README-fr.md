@@ -123,8 +123,12 @@ Permet de choisir comment [chaque niveau](https://yunohost.org/#/packaging_apps_
 Chaque niveau fixé à *auto* sera déterminé par le script. Il est également possible de fixer le niveau à *1* ou à *0* pour respectivement le valider ou l'invalider.  
 Il est à noter que les niveaux 4, 8, 9 et 10 ne peuvent être fixés à *auto* car ils ne peuvent être testés par le script et nécessitent une vérification manuelle. Il est toutefois possible de les fixer à *na* pour indiquer que le niveau n'est pas applicable (par exemple pour le niveau 4 quand une app ne propose pas de SSO LDAP). Un niveau *na* sera tout simplement ignoré dans le calcul du niveau final.
 
-Pour le forçage des niveaux, merci d’ajouter, après la déclaration du niveau, un commentaire contenant un lien vers un ticket qui explique pourquoi le niveau a été forcé.
-Comme `Level 4=1 # https://github.com/YunoHost-Apps/$app_ynh/issues/5`.
+Pour le forçage des niveaux, merci d’ajouter, avant la déclaration du niveau, un commentaire contenant un lien vers un ticket qui explique pourquoi le niveau a été forcé.
+Comme :
+```
+# https://github.com/YunoHost-Apps/$app_ynh/issues/5
+Level 4=1
+```
 
 - Niveau 1 : L'application s'installe et se désinstalle correctement. -- Peut être vérifié par package_check
 - Niveau 2 : L'application s'installe et se désinstalle dans toutes les configurations communes. -- Peut être vérifié par package_check
