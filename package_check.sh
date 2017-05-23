@@ -59,7 +59,7 @@ then
 else
 	# Reduce the arguments for getopts
 	arguments="$*"
-	arguments=${arguments//--branch=/-b }
+	arguments=${arguments//--branch=/-b}
 	arguments=${arguments//--force-install-ok/-f}
 	arguments=${arguments//--interrupt/-i}
 	arguments=${arguments//--help/-h}
@@ -80,7 +80,7 @@ else
 				case $parameter in
 					b)
 						# --branch=branch-name
-						gitbranch="$OPTARG"
+						gitbranch="-b $OPTARG"
 						;;
 					f)
 						# --force-install-ok

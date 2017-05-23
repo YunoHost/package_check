@@ -1020,11 +1020,11 @@ CHECK_BACKUP_RESTORE () {
 			then
 				# Uses the default snapshot
 				current_snapshot=snap0
+				# Place the copy of the backup archive in the container.
+				sudo mv -f ./archives /var/lib/lxcsnaps/$lxc_name/$current_snapshot/rootfs/home/yunohost.backup/
+
 				# Stop and restore the LXC container
 				LXC_STOP
-
-				# Place the copy of the backup archive in the container.
-				sudo mv -f ./archives /var/lib/lxc/$lxc_name/rootfs/home/yunohost.backup/
 
 				ECHO_FORMAT "\nRestore on a clean YunoHost system...\n" "white" "bold" clog
 			fi
