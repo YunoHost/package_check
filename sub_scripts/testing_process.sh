@@ -958,6 +958,10 @@ CHECK_BACKUP_RESTORE () {
 		# Install the application in a LXC container
 		STANDARD_SETUP_APP
 
+		# Remove the previous residual backups
+		sudo rm -rf /var/lib/lxc/$lxc_name/rootfs/home/yunohost.backup
+		sudo rm -rf /var/lib/lxcsnaps/$lxc_name/$current_snapshot/rootfs/home/yunohost.backup
+
 		# BACKUP
 		# Made a backup if the installation succeed
 		if [ $yunohost_result -ne 0 ]
