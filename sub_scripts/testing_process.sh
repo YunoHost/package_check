@@ -959,8 +959,8 @@ CHECK_BACKUP_RESTORE () {
 		STANDARD_SETUP_APP
 
 		# Remove the previous residual backups
-		sudo rm -rf /var/lib/lxc/$lxc_name/rootfs/home/yunohost.backup
-		sudo rm -rf /var/lib/lxcsnaps/$lxc_name/$current_snapshot/rootfs/home/yunohost.backup
+		sudo rm -rf /var/lib/lxc/$lxc_name/rootfs/home/yunohost.backup/archives
+		sudo rm -rf /var/lib/lxcsnaps/$lxc_name/$current_snapshot/rootfs/home/yunohost.backup/archives
 
 		# BACKUP
 		# Made a backup if the installation succeed
@@ -1024,6 +1024,10 @@ CHECK_BACKUP_RESTORE () {
 			then
 				# Uses the default snapshot
 				current_snapshot=snap0
+
+				# Remove the previous residual backups
+				sudo rm -rf /var/lib/lxcsnaps/$lxc_name/$current_snapshot/rootfs/home/yunohost.backup/archives
+
 				# Place the copy of the backup archive in the container.
 				sudo mv -f ./archives /var/lib/lxcsnaps/$lxc_name/$current_snapshot/rootfs/home/yunohost.backup/
 
