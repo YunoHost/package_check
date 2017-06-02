@@ -230,6 +230,9 @@ rm "$script_dir/pcheck.lock"
 exec "$script_dir/package_check.sh" "$arguments"
 EOF
 
+		# Get the last version of app_levels/en.json
+		wget -nv https://raw.githubusercontent.com/YunoHost/apps/master/app_levels/en.json -O "$script_dir/levels.json"
+
 		# Give the execution right
 		chmod +x "$script_dir/upgrade_script.sh"
 
@@ -694,7 +697,9 @@ TEST_RESULTS () {
 
 	# Then, print the levels
 	# Print the global level
-	ECHO_FORMAT "Level of this application: $global_level\n" "white" "bold"
+	verbose_level=$(grep applevel_$global_level\" "$script_dir/levels.json" | cut -d'"' -f4)
+
+	ECHO_FORMAT "Level of this application: $global_level ($verbose_level)\n" "white" "bold"
 
 	# And print the value for each level
 	for i in `seq 1 10`
