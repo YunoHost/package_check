@@ -51,12 +51,12 @@ package_check/package_check.sh APP_ynh
 ;; Test name
 # Comment ignored
 	; Manifest
-		domain="$DOMAIN"	(DOMAIN)
-		path="$PATH"	(PATH)
-		admin="$USER"	(USER)
+		domain="domain.tld"	(DOMAIN)
+		path="/path"	(PATH)
+		admin="john"	(USER)
 		language="en"
 		is_public=1	(PUBLIC|public=1|private=0)
-		password="$PASSWORD"	(PASSWORD)
+		password="password"
 		port="666"	(PORT)
 	; Checks
 		pkg_linter=1

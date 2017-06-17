@@ -7,7 +7,7 @@
 		language="fr"
 #		is_public="Yes"	(PUBLIC|public=Yes|private=No)
 		is_public=1	(PUBLIC|public=1|private=0)
-		password="pass"
+		password="password"
 		port="666"	(PORT)
 	; Checks
 		pkg_linter=1

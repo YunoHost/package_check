@@ -475,6 +475,26 @@ CHECK_SETUP () {
 		local check_result_remove=-1	# Remove in sub path failed
 	fi
 
+	# Reinstall the application after the removing
+	# Try to resintall only if the first install is a success.
+	if [ $check_result_setup -eq 1 ]
+	then
+		ECHO_FORMAT "\nReinstall the application after a removing.\n" "white" "bold" clog
+		
+		SETUP_APP
+
+		# Try to access the app by its url
+		CHECK_URL
+
+		# Check the result and print SUCCESS or FAIL
+		if check_test_result
+		then	# Success
+			local check_result_setup=1	# Installation succeed
+		else	# Fail
+			local check_result_setup=-1	# Installation failed
+		fi
+	fi
+
 	# Fill the correct variable depend on the type of test
 	if [ "$install_type" = "subdir" ]
 	then
