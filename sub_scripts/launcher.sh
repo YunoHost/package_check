@@ -300,7 +300,7 @@ LXC_CONNECT_INFO () {
 	echo -e "\e[1msudo lxc-attach -n $lxc_name -- command\e[0m"
 
 	echo "To establish a ssh connection:"
-	if [ $(cat "$script_dir/setup_user") = "root" ]; then
+	if [ $(cat "$script_dir/sub_scripts/setup_user") = "root" ]; then
 		echo -ne "\e[1msudo "
 	fi
 	echo -e "\e[1mssh $arg_ssh $lxc_name\e[0m"
