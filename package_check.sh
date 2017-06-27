@@ -872,7 +872,7 @@ then
 
 
 	# Parse each tests serie
-	while read tests_serie
+	while read <&3 tests_serie
 	do
 
 		# Initialize the values for this serie of tests
@@ -1020,7 +1020,7 @@ then
 		# Destroy all snapshots other than snap0
 		destroy_temporary_snapshot
 
-	done <<< "$(grep "^;; " "$check_process")"
+	done 3<<< "$(grep "^;; " "$check_process")"
 
 # No check_process file. Try to parse the manifest.
 else

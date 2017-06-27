@@ -1188,16 +1188,6 @@ CHECK_CHANGE_URL () {
 		ECHO_FORMAT "\nPreliminary install...\n" "white" "bold" clog
 		STANDARD_SETUP_APP
 
-# Wait for next release...
-LXC_START "yunohost app --help | grep --quiet change-url"
-if [ $? -ne 0 ]
-then
-	ECHO_FORMAT "change-url is only available on testing or unstable...\n" "red" "bold"
-	RESULT_change_url=0
-	return 0
-fi
-# ...
-
 		# Check if the install had work
 		if [ $yunohost_result -ne 0 ]
 		then
