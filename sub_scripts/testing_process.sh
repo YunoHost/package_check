@@ -991,7 +991,7 @@ CHECK_BACKUP_RESTORE () {
 			ECHO_FORMAT "\nBackup of the application...\n" "white" "bold" clog
 
 			# Made a backup of the application
-			LXC_START "sudo yunohost --debug backup create -n Backup_test --apps $ynh_app_id --hooks $backup_hooks"
+			LXC_START "sudo yunohost --debug backup create -n Backup_test --apps $ynh_app_id --system $backup_hooks"
 
 			# yunohost_result gets the return code of the backup
 			yunohost_result=$?
