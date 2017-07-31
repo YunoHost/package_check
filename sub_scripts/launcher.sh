@@ -98,6 +98,10 @@ use_temp_snapshot () {
 	sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$snapshot_path/$current_snapshot/rootfs/" "/var/lib/lxc/$lxc_name/rootfs/" > /dev/null 2>> "$test_result"
 
 	stop_timer 1
+
+	# Retrieve the app id in the log. To manage the app after
+	ynh_app_id=$(sudo tac "$yunohost_log" | grep --only-matching --max-count=1 "YNH_APP_INSTANCE_NAME=[^ ]*" | cut --delimiter='=' --fields=2)
+
 	# Fake the yunohost_result return code of the installation
 	yunohost_result=0
 }
