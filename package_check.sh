@@ -222,7 +222,7 @@ then
 # Clone in another directory
 git clone --quiet $git_repository "$script_dir/upgrade"
 cp -a "$script_dir/upgrade/." "$script_dir/."
-rm -r "$script_dir/upgrade"
+sudo rm -r "$script_dir/upgrade"
 # Update the version file
 echo "$check_version" > "$version_file"
 rm "$script_dir/pcheck.lock"
