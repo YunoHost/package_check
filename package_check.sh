@@ -1220,7 +1220,7 @@ then
 	fi
 
 	# Get the previous level, found in the file list_level_stable
-	previous_level=$(grep "$job" "$script_dir/../auto_build/list_level_stable" | cut -d: -f2)
+	previous_level=$(grep "^$job:" "$script_dir/../auto_build/list_level_stable" | cut -d: -f2)
 
 	# Print the variation of the level. If this level is different than 0
 	if [ $global_level -gt 0 ]
