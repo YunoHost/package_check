@@ -443,7 +443,8 @@ CHECK_SETUP () {
 			if [ -z "$root_snapshot" ]
 			then
 				ECHO_FORMAT "Create a snapshot for root installation.\n" "white" clog
-				root_snapshot=$(create_temp_backup)
+				create_temp_backup 2
+				root_snapshot=snap2
 			fi
 		else
 			# Check if a snapshot already exist for a subpath (or no_url) install
@@ -451,7 +452,8 @@ CHECK_SETUP () {
 			then
 				# Then create a snapshot
 				ECHO_FORMAT "Create a snapshot for sub path installation.\n" "white" clog
-				subpath_snapshot=$(create_temp_backup)
+				create_temp_backup 1
+				subpath_snapshot=snap1
 			fi
 		fi
 	fi

@@ -1017,8 +1017,8 @@ then
 		# Print the final results of the tests
 		TEST_RESULTS
 
-		# Destroy all snapshots other than snap0
-		destroy_temporary_snapshot
+		# Set snap0 as the current snapshot
+		current_snapshot=snap0
 
 	done 3<<< "$(grep "^;; " "$check_process")"
 
