@@ -65,6 +65,9 @@ stop_timer () {
 create_temp_backup () {
 	# Create a temporary snapshot
 
+	# snap1 for subpath or snap2 for root install
+	snap_number=$1
+
 	start_timer
 	# Check all the witness files, to verify if them still here
 	check_witness_files >&2
@@ -72,13 +75,28 @@ create_temp_backup () {
 	# Stop the container, before its snapshot
 	sudo lxc-stop --name $lxc_name >&2
 
-	# Create the snapshot.
-	sudo lxc-snapshot --name $lxc_name >> "$test_result" 2>&1
+	# Check if the snapshot already exist
+	if [ ! -e "$snapshot_path/snap$snap_number" ]
+	then
+		echo "snap$snap_number doesn't exist, its first creation can be take a little while." >&2
+		# Create the snapshot.
+		sudo lxc-snapshot --name $lxc_name >> "$test_result" 2>&1
 
-	# Get the last created snapshot, and set it as the new current snapshot.
-	current_snapshot=$(sudo lxc-snapshot --name $lxc_name --list | sort | tail --lines=1 | cut --delimiter=' ' --fields=1)
-	# And return it
-	echo "$current_snapshot"
+		# lxc always creates the first snapshot it can creates.
+		# So if snap1 doesn't exist and you try to create snap2, it will be named snap1.
+		if [ "$snap_number" == "2" ] && [ ! -e "$snapshot_path/snap1" ]
+		then
+			# Rename snap1 to snap2
+			sudo mv "$snapshot_path/snap1" "$snapshot_path/snap2"
+		fi
+	fi
+
+	# Update the snapshot with rsync to clone the current lxc state
+	sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "/var/lib/lxc/$lxc_name/rootfs/" "$snapshot_path/snap$snap_number/rootfs/" > /dev/null 2>> "$test_result"
+
+	# Set this snapshot as the current snapshot
+	current_snapshot=snap$snap_number
+
 	stop_timer 1 >&2
 
 	# Restart the container, after the snapshot
@@ -104,27 +122,6 @@ use_temp_snapshot () {
 
 	# Fake the yunohost_result return code of the installation
 	yunohost_result=0
-}
-
-destroy_temporary_snapshot () {
-	# Destroy all snapshots other than snap0
-
-	while true
-	do
-		local snapshot=$(sudo lxc-snapshot --name $lxc_name --list | sort | tail --lines=1 | cut --delimiter=' ' --fields=1)
-		if [ -n "$snapshot" ] && [ "$snapshot" != "snap0" ]
-		then
-			echo "Destroy temporary snapshot $snapshot."
-			sudo lxc-snapshot --name $lxc_name --destroy $snapshot
-		else
-			break
-		fi
-	done
-
-	# Clear the variables which contains the snapshot names
-	unset root_snapshot
-	unset subpath_snapshot
-	current_snapshot=snap0
 }
 
 #=================================================
@@ -292,8 +289,8 @@ LXC_TURNOFF () {
 		sudo ifdown --force $lxc_bridge | tee --append "$test_result" 2>&1
 	fi
 
-	# Destroy all snapshots other than snap0
-	destroy_temporary_snapshot
+	# Set snap0 as the current snapshot
+	current_snapshot=snap0
 }
 
 LXC_CONNECT_INFO () {
