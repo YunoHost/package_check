@@ -14,7 +14,7 @@ then
 	LXC_BRIDGE=$(cat "$pcheck_config" | grep LXC_BRIDGE= | cut -d '=' -f2)
 	dns=$(cat "$pcheck_config" | grep dns= | cut -d '=' -f2)
 	dnsforce=$(cat "$pcheck_config" | grep dnsforce= | cut -d '=' -f2)
-	main_iface=$(cat "$pcheck_config" | grep main_iface= | cut -d '=' -f2)
+	main_iface=$(cat "$pcheck_config" | grep iface= | cut -d '=' -f2)
 fi
 
 LOG_BUILD_LXC="$script_dir/Build_lxc.log"
