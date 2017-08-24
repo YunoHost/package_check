@@ -29,7 +29,7 @@ ARG_SSH="-t"
 # Tente de définir l'interface réseau principale
 if [ -z $main_iface ]	# Si main_iface est vide, tente de le trouver.
 then
-	main_iface=$(sudo route | grep default -m 1 | awk '{print $8;}')	# Prend l'interface réseau défini par default
+	main_iface=$(sudo route | grep default.*0.0.0.0 -m1 | awk '{print $8;}')	# Prend l'interface réseau défini par default
 	if [ -z $main_iface ]; then
 		echo -e "\e[91mImpossible de déterminer le nom de l'interface réseau de l'hôte.\e[0m"
 		exit 1
@@ -38,7 +38,7 @@ fi
 
 if [ -z $dns ]	# Si l'adresse du dns est vide, tente de le déterminer à partir de la passerelle par défaut.
 then
-	dns=$(sudo route -n | grep ^0.0.0.0 | awk '{print $2;}')
+	dns=$(sudo route -n | grep ^0.0.0.0.*$main_iface | awk '{print $2;}')
 	if [ -z $dns ]; then
 		echo -e "\e[91mImpossible de déterminer l'adresse de la passerelle.\e[0m"
 		exit 1
