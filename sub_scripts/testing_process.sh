@@ -738,7 +738,7 @@ CHECK_MULTI_INSTANCE () {
 		# Second installation
 		elif [ $i -eq 2 ]
 		then
-			local path_2=$test_path-2
+			local path_2="/2${test_path#/}"
 			ECHO_FORMAT "Second installation: path=$path_2\n" clog
 			check_path=$path_2
 		# Third installation
@@ -759,13 +759,16 @@ CHECK_MULTI_INSTANCE () {
 		if [ $i -eq 1 ]
 		then
 			local multi_yunohost_result_1=$yunohost_result
+                        local ynh_app_id_1=$ynh_app_id
 		# Second installation
 		elif [ $i -eq 2 ]
 		then
 			local multi_yunohost_result_2=$yunohost_result
+                        local ynh_app_id_2=$ynh_app_id
 		# Third installation
 		else
 			local multi_yunohost_result_3=$yunohost_result
+                        local ynh_app_id_3=$ynh_app_id
 		fi
 	done
 
@@ -776,13 +779,16 @@ CHECK_MULTI_INSTANCE () {
 		if [ $i -eq 1 ]
 		then
 			check_path=$path_1
+                        ynh_app_id=$ynh_app_id_1
 		# Second app
 		elif [ $i -eq 2 ]
 		then
 			check_path=$path_2
+                        ynh_app_id=$ynh_app_id_2
 		# Third app
 		else
 			check_path=$path_3
+                        ynh_app_id=$ynh_app_id_3
 		fi
 
 		# Try to access the app by its url
