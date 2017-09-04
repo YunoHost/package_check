@@ -139,7 +139,7 @@ package_check.sh [OPTION]... PACKAGE_TO_CHECK
 	-b, --branch=BRANCH
 		Specify a branch to check.
 	-f, --force-install-ok
-		Force following test even if all install have failed.
+		Force remaining tests even if installation tests failed or were not selected for execution.
 	-i, --interrupt
 		Force auto_remove value, break before each remove.
 	-h, --help
