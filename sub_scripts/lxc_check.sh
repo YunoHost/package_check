@@ -42,7 +42,7 @@ if [ -z "$LXC_BRIDGE" ]; then
 fi
 if [ -z "$main_iface" ]; then
 	# Tente de définir l'interface réseau principale
-	main_iface=$(sudo route | grep default | awk '{print $8;}')	# Prend l'interface réseau défini par default
+	main_iface=$(sudo ip route | grep default | awk '{print $5;}')	# Prend l'interface réseau défini par default
 	if [ -z $main_iface ]; then
 		echo -e "\e[91mImpossible de déterminer le nom de l'interface réseau de l'hôte.\e[0m"
 		exit 1

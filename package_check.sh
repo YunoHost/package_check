@@ -319,7 +319,7 @@ fi
 
 if [ -z "$main_iface" ]; then
 	# Try to determine the main iface
-	main_iface=$(sudo route | grep default | awk '{print $8;}')
+	main_iface=$(sudo ip route | grep default | awk '{print $5;}')
 	if [ -z $main_iface ]
 	then
 		echo -e "\e[91mUnable to find the name of the main iface.\e[0m"
@@ -376,7 +376,6 @@ test_user=package_checker
 source "$script_dir/sub_scripts/launcher.sh"
 source "$script_dir/sub_scripts/testing_process.sh"
 source "$script_dir/sub_scripts/log_extractor.sh"
-source /usr/share/yunohost/helpers
 
 #=================================================
 # Check LXC

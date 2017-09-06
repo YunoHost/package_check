@@ -1332,7 +1332,12 @@ set_witness_files () {
 	create_witness_file "/var/log/witnessfile" file
 
 	# Config fpm
-	create_witness_file "/etc/php5/fpm/pool.d/witnessfile.conf" file
+	if [ -d "/etc/php5" ]; then
+		create_witness_file "/etc/php5/fpm/pool.d/witnessfile.conf" file
+	fi
+	if [ -d "/etc/php/7.0" ]; then
+		create_witness_file "/etc/php/7.0/fpm/pool.d/witnessfile.conf" file
+	fi
 
 	# Config logrotate
 	create_witness_file "/etc/logrotate.d/witnessfile" file
@@ -1378,7 +1383,12 @@ check_witness_files () {
 	check_file_exist "/var/log/witnessfile"
 
 	# Config fpm
-	check_file_exist "/etc/php5/fpm/pool.d/witnessfile.conf"
+	if [ -d "/etc/php5" ]; then
+		check_file_exist "/etc/php5/fpm/pool.d/witnessfile.conf" file
+	fi
+	if [ -d "/etc/php/7.0" ]; then
+		check_file_exist "/etc/php/7.0/fpm/pool.d/witnessfile.conf" file
+	fi
 
 	# Config logrotate
 	check_file_exist "/etc/logrotate.d/witnessfile"
