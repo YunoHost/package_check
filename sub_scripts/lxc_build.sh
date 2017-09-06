@@ -19,7 +19,7 @@ then
 fi
 
 LOG_BUILD_LXC="$script_dir/Build_lxc.log"
-test -n "$PLAGE_IP" || PLAGE_IP="10.1.4"	# Utilise des valeurs par défaut si les variables sont vides.
+test -n "$PLAGE_IP" || PLAGE_IP=10.1.4	# Utilise des valeurs par défaut si les variables sont vides.
 test -n "$DOMAIN" || DOMAIN=domain.tld
 test -n "$YUNO_PWD" || YUNO_PWD=admin
 test -n "$LXC_NAME" || LXC_NAME=pchecker_lxc

@@ -19,26 +19,35 @@ then
 	LXC_BRIDGE=$(cat "$pcheck_config" | grep LXC_BRIDGE= | cut -d '=' -f2)
 	main_iface=$(cat "$pcheck_config" | grep iface= | cut -d '=' -f2)
 fi
+
+# Use the default value and set it in the config file
+replace_default_value () {
+	CONFIG_KEY=$1
+	local value=$(grep "|| $CONFIG_KEY=" "$build_script" | cut -d '=' -f2)
+	if grep -q $CONFIG_KEY= "$pcheck_config"
+	then
+		sed -i "s/$CONFIG_KEY=.*/$CONFIG_KEY=$value/"
+	else
+		echo -e "$CONFIG_KEY=$value\n" >> "$pcheck_config"
+	fi
+	echo $value
+}
+
 # Utilise des valeurs par défaut si les variables sont vides, et génère le fichier de config
 if [ -z "$PLAGE_IP" ]; then
-	PLAGE_IP=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| PLAGE_IP=" | cut -d '"' -f4)
-	echo -e "# Plage IP du conteneur\nPLAGE_IP=$PLAGE_IP\n" >> "$pcheck_config"
+	PLAGE_IP=$(replace_default_value PLAGE_IP)
 fi
 if [ -z "$DOMAIN" ]; then
-	DOMAIN=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| DOMAIN=" | cut -d '=' -f2)
-	echo -e "# Domaine de test\nDOMAIN=$DOMAIN\n" >> "$pcheck_config"
+	DOMAIN=$(replace_default_value DOMAIN)
 fi
 if [ -z "$YUNO_PWD" ]; then
-	YUNO_PWD=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| YUNO_PWD=" | cut -d '=' -f2)
-	echo -e "# Mot de passe\nYUNO_PWD=$YUNO_PWD\n" >> "$pcheck_config"
+	YUNO_PWD=$(replace_default_value YUNO_PWD)
 fi
 if [ -z "$LXC_NAME" ]; then
-	LXC_NAME=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| LXC_NAME=" | cut -d '=' -f2)
-	echo -e "# Nom du conteneur\nLXC_NAME=$LXC_NAME\n" >> "$pcheck_config"
+	LXC_NAME=$(replace_default_value LXC_NAME)
 fi
 if [ -z "$LXC_BRIDGE" ]; then
-	LXC_BRIDGE=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| LXC_BRIDGE=" | cut -d '=' -f2)
-	echo -e "# Nom du bridge\nLXC_BRIDGE=$LXC_BRIDGE\n" >> "$pcheck_config"
+	LXC_BRIDGE=$(replace_default_value LXC_BRIDGE)
 fi
 if [ -z "$main_iface" ]; then
 	# Tente de définir l'interface réseau principale
@@ -47,8 +56,13 @@ if [ -z "$main_iface" ]; then
 		echo -e "\e[91mImpossible de déterminer le nom de l'interface réseau de l'hôte.\e[0m"
 		exit 1
 	fi
-	# Enregistre le nom de l'interface réseau de l'hôte dans un fichier de config
-	echo -e "# Interface réseau principale de l'hôte\niface=$main_iface\n" >> "$pcheck_config"
+	# Store the main iface in the config file
+	if grep -q iface= "$pcheck_config"
+	then
+		sed -i "s/iface=.*/iface=$main_iface/"
+	else
+		echo -e "# Main host iface\niface=$main_iface\n" >> "$pcheck_config"
+	fi
 fi
 
 STOP_CONTAINER () {

@@ -295,26 +295,33 @@ then
 	main_iface=$(grep iface= "$pcheck_config" | cut -d '=' -f2)
 fi
 
+# Use the default value and set it in the config file
+replace_default_value () {
+	CONFIG_KEY=$1
+	local value=$(grep "|| $CONFIG_KEY=" "$build_script" | cut -d '=' -f2)
+	if grep -q $CONFIG_KEY= "$pcheck_config"
+	then
+		sed -i "s/$CONFIG_KEY=.*/$CONFIG_KEY=$value/"
+	else
+		echo -e "$CONFIG_KEY=$value\n" >> "$pcheck_config"
+	fi
+	echo $value
+}
 # Use default value from the build script if needed
 if [ -z "$ip_range" ]; then
-	ip_range=$(grep "|| PLAGE_IP=" "$build_script" | cut -d '"' -f4)
-	echo -e "# Ip range for the container\nPLAGE_IP=$ip_range\n" >> "$pcheck_config"
+	ip_range=$(replace_default_value PLAGE_IP)
 fi
 if [ -z "$main_domain" ]; then
-	main_domain=$(grep "|| DOMAIN="  "$build_script" | cut -d '=' -f2)
-	echo -e "# Test domain\nDOMAIN=$main_domain\n" >> "$pcheck_config"
+	main_domain=$(replace_default_value DOMAIN)
 fi
 if [ -z "$yuno_pwd" ]; then
-	yuno_pwd=$(grep "|| YUNO_PWD="  "$build_script" | cut -d '=' -f2)
-	echo -e "# YunoHost password, in the container\nYUNO_PWD=$yuno_pwd\n" >> "$pcheck_config"
+	yuno_pwd=$(replace_default_value YUNO_PWD)
 fi
 if [ -z "$lxc_name" ]; then
-	lxc_name=$(grep "|| LXC_NAME="  "$build_script" | cut -d '=' -f2)
-	echo -e "# Container name\nLXC_NAME=$lxc_name\n" >> "$pcheck_config"
+	lxc_name=$(replace_default_value LXC_NAME)
 fi
 if [ -z "$lxc_bridge" ]; then
-	lxc_bridge=$(grep "|| LXC_BRIDGE="  "$build_script" | cut -d '=' -f2)
-	echo -e "# Bridge name\nLXC_BRIDGE=$lxc_bridge\n" >> "$pcheck_config"
+	lxc_bridge=$(replace_default_value LXC_BRIDGE)
 fi
 
 if [ -z "$main_iface" ]; then
@@ -330,7 +337,12 @@ if [ -z "$main_iface" ]; then
 		exit 1
 	fi
 	# Store the main iface in the config file
-	echo -e "# Main host iface\niface=$main_iface\n" >> "$pcheck_config"
+	if grep -q iface= "$pcheck_config"
+	then
+		sed -i "s/iface=.*/iface=$main_iface/"
+	else
+		echo -e "# Main host iface\niface=$main_iface\n" >> "$pcheck_config"
+	fi
 fi
 
 #=================================================
