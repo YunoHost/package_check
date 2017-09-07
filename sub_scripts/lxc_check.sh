@@ -26,7 +26,7 @@ replace_default_value () {
 	local value=$(grep "|| $CONFIG_KEY=" "$build_script" | cut -d '=' -f2)
 	if grep -q $CONFIG_KEY= "$pcheck_config"
 	then
-		sed -i "s/$CONFIG_KEY=.*/$CONFIG_KEY=$value/"
+		sed -i "s/$CONFIG_KEY=.*/$CONFIG_KEY=$value/" "$pcheck_config"
 	else
 		echo -e "$CONFIG_KEY=$value\n" >> "$pcheck_config"
 	fi
