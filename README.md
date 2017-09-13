@@ -149,7 +149,7 @@ These options are facultative.
 - `Notification` : Grade of notification for this application. There are 3 available levels.
   - `down` : Send an email only if the level of this application has decreased.
   - `change` : Send an email if the level of this application has changed.
-  - `all` : Send an email for each test on this application, whiech ever the result.
+  - `all` : Send an email for each test on this application, which ever the result.
 
 ---
 The `package_check.sh` script accept 6 arguments in addition of package to be checked.
