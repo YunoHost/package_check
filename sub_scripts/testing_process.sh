@@ -361,14 +361,14 @@ check_test_result_remove () {
 is_install_failed () {
 	# Check if an install have previously work
 
-	if [ $RESULT_check_root -eq 1 ]
+	if [ $RESULT_check_sub_dir -eq 1 ]
 	then
-		# If root installation worked, return root.
-		echo root
-	elif [ $RESULT_check_sub_dir -eq 1 ] || [ $force_install_ok -eq 1 ]
-	then
-		# If subdir installation worked or force_install_ok setted, return subdir.
+		# If subdir installation worked.
 		echo subdir
+	elif [ $RESULT_check_root -eq 1 ] || [ $force_install_ok -eq 1 ]
+	then
+		# If root installation worked, return root or force_install_ok setted, return root.
+		echo root
 	else
 		ECHO_FORMAT "All installs failed, impossible to perform this test...\n" "red" clog
 		return 1
