@@ -271,6 +271,10 @@ CHECK_URL () {
 					echo -e "\e[37m"	# Write in 'light grey'
 					grep "<body" --after-context=20 "$script_dir/url_output" | sed 1d | tee --append "$test_result"
 					echo -e "\e[0m"
+
+				# Test http status of ressources files
+				CHECK_URL_RESSOURCES
+
 				fi
 			fi
 		done
@@ -284,6 +288,116 @@ CHECK_URL () {
 		yuno_portal=0
 	fi
 }
+
+CHECK_URL_RESSOURCES()
+{
+	local URLS_TO_TEST
+	local RESULTS
+	local http_code
+	local url_title
+
+	URLS_TO_TEST="$script_dir/url_output_ressources"
+	RESULTS="$script_dir/url_output_ressources_results"
+
+	ECHO_FORMAT "Testing ressources URLs (javascript, css)"
+
+	touch "$URLS_TO_TEST"
+	mkdir -p "$RESULTS"
+
+	# JavaScripts and images
+	cat "$script_dir/url_output" \
+		| grep -o 'src=['"'"'"][^"'"'"']*['"'"'"]'      \
+		| sed -e 's/^src=["'"'"']//' -e 's/["'"'"']$//' \
+		| while read x ; do FULL_URL $x ; done           \
+		| sort --unique                                 \
+		| awk 'NF'                                      \
+		>> "$URLS_TO_TEST"
+
+	# CSS, favicon, etc.
+	cat "$script_dir/url_output" \
+		| grep "link"                                    \
+		| grep -o 'href=['"'"'"][^"'"'"']*['"'"'"]'      \
+		| sed -e 's/^href=["'"'"']//' -e 's/["'"'"']$//' \
+		| while read x ; do FULL_URL $x ; done           \
+		| sort --unique                                  \
+		| awk 'NF'                                       \
+		>> "$URLS_TO_TEST"
+
+	# Get HTTP response code for every ressources
+	while read -r LINE; do
+		http_code=$(curl -o /dev/null --location --silent --head --write-out '%{http_code}' "$LINE")
+		touch "$RESULTS/$http_code"
+		echo "$LINE" >> "$RESULTS/$http_code"
+	done < "$URLS_TO_TEST"
+
+	# Get content to make sure this is no SSO catch
+	if [ -e "$RESULTS/200" ]
+	then
+		while read -r LINE; do
+			curl -o "$RESULTS/download" --location --silent "$LINE"
+			url_title=$(grep "<title>" "$RESULTS/download" | cut --delimiter='>' --fields=2 | cut --delimiter='<' --fields=1)
+
+			# Check if the page title is neither the YunoHost portail or default nginx page
+			if [ "$url_title" = "YunoHost Portal" ]
+			then
+				touch "$RESULTS/portal"
+				echo "$LINE" >> "$RESULTS/portal"
+			fi
+
+			rm "$RESULTS/download"
+		done < "$RESULTS/200"
+	fi
+
+	if [ -e "$RESULTS/000" ]
+	then
+		ECHO_FORMAT "Some ressources could not be reached by curl.\n" "white" "bold"
+		cat "$RESULTS/000"
+		curl_error=1
+	fi
+
+	if [ -e "$RESULTS/404" ]
+	then
+		ECHO_FORMAT "Some ressources returns a code http 404.\n" "white" "bold"
+		cat "$RESULTS/404"
+		curl_error=1
+	fi
+
+	if [ -e "$RESULTS/portal" ]
+	then
+		ECHO_FORMAT "Some ressources where catched by SSO, they contain YunoHost's portal HTML.\n" "white" "bold"
+		cat "$RESULTS/portal"
+		curl_error=1
+		rm "$RESULTS/portal"
+	fi
+
+	wc -l "$RESULTS"/*
+	rm "$URLS_TO_TEST"
+	rm -rf "$RESULTS"
+}
+
+FULL_URL()
+{
+	local url
+	local directory
+	local fullpath
+	url=$1
+
+	directory=$(dirname "$check_domain/hop")
+	fullpath=$(realpath -m "$directory/$url")
+
+	if [[ ${url:0:2} == "//" ]]
+	then
+		echo "$url"
+	else
+		if [[ ${url:0} == "/" ]]
+		then
+			echo "$check_domain$url"
+		else
+			echo "${fullpath#$(pwd)/}"
+		fi
+	fi
+}
+
 
 #=================================================
 # Generic functions for unit tests
