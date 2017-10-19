@@ -273,7 +273,10 @@ CHECK_URL () {
 					echo -e "\e[0m"
 
 				# Test http status of ressources files
-				CHECK_URL_RESSOURCES
+				if [[ $curl_error -eq 0 ]]
+				then
+					CHECK_URL_RESSOURCES
+				fi
 
 				fi
 			fi
