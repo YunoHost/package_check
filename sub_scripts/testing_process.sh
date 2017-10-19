@@ -370,7 +370,7 @@ CHECK_URL_RESSOURCES()
 		rm "$RESULTS/portal"
 	fi
 
-	wc -l "$RESULTS"/*
+	wc -l "$RESULTS"/* | sed "s|$RESULTS||"
 	rm "$URLS_TO_TEST"
 	rm -rf "$RESULTS"
 }
