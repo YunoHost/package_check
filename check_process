@@ -1,5 +1,8 @@
 ;; Nom du test
 # Commentaire ignoré
+	; pre-install
+		echo -n "Here your commands to execute in the container"
+		echo ", before each installation of the app."
 	; Manifest
 		domain="domain.tld"	(DOMAIN)
 		path="/path"	(PATH)

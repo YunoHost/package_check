@@ -38,4 +38,4 @@ echo "Pour établir une connexion ssh:"
 if [ $(cat "$script_dir/setup_user") = "root" ]; then
 	echo -ne "\e[1msudo "
 fi
-echo -e "\e[1mssh -t $LXC_NAME\e[0m"
+echo -e "\e[1mssh -t $LXC_NAME 'bash -i'\e[0m"

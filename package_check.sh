@@ -840,7 +840,7 @@ then
 					break;
 				fi
 				# Copy the line in the partial check_process
-				echo $line >> "$partial_check_process"
+				echo "$line" >> "$partial_check_process"
 			fi
 
 			# Search for the first line
@@ -899,9 +899,14 @@ then
 
 		# Extract the section of the current tests serie
 		extract_section "^$tests_serie" "^;;" "$check_process"
+		partial_check_process=$partial1
+
+		# Check if there a pre-install instruction for this serie
+		extract_section "^; pre-install" "^;" "$partial2"
+		pre_install="$(cat "$partial_check_process")"
+
 		# Parse all infos about arguments of manifest
 		# Extract the manifest arguments section from the second partial file
-		partial_check_process=$partial1
 		extract_section "^; Manifest" "^; " "$partial2"
 
 		# Initialize the arguments list
