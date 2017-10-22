@@ -175,7 +175,7 @@ then
 	fi
 fi
 # Create the lock file
-touch "$lock_file"
+echo "start:$(date +%s)" > "$lock_file"
 
 #=================================================
 # Check the internet connectivity
