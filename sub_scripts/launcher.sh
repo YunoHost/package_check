@@ -84,7 +84,7 @@ create_temp_backup () {
 
 		# lxc always creates the first snapshot it can creates.
 		# So if snap1 doesn't exist and you try to create snap2, it will be named snap1.
-		if [ "$snap_number" == "2" ] && [ ! -e "$snapshot_path/snap1" ]
+		if [ "$snap_number" == "2" ] && [ ! -e "$snapshot_path/snap2" ]
 		then
 			# Rename snap1 to snap2
 			sudo mv "$snapshot_path/snap1" "$snapshot_path/snap2"
