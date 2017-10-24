@@ -31,6 +31,28 @@ SETUP_APP () {
 	# Uses the default snapshot
 	current_snapshot=snap0
 
+	# Exec the pre-install instruction, if there one
+	if [ -n "$pre_install" ]
+	then
+		ECHO_FORMAT "Pre installation request\n" "white" "bold" clog
+		# Start the lxc container
+		LXC_START "true"
+		# Copy all the instructions into a script
+		echo "$pre_install" > "$script_dir/preinstall.sh"
+		chmod +x "$script_dir/preinstall.sh"
+		# Replace variables
+		sed -i "s/\$USER/$test_user/" "$script_dir/preinstall.sh"
+		sed -i "s/\$DOMAIN/$main_domain/" "$script_dir/preinstall.sh"
+		sed -i "s/\$SUBDOMAIN/$sub_domain/" "$script_dir/preinstall.sh"
+		sed -i "s/\$PASSWORD/$yuno_pwd/" "$script_dir/preinstall.sh"
+		# Copy the pre-install script into the container.
+		scp -rq "$script_dir/preinstall.sh" "$lxc_name":
+		# Then execute the script to execute the pre-install commands.
+		LXC_START "./preinstall.sh >&2"
+		# Print the log to print the results
+		ECHO_FORMAT "$(cat "$temp_log")\n" clog
+	fi
+
 	# Install the application in a LXC container
 	LXC_START "sudo yunohost --debug app install \"$package_dir\" -a \"$manifest_args_mod\""
 
