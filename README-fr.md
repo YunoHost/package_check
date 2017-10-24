@@ -50,6 +50,9 @@ package_check/package_check.sh APP_ynh
 ```
 ;; Nom du test
 # Commentaire ignoré
+	; pre-install
+		echo -n "Placez ici vos commandes a exéxuter dans le conteneur, "
+		echo "avant chaque installation de l'application."
 	; Manifest
 		domain="domain.tld"	(DOMAIN)
 		path="/path"	(PATH)
@@ -90,6 +93,11 @@ Notification=none
 Nom du scénario de test qui sera effectué.  
 On peut créer autant de scénario de test que voulu, tous ayant la même syntaxe.  
 Les différents scénarios de test seront exécutés successivement.
+
+### `; pre-install`
+*Instruction optionnelle*  
+Si vous devez exécuter une commande ou un groupe de commandes avant l'installation, vous pouvez utiliser cette instruction.  
+Toutes les commandes ajoutées après l'instruction `; pre-install` seront exécutées dans le conteneur avant chaque installation de l'application.
 
 ### `; Manifest`
 Ensemble des clés du manifest.  

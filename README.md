@@ -50,6 +50,9 @@ package_check/package_check.sh APP_ynh
 ```
 ;; Test name
 # Comment ignored
+	; pre-install
+		echo -n "Here your commands to execute in the container, "
+		echo "before each installation of the app."
 	; Manifest
 		domain="domain.tld"	(DOMAIN)
 		path="/path"	(PATH)
@@ -90,6 +93,11 @@ Notification=none
 Name of tests series that will be perform.  
 It's possible to create multiples tests series, all with the same syntax.  
 All different tests series will be perform sequentialy.
+
+### `; pre-install`
+*Optionnal instruction*  
+If you have to execute a command or a group of commands before the installation. You can use this instruction.  
+All the commands added after the instruction `; pre-install` will be executed in the container before each installation of the app.
 
 ### `; Manifest`
 Set of manifest keys.  
