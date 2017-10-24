@@ -686,12 +686,14 @@ CHECK_PUBLIC_PRIVATE () {
 		then
 			# In private mode, if curl doesn't fell on the ynh portal, it's a fail.
 			if [ $yuno_portal -eq 0 ]; then
+				ECHO_FORMAT "App is not private: it should redirect to the Yunohost portal, but is publicly accessible instead\n" "lyellow" clog
 				yunohost_result=1
 			fi
 		elif [ "$install_type" = "public" ]
 		then
 			# In public mode, if curl fell on the ynh portal, it's a fail.
 			if [ $yuno_portal -eq 1 ]; then
+				ECHO_FORMAT "App page is not public: it should be publicly accessible, but redirects to the Yunohost portal instead\n" "lyellow" clog
 				yunohost_result=1
 			fi
 		fi
