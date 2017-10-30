@@ -263,7 +263,7 @@ do
     then
         echo -e "\e[92mLe bridge démarre correctement.\e[0m"
         # Vérifie que le bridge obtient une adresse IP
-        if sudo ifconfig | grep -A 10 $LXC_BRIDGE | grep "inet adr" | grep -q -F "$PLAGE_IP.1 "
+        if LC_ALL=C sudo ifconfig | grep -A 10 $LXC_BRIDGE | grep "inet addr" | grep -q -F "$PLAGE_IP.1 "
         then
             echo -e "\e[92mLe bridge obtient correctement son adresse IP.\e[0m"
         else
