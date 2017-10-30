@@ -127,7 +127,7 @@ RESTORE_SNAPSHOT () {
 }
 
 RESTORE_ARCHIVE_SNAPSHOT () {
-	if ! test -e "/var/lib/lxcsnaps/$LXC_NAME/snap1.tar.gz"; then
+	if ! test -e "/var/lib/lxcsnaps/$LXC_NAME/snap0.tar.gz"; then
 		echo -e "\e[91mAucune archive de snapshot pour le conteneur $LXC_NAME.\e[0m"
 		return 1
 	fi
