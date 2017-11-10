@@ -57,69 +57,87 @@ then
 	# Print the help and exit
 	notice=1
 else
-	# Reduce the arguments for getopts
-	arguments="$*"
-	arguments=${arguments//--branch=/-b}
-	arguments=${arguments//--force-install-ok/-f}
-	arguments=${arguments//--interrupt/-i}
-	arguments=${arguments//--help/-h}
-	arguments=${arguments//--build-lxc/-l}
-	arguments=${arguments//--bash-mode/-y}
+	# Store arguments in a array to keep each argument separated
+	arguments=("$@")
+
+	# Read the array value per value
+	for i in `seq 0 $(( ${#arguments[@]} -1 ))`
+	do
+		# For each argument in the array, reduce to short argument for getopts
+		arguments[$i]=${arguments[$i]//--branch=/-b}
+		arguments[$i]=${arguments[$i]//--force-install-ok/-f}
+		arguments[$i]=${arguments[$i]//--interrupt/-i}
+		arguments[$i]=${arguments[$i]//--help/-h}
+		arguments[$i]=${arguments[$i]//--build-lxc/-l}
+		arguments[$i]=${arguments[$i]//--bash-mode/-y}
+	done
 
 	# Read and parse all the arguments
-	# Use a function here, to use standart arguments $@ and use more simply getopts and shift.
+	# Use a function here, to use standart arguments $@ and be able to use shift.
 	parse_arg () {
 		while [ $# -ne 0 ]
 		do
-			# Initialize the index of getopts
-			OPTIND=1
-			# Parse with getopts only if the argument begin by -
-			if [ ${1:0:1} = "-" ]
+			# If the paramater begins by -, treat it with getopts
+			if [ "${1:0:1}" == "-" ]
 			then
-				getopts ":b:fihly " parameter
+				# Initialize the index of getopts
+				OPTIND=1
+				# Parse with getopts only if the argument begin by -
+				getopts ":b:fihly" parameter || true
 				case $parameter in
 					b)
 						# --branch=branch-name
 						gitbranch="-b $OPTARG"
+						shift_value=2
 						;;
 					f)
 						# --force-install-ok
 						force_install_ok=1
+						shift_value=1
 						;;
 					i)
 						# --interrupt
 						interrupt=1
+						shift_value=1
 						;;
 					h)
 						# --help
 						notice=1
+						shift_value=1
 						;;
 					l)
 						# --build-lxc
 						build_lxc=1
+						shift_value=1
 						;;
 					y)
 						# --bash-mode
 						bash_mode=1
+						shift_value=1
 						;;
 					\?)
-						echo "Invalid argument: -$OPTARG" >&2
+						echo "Invalid argument: -${OPTARG:-}"
 						notice=1
+						shift_value=1
 						;;
 					:)
-						echo "-$OPTARG parameter requires an argument." >&2
+						echo "-$OPTARG parameter requires an argument."
 						notice=1
+						shift_value=1
 						;;
 				esac
+			# Otherwise, it's not an option, it's an operand
 			else
 				app_arg="$1"
+				shift_value=1
 			fi
-			shift
+			# Shift the parameter and its argument
+			shift $shift_value
 		done
 	}
 
-	# Call parse_arg and pass the modified list of args.
-	parse_arg $arguments
+	# Call parse_arg and pass the modified list of args as a array of arguments.
+	parse_arg "${arguments[@]}"
 fi
 
 # Prevent a conflict between --interrupt and --bash-mode
