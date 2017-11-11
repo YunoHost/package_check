@@ -145,7 +145,7 @@ CHECK_URL () {
 		ECHO_FORMAT "\nTry to access by url...\n" "white" "bold"
 
 		# Force a skipped_uris if public mode is not set
-		if [ -z "$public_arg" ]
+		if [ "$install_type" != "private" ] && [ "$install_type" != "public" ] && [ -z "$public_arg" ]
 		then
 			# Add a skipped_uris on / for the app
 			LXC_START "sudo yunohost app setting \"$ynh_app_id\" skipped_uris -v \"/\""
