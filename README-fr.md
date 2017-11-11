@@ -119,7 +119,7 @@ Si un test est absent de la liste, il sera ignoré. Cela revient à le noter à 
 - `setup_public`: Installation en public.
 - `upgrade`: Upgrade du package sur la même version. Test uniquement le script upgrade.
 - `backup_restore`: Backup et restauration.
-- `multi_instance`: Installation de l'application 3 fois de suite, pour vérifier sa capacité à être multi-instance. Les 2e et 3e installations se font respectivement en ajoutant un suffixe et un préfixe au path.
+- `multi_instance`: Installation de l'application 2 fois de suite, pour vérifier sa capacité à être multi-instance.
 - `incorrect_path`: Provoque une erreur avec un path malformé, path/.
 - `port_already_use`: Provoque une erreur sur le port en l'ouvrant avant le script d'install.  
 	Le test` port_already_use` peut éventuellement prendre en argument un numéro de port. Si celui-ci n'est pas dans le manifest.  

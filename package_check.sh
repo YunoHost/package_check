@@ -813,7 +813,7 @@ initialize_values() {
 	all_test=0
 
 	# Default path
-	test_path=/check
+	test_path=/
 }
 
 #=================================================

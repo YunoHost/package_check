@@ -119,7 +119,7 @@ If a test is not in the list, it will be ignored. It's similar to marked at 0.
 - `setup_public`: Public installation.
 - `upgrade`: Upgrade package on same version. Only test the upgrade script.
 - `backup_restore`: Backup then restore.
-- `multi_instance`: Installing the application 3 times to verify its ability to be multi-instance. The 2nd and 3rd respectively installs are adding a suffix then prefix path.
+- `multi_instance`: Installing the application 2 times to verify its ability to be multi-instance.
 - `incorrect_path`: Causes an arror with a malformed path, path/.
 - `port_already_use`: Causes an error on the port by opening before.  
         The `port_already_use` test may eventually take in argument the port number.  

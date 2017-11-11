@@ -732,48 +732,38 @@ CHECK_MULTI_INSTANCE () {
 
 	unit_test_title "Multi-instance installations..."
 
-	# Check if the sub path install have previously work
-	if [ $RESULT_check_sub_dir -ne 1 ] && [ $force_install_ok -ne 1 ]
-	then
-		# If subdir installation doesn't worked and force_install_ok not setted, aborted this test.
-		ECHO_FORMAT "Sub path install failed, impossible to perform this test...\n" "red" clog
-		return
-	fi
+	# Check if an install have previously work
+	local previous_install=$(is_install_failed)
+	# Abort if none install worked
+	[ "$previous_install" = "1" ] && return
 
 	# Copy original arguments
 	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
-	check_domain=$sub_domain
-	replace_manifest_key "domain" "$check_domain"
+	replace_manifest_key "path" "$test_path"
+	check_path=$test_path
 	replace_manifest_key "user" "$test_user"
 	replace_manifest_key "public" "$public_public_arg"
 
-	# Install 3 times the same app
+	# Install 2 times the same app
 	local i=0
-	for i in 1 2 3
+	for i in 1 2
 	do
 		# First installation
 		if [ $i -eq 1 ]
 		then
-			local path_1=$test_path
-			ECHO_FORMAT "First installation: path=$path_1\n" clog
-			check_path=$path_1
+			check_domain=$main_domain
+			ECHO_FORMAT "First installation: path=$check_domain$check_path\n" clog
 		# Second installation
 		elif [ $i -eq 2 ]
 		then
-			local path_2="/2${test_path#/}"
-			ECHO_FORMAT "Second installation: path=$path_2\n" clog
-			check_path=$path_2
-		# Third installation
-		else
-			local path_3="/3-${test_path#/}"
-			ECHO_FORMAT "Third installation: path=$path_3\n" clog
-			check_path=$path_3
+			check_domain=$sub_domain
+			ECHO_FORMAT "Second installation: path=$check_domain$check_path\n" clog
 		fi
 
-		# Replace path manifest key for the test
-		replace_manifest_key "path" "$check_path"
+		# Replace path and domain manifest keys for the test
+		replace_manifest_key "domain" "$check_domain"
 
 		# Install the application in a LXC container
 		SETUP_APP
@@ -783,36 +773,28 @@ CHECK_MULTI_INSTANCE () {
 		if [ $i -eq 1 ]
 		then
 			local multi_yunohost_result_1=$yunohost_result
-                        local ynh_app_id_1=$ynh_app_id
+			local ynh_app_id_1=$ynh_app_id
 		# Second installation
 		elif [ $i -eq 2 ]
 		then
 			local multi_yunohost_result_2=$yunohost_result
-                        local ynh_app_id_2=$ynh_app_id
-		# Third installation
-		else
-			local multi_yunohost_result_3=$yunohost_result
-                        local ynh_app_id_3=$ynh_app_id
+			local ynh_app_id_2=$ynh_app_id
 		fi
 	done
 
-	# Try to access to the 3 apps by theirs url
-	for i in 1 2 3
+	# Try to access to the 2 apps by theirs url
+	for i in 1 2
 	do
 		# First app
 		if [ $i -eq 1 ]
 		then
-			check_path=$path_1
-                        ynh_app_id=$ynh_app_id_1
+			check_domain=$main_domain
+			ynh_app_id=$ynh_app_id_1
 		# Second app
 		elif [ $i -eq 2 ]
 		then
-			check_path=$path_2
-                        ynh_app_id=$ynh_app_id_2
-		# Third app
-		else
-			check_path=$path_3
-                        ynh_app_id=$ynh_app_id_3
+			check_domain=$sub_domain
+			ynh_app_id=$ynh_app_id_2
 		fi
 
 		# Try to access the app by its url
@@ -830,16 +812,13 @@ CHECK_MULTI_INSTANCE () {
 			elif [ $i -eq 2 ]
 			then
 				multi_yunohost_result_2=1
-			# Third app
-			else
-				multi_yunohost_result_3=1
 			fi
 		fi
 	done
 
 	# Check the result and print SUCCESS or FAIL
-	# Succeed if first installation works, and either the second or the third works also
-	if [ $multi_yunohost_result_1 -eq 0 ] && ( [ $multi_yunohost_result_2 -eq 0 ] || [ $multi_yunohost_result_3 -eq 0 ] )
+	# Succeed if the 2 installations work;
+	if [ $multi_yunohost_result_1 -eq 0 ] && [ $multi_yunohost_result_2 -eq 0 ]
 	then	# Success
 		check_success
 		RESULT_check_multi_instance=1
