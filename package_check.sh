@@ -254,6 +254,13 @@ EOF
 		# Give the execution right
 		chmod +x "$script_dir/upgrade_script.sh"
 
+	# Temporary upgrade fix
+	# Check if lynx is already installed.
+	if [ ! -e "$(which lynx)" ]
+	then
+		sudo apt-get install -y lynx
+	fi
+
 		# Start the upgrade script by replacement of this process
 		exec "$script_dir/upgrade_script.sh"
 	fi

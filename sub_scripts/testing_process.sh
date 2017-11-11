@@ -288,10 +288,10 @@ CHECK_URL () {
 						ECHO_FORMAT "The connection attempt fall on nginx default page.\n" "white" "bold" clog
 					fi
 
-					# Print the first 20 lines of the body
-					ECHO_FORMAT "Extract of the body:\n" "white"
-					echo -e "\e[37m"	# Write in 'light grey'
-					grep "<body" --after-context=20 "$script_dir/url_output" | sed 1d | tee --append "$test_result"
+					# Print the first 20 lines of the page
+					ECHO_FORMAT "Extract of the page:\n" "white"
+					echo -en "\e[37m"	# Write in 'light grey'
+					lynx -dump -force_html "$script_dir/url_output" | head --lines 20 | tee --append "$test_result"
 					echo -e "\e[0m"
 				fi
 			fi

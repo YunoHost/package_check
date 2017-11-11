@@ -71,8 +71,8 @@ echo -e "\e[1m> Update et install lxc lxctl\e[0m" | tee "$LOG_BUILD_LXC"
 sudo apt-get update >> "$LOG_BUILD_LXC" 2>&1
 sudo apt-get install -y lxc lxctl >> "$LOG_BUILD_LXC" 2>&1
 
-echo -e "\e[1m> Install git curl\e[0m" | tee "$LOG_BUILD_LXC"
-sudo apt-get install -y git curl >> "$LOG_BUILD_LXC" 2>&1
+echo -e "\e[1m> Install git, curl and lynx\e[0m" | tee "$LOG_BUILD_LXC"
+sudo apt-get install -y git curl lynx >> "$LOG_BUILD_LXC" 2>&1
 
 sudo mkdir -p /var/lib/lxcsnaps	# Créer le dossier lxcsnaps, pour s'assurer que lxc utilisera ce dossier, même avec lxc 2.
 
