@@ -78,7 +78,7 @@ create_temp_backup () {
 	# Check if the snapshot already exist
 	if [ ! -e "$snapshot_path/snap$snap_number" ]
 	then
-		echo "snap$snap_number doesn't exist, its first creation can be take a little while." >&2
+		echo "snap$snap_number doesn't exist, its first creation can takes a little while." >&2
 		# Create the snapshot.
 		sudo lxc-snapshot --name $lxc_name >> "$test_result" 2>&1
 
