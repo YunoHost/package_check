@@ -69,6 +69,7 @@ package_check/package_check.sh APP_ynh
 		setup_private=1
 		setup_public=1
 		upgrade=1
+		upgrade=1	from_commit=65c382d138596fcb32b4c97c39398815a1dcd4e8
 		backup_restore=1
 		multi_instance=1
 		incorrect_path=1
@@ -88,6 +89,10 @@ package_check/package_check.sh APP_ynh
 ;;; Options
 Email=
 Notification=none
+;;; Upgrade options
+	; commit=65c382d138596fcb32b4c97c39398815a1dcd4e8
+		name=Name of this previous version
+		manifest_arg=domain=DOMAIN&path=PATH&admin=USER&password=pass&is_public=1&
 ```
 ### `;; Test name`
 Name of tests series that will be perform.  
@@ -118,6 +123,7 @@ If a test is not in the list, it will be ignored. It's similar to marked at 0.
 - `setup_private`: Private installation.
 - `setup_public`: Public installation.
 - `upgrade`: Upgrade package on same version. Only test the upgrade script.
+- `upgrade from_commit`: Upgrade package from the specified commit to the latest version.
 - `backup_restore`: Backup then restore.
 - `multi_instance`: Installing the application 2 times to verify its ability to be multi-instance.
 - `incorrect_path`: Causes an arror with a malformed path, path/.
@@ -158,6 +164,13 @@ These options are facultative.
   - `down` : Send an email only if the level of this application has decreased.
   - `change` : Send an email if the level of this application has changed.
   - `all` : Send an email for each test on this application, which ever the result.
+
+### `;;; Upgrade options`
+*Optionnal instruction*  
+For each specified commit for an upgrade, allow to give a name for this version and manifest parameters which will be used for the preliminary installation.  
+In case of lack of name, the commit will be used.  
+And so on in case of lack of manifest arguments, the default arguments of the check process will be used.  
+> 3 variables shall be used for the arguments of the manifest, DOMAIN, PATH et USER.
 
 ---
 The `package_check.sh` script accept 6 arguments in addition of package to be checked.

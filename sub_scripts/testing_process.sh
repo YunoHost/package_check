@@ -533,73 +533,129 @@ CHECK_SETUP () {
 CHECK_UPGRADE () {
 	# Try the upgrade script
 
-	unit_test_title "Upgrade..."
-
-	# Check if an install have previously work
-	local previous_install=$(is_install_failed)
-	# Abort if none install worked
-	[ "$previous_install" = "1" ] && return
-
-	# Copy original arguments
-	local manifest_args_mod="$manifest_arguments"
-
-	# Replace manifest key for the test
-	check_domain=$sub_domain
-	replace_manifest_key "domain" "$check_domain"
-	# Use a path according to previous succeeded installs
-	if [ "$previous_install" = "subdir" ]; then
-		local check_path=$test_path
-	elif [ "$previous_install" = "root" ]; then
-		local check_path=/
-	fi
-	replace_manifest_key "path" "$check_path"
-	replace_manifest_key "user" "$test_user"
-	replace_manifest_key "public" "$public_public_arg"
-
-	# Install the application in a LXC container
-	ECHO_FORMAT "\nPreliminary install...\n" "white" "bold" clog
-	STANDARD_SETUP_APP
-
-	# Check if the install had work
-	if [ $yunohost_result -ne 0 ]
-	then
-		ECHO_FORMAT "\nInstallation failed...\n" "red" "bold"
-	else
-		ECHO_FORMAT "\nUpgrade on the same version...\n" "white" "bold" clog
-
-		# Upgrade the application in a LXC container
-		LXC_START "sudo yunohost --debug app upgrade $ynh_app_id -f \"$package_dir\""
-
-		# yunohost_result gets the return code of the upgrade
-		yunohost_result=$?
-
-		# Print the result of the upgrade command
-		if [ $yunohost_result -eq 0 ]; then
-			ECHO_FORMAT "Upgrade successful. ($yunohost_result)\n" "white" clog
+	# Do an upgrade test for each commit in the upgrade list
+	while read <&4 commit
+	do
+		if [ "$commit" == "current" ]
+		then
+			unit_test_title "Upgrade from the same version..."
 		else
-			ECHO_FORMAT "Upgrade failed. ($yunohost_result)\n" "white" clog
+			# Get the specific section for this upgrade from the check_process
+			extract_section "^; commit=$commit" "^;" "$check_process"
+			# Get the name for this upgrade.
+			upgrade_name=$(grep "^name=" "$partial_check_process" | cut -d'=' -f2)
+			# Or use the commit if there's no name.
+			if [ -z "$upgrade_name" ]; then
+				unit_test_title "Upgrade from the commit $commit..."
+			else
+				unit_test_title "Upgrade from $upgrade_name..."
+			fi
 		fi
 
-		# Check all the witness files, to verify if them still here
-		check_witness_files
+		# Check if an install have previously work
+		local previous_install=$(is_install_failed)
+		# Abort if none install worked
+		[ "$previous_install" = "1" ] && return
 
-		# Analyse the log to extract "warning" and "error" lines
-		LOG_EXTRACTOR
+		# Copy original arguments
+		local manifest_args_mod="$manifest_arguments"
 
-		# Try to access the app by its url
-		CHECK_URL
-	fi
+		# Replace manifest key for the test
+		check_domain=$sub_domain
+		replace_manifest_key "domain" "$check_domain"
+		# Use a path according to previous succeeded installs
+		if [ "$previous_install" = "subdir" ]; then
+			local check_path=$test_path
+		elif [ "$previous_install" = "root" ]; then
+			local check_path=/
+		fi
+		replace_manifest_key "path" "$check_path"
+		replace_manifest_key "user" "$test_user"
+		replace_manifest_key "public" "$public_public_arg"
 
-	# Check the result and print SUCCESS or FAIL
-	if check_test_result
-	then	# Success
-		RESULT_check_upgrade=1	# Upgrade succeed
-	else	# Fail
-		RESULT_check_upgrade=-1	# Upgrade failed
-	fi
+		# Install the application in a LXC container
+		ECHO_FORMAT "\nPreliminary install...\n" "white" "bold" clog
+		if [ "$commit" == "current" ]
+		then
+			# If no commit is specified, use the current version.
+			STANDARD_SETUP_APP
+		else
+			# Otherwise, use a specific commit
+			# Backup the modified arguments
+			update_manifest_args="$manifest_args_mod"
+			# Get the arguments of the manifest for this upgrade.
+			manifest_args_mod=$(grep "^manifest_arg=" "$partial_check_process" | cut -d'=' -f2-)
+			if [ -z "$manifest_args_mod" ]; then
+				# If there's no specific arguments, use the previous one.
+				manifest_args_mod="$update_manifest_args"
+			else
+				# Otherwise, keep the new arguments, and replace the variables.
+				manifest_args_mod="${manifest_args_mod//DOMAIN/$check_domain}"
+				manifest_args_mod="${manifest_args_mod//PATH/$check_path}"
+				manifest_args_mod="${manifest_args_mod//USER/$test_user}"
+			fi
+			# Make a backup of the directory
+			sudo cp -a "$package_path" "${package_path}_back"
+			# Change to the specified commit
+			(cd "$package_path"; git checkout --force --quiet "$commit")
+			# Install the application
+			SETUP_APP
+			# Then replace the backup
+			sudo rm -r "$package_path"
+			sudo mv "${package_path}_back" "$package_path"
+			# And restore the arguments for the manifest
+			manifest_args_mod="$update_manifest_args"
+		fi
 
-	# Remove the application
-	REMOVE_APP
+		# Check if the install had work
+		if [ $yunohost_result -ne 0 ]
+		then
+			ECHO_FORMAT "\nInstallation failed...\n" "red" "bold"
+		else
+			ECHO_FORMAT "\nUpgrade...\n" "white" "bold" clog
+
+			# Upgrade the application in a LXC container
+			LXC_START "sudo yunohost --debug app upgrade $ynh_app_id -f \"$package_dir\""
+
+			# yunohost_result gets the return code of the upgrade
+			yunohost_result=$?
+
+			# Print the result of the upgrade command
+			if [ $yunohost_result -eq 0 ]; then
+				ECHO_FORMAT "Upgrade successful. ($yunohost_result)\n" "white" clog
+			else
+				ECHO_FORMAT "Upgrade failed. ($yunohost_result)\n" "white" clog
+			fi
+
+			# Check all the witness files, to verify if them still here
+			check_witness_files
+
+			# Analyse the log to extract "warning" and "error" lines
+			LOG_EXTRACTOR
+
+			# Try to access the app by its url
+			CHECK_URL
+		fi
+
+		# Check the result and print SUCCESS or FAIL
+		if check_test_result
+		then	# Success
+			# The global success for an upgrade can't be a success if another upgrade failed
+			if [ $RESULT_check_upgrade -ne -1 ]; then
+				RESULT_check_upgrade=1	# Upgrade succeed
+			fi
+		else	# Fail
+			RESULT_check_upgrade=-1	# Upgrade failed
+		fi
+
+		# Remove the application
+		REMOVE_APP
+
+		# Uses the default snapshot
+		current_snapshot=snap0
+		# Stop and restore the LXC container
+		LXC_STOP
+	done 4< "$script_dir/upgrade_list"
 }
 
 CHECK_PUBLIC_PRIVATE () {
