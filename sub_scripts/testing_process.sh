@@ -337,7 +337,7 @@ CHECK_URL () {
 								moved=0
 							fi
 						fi
-					done <<< "$(LC_ALL=C wget --adjust-extension --page-requisites --no-check-certificate $check_domain$curl_check_path 2>&1 | grep "^--.*--  http\|^HTTP request sent")"
+					done <<< "$(cd "$package_path"; LC_ALL=C wget --adjust-extension --page-requisites --no-check-certificate $check_domain$curl_check_path 2>&1 | grep "^--.*--  http\|^HTTP request sent")"
 					echo ""
 				fi
 			fi
