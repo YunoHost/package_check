@@ -528,6 +528,9 @@ CHECK_SETUP () {
 		RESULT_check_root=$check_result_setup
 		RESULT_check_remove_root=$check_result_remove
 	fi
+
+	# Make a break if auto_remove is set
+	break_before_continue
 }
 
 CHECK_UPGRADE () {
