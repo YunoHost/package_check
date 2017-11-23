@@ -248,7 +248,7 @@ CHECK_URL () {
 					ECHO_FORMAT "Service temporarily unavailable\n" "lyellow" "bold"
 					# 3 successive error are allowed
 					http503=$(( http503 + 1 ))
-					if [ $http503 -eq 3 ]; then
+					if [ $http503 -ge 3 ]; then
 						# Over 3, it's definitively an error
 						curl_error=1
 					else
