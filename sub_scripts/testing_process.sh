@@ -293,6 +293,52 @@ CHECK_URL () {
 					echo -en "\e[37m"	# Write in 'light grey'
 					lynx -dump -force_html "$script_dir/url_output" | head --lines 20 | tee --append "$test_result"
 					echo -e "\e[0m"
+
+					# Get all the resources for the main page of the app.
+					local HTTP_return
+					local moved=0
+					while read HTTP_return
+					do
+						# If it's the line with the resource to get
+						if echo "$HTTP_return" | grep --quiet "^--.*--  http"
+						then
+							# Get only the resource itself.
+							local resource=${HTTP_return##*http*://}
+
+						# Else, if would be the HTTP return code.
+						else
+							# If the return code is different than 200.
+							if ! echo "$HTTP_return" | grep --quiet "200 OK$"
+							then
+								# Isolate the http return code.
+								http_code="${HTTP_return##*awaiting response... }"
+								http_code="${http_code:0:3}"
+								# If the return code is 301 or 302, let's check the redirection.
+								if echo "$HTTP_return" | grep --quiet "30[12] Moved"
+								then
+									ECHO_FORMAT "Ressource moved:" "white"
+									ECHO_FORMAT " $resource\n"
+									moved=1
+								else
+									ECHO_FORMAT "Resource unreachable (Code $http_code)" "red" "bold"
+									ECHO_FORMAT " $resource\n"
+# 					 				curl_error=1
+									moved=0
+								fi
+							else
+								if [ $moved -eq 1 ]
+								then
+									if echo "$resource" | grep --quiet "/yunohost/sso/"
+									then
+										ECHO_FORMAT "The previous resource is redirected to the YunoHost portal\n" "red"
+#	 					 				curl_error=1
+									fi
+								fi
+								moved=0
+							fi
+						fi
+					done <<< "$(cd "$package_path"; LC_ALL=C wget --adjust-extension --page-requisites --no-check-certificate $check_domain$curl_check_path 2>&1 | grep "^--.*--  http\|^HTTP request sent")"
+					echo ""
 				fi
 			fi
 		done
