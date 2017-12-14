@@ -139,7 +139,7 @@ REMOVE_APP () {
 
 CHECK_URL () {
 	# Try to access the app by its url
-	
+
 	if [ $use_curl -eq 1 ]
 	then
 		ECHO_FORMAT "\nTry to access by url...\n" "white" "bold"
@@ -297,8 +297,16 @@ CHECK_URL () {
 					# Get all the resources for the main page of the app.
 					local HTTP_return
 					local moved=0
+					local ignored=0
 					while read HTTP_return
 					do
+						# Ignore robots.txt and ynhpanel.js. They always redirect to the portal.
+						if echo "$HTTP_return" | grep --quiet "$check_domain/robots.txt\|$check_domain/ynhpanel.js"; then
+							ECHO_FORMAT "Ressource ignored:" "white"
+							ECHO_FORMAT " ${HTTP_return##*http*://}\n"
+							ignored=1
+						fi
+
 						# If it's the line with the resource to get
 						if echo "$HTTP_return" | grep --quiet "^--.*--  http"
 						then
@@ -310,6 +318,12 @@ CHECK_URL () {
 							# If the return code is different than 200.
 							if ! echo "$HTTP_return" | grep --quiet "200 OK$"
 							then
+								# Skipped the check of ignored ressources.
+								if [ $ignored -eq 1 ]
+								then
+									ignored=0
+									continue
+								fi
 								# Isolate the http return code.
 								http_code="${HTTP_return##*awaiting response... }"
 								http_code="${http_code:0:3}"
