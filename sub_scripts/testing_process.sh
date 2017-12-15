@@ -54,7 +54,7 @@ SETUP_APP () {
 	fi
 
 	# Install the application in a LXC container
-	LXC_START "sudo yunohost --debug app install \"$package_dir\" -a \"$manifest_args_mod\""
+	LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app install \"$package_dir\" -a \"$manifest_args_mod\""
 
 	# yunohost_result gets the return code of the installation
 	yunohost_result=$?
@@ -117,7 +117,7 @@ REMOVE_APP () {
 	ECHO_FORMAT "\nDeleting...\n" "white" "bold" clog
 
 	# Remove the application from the LXC container
-	LXC_START "sudo yunohost --debug app remove \"$ynh_app_id\""
+	LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app remove \"$ynh_app_id\""
 
 	# yunohost_remove gets the return code of the deletion
 	yunohost_remove=$?
@@ -675,7 +675,7 @@ CHECK_UPGRADE () {
 			ECHO_FORMAT "\nUpgrade...\n" "white" "bold" clog
 
 			# Upgrade the application in a LXC container
-			LXC_START "sudo yunohost --debug app upgrade $ynh_app_id -f \"$package_dir\""
+			LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app upgrade $ynh_app_id -f \"$package_dir\""
 
 			# yunohost_result gets the return code of the upgrade
 			yunohost_result=$?
@@ -1118,7 +1118,7 @@ CHECK_BACKUP_RESTORE () {
 			ECHO_FORMAT "\nBackup of the application...\n" "white" "bold" clog
 
 			# Made a backup of the application
-			LXC_START "sudo yunohost --debug backup create -n Backup_test --apps $ynh_app_id --system $backup_hooks"
+			LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug backup create -n Backup_test --apps $ynh_app_id --system $backup_hooks"
 
 			# yunohost_result gets the return code of the backup
 			yunohost_result=$?
@@ -1185,7 +1185,7 @@ CHECK_BACKUP_RESTORE () {
 			fi
 
 			# Restore the application from the previous backup
-			LXC_START "sudo yunohost --debug backup restore Backup_test --force --apps $ynh_app_id"
+			LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug backup restore Backup_test --force --apps $ynh_app_id"
 
 			# yunohost_result gets the return code of the restore
 			yunohost_result=$?
@@ -1323,7 +1323,7 @@ CHECK_CHANGE_URL () {
 			ECHO_FORMAT "Change the url from $sub_domain$check_path to $new_domain$new_path...\n" "white" "bold" clog
 
 			# Change the url
-			LXC_START "sudo yunohost --debug app change-url $ynh_app_id -d \"$new_domain\" -p \"$new_path\""
+			LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app change-url $ynh_app_id -d \"$new_domain\" -p \"$new_path\""
 
 			# yunohost_result gets the return code of the change-url script
 			yunohost_result=$?
