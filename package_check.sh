@@ -1354,9 +1354,10 @@ if [ $type_exec_env -ge 1 ] && [ $send_mail -eq 1 ]
 then
 
 	# Add a 'from' header for the official CI only.
-	if [ $type_exec_env -eq 2 ]; then
-		from_yuno="-a \"From: yunohost@yunohost.org\""
-	fi
+# Apparently, this trick is not needed anymore !?
+#	if [ $type_exec_env -eq 2 ]; then
+#		from_yuno="-a \"From: yunohost@yunohost.org\""
+#	fi
 
 	# Get the maintainer email from the manifest. If it doesn't found if the check_process
 	if [ -z "$dest" ]; then
