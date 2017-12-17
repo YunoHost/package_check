@@ -181,12 +181,12 @@ then
 	# If the lock file exist
 	echo "The lock file $lock_file is present. Package check would not continue."
 	if [ $bash_mode -ne 1 ]; then
-		echo -n "Do you want to continue anyway? (y/n) :"
+		echo -n "Do you want to continue anyway? (Y/n) :"
 		read answer
 	fi
 	# Set the answer at lowercase only
 	answer=${answer,,}
-	if [ "${answer:0:1}" != "y" ]
+	if [ "${answer:0:1}" != "y" ] || [ ${answer:0:1} == '' ]
 	then
 		echo "Cancel Package check execution"
 		exit 0
