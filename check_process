@@ -20,6 +20,7 @@
 		setup_private=1
 		setup_public=1
 		upgrade=1
+		upgrade=1	from_commit=65c382d138596fcb32b4c97c39398815a1dcd4e8
 		backup_restore=1
 		multi_instance=1
 		incorrect_path=1
@@ -39,3 +40,7 @@
 ;;; Options
 Email=
 Notification=none
+;;; Upgrade options
+	; commit=65c382d138596fcb32b4c97c39398815a1dcd4e8
+		name=Name of this previous version
+		manifest_arg=domain=DOMAIN&path=PATH&admin=USER&password=pass&is_public=1&

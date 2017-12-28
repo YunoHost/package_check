@@ -69,6 +69,7 @@ package_check/package_check.sh APP_ynh
 		setup_private=1
 		setup_public=1
 		upgrade=1
+		upgrade=1	from_commit=65c382d138596fcb32b4c97c39398815a1dcd4e8
 		backup_restore=1
 		multi_instance=1
 		incorrect_path=1
@@ -88,6 +89,10 @@ package_check/package_check.sh APP_ynh
 ;;; Options
 Email=
 Notification=none
+;;; Upgrade options
+	; commit=65c382d138596fcb32b4c97c39398815a1dcd4e8
+		name=Name of this previous version
+		manifest_arg=domain=DOMAIN&path=PATH&admin=USER&password=pass&is_public=1&
 ```
 ### `;; Nom du test`
 Nom du scénario de test qui sera effectué.  
@@ -118,8 +123,9 @@ Si un test est absent de la liste, il sera ignoré. Cela revient à le noter à 
 - `setup_private`: Installation en privé.
 - `setup_public`: Installation en public.
 - `upgrade`: Upgrade du package sur la même version. Test uniquement le script upgrade.
+- `upgrade from_commit`: Upgrade du package à partir du commit spécifié vers la dernière version.
 - `backup_restore`: Backup et restauration.
-- `multi_instance`: Installation de l'application 3 fois de suite, pour vérifier sa capacité à être multi-instance. Les 2e et 3e installations se font respectivement en ajoutant un suffixe et un préfixe au path.
+- `multi_instance`: Installation de l'application 2 fois de suite, pour vérifier sa capacité à être multi-instance.
 - `incorrect_path`: Provoque une erreur avec un path malformé, path/.
 - `port_already_use`: Provoque une erreur sur le port en l'ouvrant avant le script d'install.  
 	Le test` port_already_use` peut éventuellement prendre en argument un numéro de port. Si celui-ci n'est pas dans le manifest.  
@@ -158,6 +164,13 @@ Ces options sont facultatives.
   - `down` : Envoi un mail seulement si le niveau de l'application a baissé.
   - `change` : Envoi un mail seulement si le niveau de l'application a changé.
   - `all` : Envoi un mail pour chaque test de l'application, quel que ce soit le résultat.
+
+### `;;; Upgrade options`
+*Instruction optionnelle*  
+Pour chaque commit indiqué pour un upgrade, permet d'indiquer un nom pour cette version et les paramètres du manifest à utiliser lors de l'installation préliminaire.  
+En cas d'absence de nom, le commit sera utilisé.  
+De même en cas d'absence d'arguments pour le manifest, les arguments du check_process seront utilisés.  
+> 3 variables doivent être utilisées pour les arguments du manifest, DOMAIN, PATH et USER.
 
 ---
 Le script `package_check.sh` accepte 6 arguments en plus du package à tester.

@@ -254,6 +254,13 @@ EOF
 		# Give the execution right
 		chmod +x "$script_dir/upgrade_script.sh"
 
+	# Temporary upgrade fix
+	# Check if lynx is already installed.
+	if [ ! -e "$(which lynx)" ]
+	then
+		sudo apt-get install -y lynx
+	fi
+
 		# Start the upgrade script by replacement of this process
 		exec "$script_dir/upgrade_script.sh"
 	fi
@@ -490,9 +497,6 @@ if [ ! -d "$package_path" ]; then
 	ECHO_FORMAT "Unable to find the directory $package_path for the package...\n" "red"
 	clean_exit 1
 fi
-
-# Remove the .git directory.
-rm -rf "$package_path/.git"
 
 
 
@@ -813,7 +817,7 @@ initialize_values() {
 	all_test=0
 
 	# Default path
-	test_path=/check
+	test_path=/
 }
 
 #=================================================
@@ -837,7 +841,7 @@ then
 
 	# Search a string in the partial check_process
 	find_string () {
-		echo $(grep "$1" "$partial_check_process")
+		echo $(grep -m1 "$1" "$partial_check_process")
 	}
 
 	# Extract a section found between $1 and $2 from the file $3
@@ -1009,6 +1013,7 @@ then
 			test "$1" -eq 1 && all_test=$((all_test+1))
 		}
 
+		# Get standard options
 		pkg_linter=$(read_check_option pkg_linter)
 		count_test $pkg_linter
 		setup_sub_dir=$(read_check_option setup_sub_dir)
@@ -1021,8 +1026,6 @@ then
 		count_test $setup_private
 		setup_public=$(read_check_option setup_public)
 		count_test $setup_public
-		upgrade=$(read_check_option upgrade)
-		count_test $upgrade
 		backup_restore=$(read_check_option backup_restore)
 		count_test $backup_restore
 		multi_instance=$(read_check_option multi_instance)
@@ -1045,6 +1048,33 @@ then
 				port_arg="#$(echo "$line" | cut -d '(' -f2 | cut -d ')' -f1)"
 			fi
 		fi
+
+		# Clean the upgrade list
+		> "$script_dir/upgrade_list"
+		# Get multiples lines for upgrade option.
+		while $(grep --quiet "^upgrade=" "$partial_check_process")
+		do
+			# Get the value for the first upgrade test.
+			temp_upgrade=$(read_check_option upgrade)
+			count_test $temp_upgrade
+			# Set upgrade to 1, but never to 0.
+			if [ "$upgrade" != "1" ]; then
+				upgrade=$temp_upgrade
+			fi
+			# Get this line to find if there an option.
+			line=$(find_string "^upgrade=")
+			if echo "$line" | grep --quiet "from_commit="
+			then
+				# Add the commit to the upgrade list
+				line="${line##*from_commit=}"
+				echo "$line" >> "$script_dir/upgrade_list"
+			else
+				# Or simply 'current' for a standard upgrade.
+				echo "current" >> "$script_dir/upgrade_list"
+			fi
+			# Remove this line from the check_process
+			sed --in-place "\|${line}$|d" "$partial_check_process"
+		done
 
 		# Launch all tests successively
 		TESTING_PROCESS
@@ -1324,9 +1354,10 @@ if [ $type_exec_env -ge 1 ] && [ $send_mail -eq 1 ]
 then
 
 	# Add a 'from' header for the official CI only.
-	if [ $type_exec_env -eq 2 ]; then
-		from_yuno="-a \"From: yunohost@yunohost.org\""
-	fi
+# Apparently, this trick is not needed anymore !?
+#	if [ $type_exec_env -eq 2 ]; then
+#		from_yuno="-a \"From: yunohost@yunohost.org\""
+#	fi
 
 	# Get the maintainer email from the manifest. If it doesn't found if the check_process
 	if [ -z "$dest" ]; then

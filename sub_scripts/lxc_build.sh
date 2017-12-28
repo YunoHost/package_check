@@ -71,8 +71,8 @@ echo -e "\e[1m> Update et install lxc lxctl\e[0m" | tee "$LOG_BUILD_LXC"
 sudo apt-get update >> "$LOG_BUILD_LXC" 2>&1
 sudo apt-get install -y lxc lxctl >> "$LOG_BUILD_LXC" 2>&1
 
-echo -e "\e[1m> Install git curl\e[0m" | tee "$LOG_BUILD_LXC"
-sudo apt-get install -y git curl >> "$LOG_BUILD_LXC" 2>&1
+echo -e "\e[1m> Install git, curl and lynx\e[0m" | tee "$LOG_BUILD_LXC"
+sudo apt-get install -y git curl lynx >> "$LOG_BUILD_LXC" 2>&1
 
 sudo mkdir -p /var/lib/lxcsnaps	# Créer le dossier lxcsnaps, pour s'assurer que lxc utilisera ce dossier, même avec lxc 2.
 
@@ -80,6 +80,8 @@ if sudo lxc-info -n $LXC_NAME > /dev/null 2>&1
 then	# Si le conteneur existe déjà
 	echo -e "\e[1m> Suppression du conteneur existant.\e[0m" | tee -a "$LOG_BUILD_LXC"
 	sudo lxc-snapshot -n $LXC_NAME -d snap0 | tee -a "$LOG_BUILD_LXC"
+	sudo lxc-snapshot -n $LXC_NAME -d snap1 | tee -a "$LOG_BUILD_LXC"
+	sudo lxc-snapshot -n $LXC_NAME -d snap2 | tee -a "$LOG_BUILD_LXC"
 	sudo rm -f /var/lib/lxcsnaps/$LXC_NAME/snap0.tar.gz | tee -a "$LOG_BUILD_LXC"
 	sudo lxc-destroy -n $LXC_NAME -f | tee -a "$LOG_BUILD_LXC"
 fi
@@ -123,6 +125,9 @@ fi
 if [ $dnsforce -eq 1 ]; then	# Force la réécriture du resolv.conf
 	echo "nameserver $dns" | sudo tee /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf
 fi
+
+# Fix an issue with apparmor when the container start.
+echo -e "\n# Fix apparmor issues\nlxc.aa_profile = unconfined" | sudo tee -a /var/lib/lxc/$LXC_NAME/config >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Démarrage de la machine\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo lxc-start -n $LXC_NAME -d --logfile "$script_dir/lxc_boot.log" >> "$LOG_BUILD_LXC" 2>&1

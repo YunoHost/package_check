@@ -54,7 +54,7 @@ SETUP_APP () {
 	fi
 
 	# Install the application in a LXC container
-	LXC_START "sudo yunohost --debug app install \"$package_dir\" -a \"$manifest_args_mod\""
+	LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app install \"$package_dir\" -a \"$manifest_args_mod\""
 
 	# yunohost_result gets the return code of the installation
 	yunohost_result=$?
@@ -117,7 +117,7 @@ REMOVE_APP () {
 	ECHO_FORMAT "\nDeleting...\n" "white" "bold" clog
 
 	# Remove the application from the LXC container
-	LXC_START "sudo yunohost --debug app remove \"$ynh_app_id\""
+	LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app remove \"$ynh_app_id\""
 
 	# yunohost_remove gets the return code of the deletion
 	yunohost_remove=$?
@@ -139,13 +139,13 @@ REMOVE_APP () {
 
 CHECK_URL () {
 	# Try to access the app by its url
-	
+
 	if [ $use_curl -eq 1 ]
 	then
 		ECHO_FORMAT "\nTry to access by url...\n" "white" "bold"
 
 		# Force a skipped_uris if public mode is not set
-		if [ -z "$public_arg" ]
+		if [ "$install_type" != "private" ] && [ "$install_type" != "public" ] && [ -z "$public_arg" ]
 		then
 			# Add a skipped_uris on / for the app
 			LXC_START "sudo yunohost app setting \"$ynh_app_id\" skipped_uris -v \"/\""
@@ -248,7 +248,7 @@ CHECK_URL () {
 					ECHO_FORMAT "Service temporarily unavailable\n" "lyellow" "bold"
 					# 3 successive error are allowed
 					http503=$(( http503 + 1 ))
-					if [ $http503 -eq 3 ]; then
+					if [ $http503 -ge 3 ]; then
 						# Over 3, it's definitively an error
 						curl_error=1
 					else
@@ -288,11 +288,71 @@ CHECK_URL () {
 						ECHO_FORMAT "The connection attempt fall on nginx default page.\n" "white" "bold" clog
 					fi
 
-					# Print the first 20 lines of the body
-					ECHO_FORMAT "Extract of the body:\n" "white"
-					echo -e "\e[37m"	# Write in 'light grey'
-					grep "<body" --after-context=20 "$script_dir/url_output" | sed 1d | tee --append "$test_result"
+					# Print the first 20 lines of the page
+					ECHO_FORMAT "Extract of the page:\n" "white"
+					echo -en "\e[37m"	# Write in 'light grey'
+					lynx -dump -force_html "$script_dir/url_output" | head --lines 20 | tee --append "$test_result"
 					echo -e "\e[0m"
+
+					# Get all the resources for the main page of the app.
+					local HTTP_return
+					local moved=0
+					local ignored=0
+					while read HTTP_return
+					do
+						# Ignore robots.txt and ynhpanel.js. They always redirect to the portal.
+						if echo "$HTTP_return" | grep --quiet "$check_domain/robots.txt\|$check_domain/ynhpanel.js"; then
+							ECHO_FORMAT "Ressource ignored:" "white"
+							ECHO_FORMAT " ${HTTP_return##*http*://}\n"
+							ignored=1
+						fi
+
+						# If it's the line with the resource to get
+						if echo "$HTTP_return" | grep --quiet "^--.*--  http"
+						then
+							# Get only the resource itself.
+							local resource=${HTTP_return##*http*://}
+
+						# Else, if would be the HTTP return code.
+						else
+							# If the return code is different than 200.
+							if ! echo "$HTTP_return" | grep --quiet "200 OK$"
+							then
+								# Skipped the check of ignored ressources.
+								if [ $ignored -eq 1 ]
+								then
+									ignored=0
+									continue
+								fi
+								# Isolate the http return code.
+								http_code="${HTTP_return##*awaiting response... }"
+								http_code="${http_code:0:3}"
+								# If the return code is 301 or 302, let's check the redirection.
+								if echo "$HTTP_return" | grep --quiet "30[12] Moved"
+								then
+									ECHO_FORMAT "Ressource moved:" "white"
+									ECHO_FORMAT " $resource\n"
+									moved=1
+								else
+									ECHO_FORMAT "Resource unreachable (Code $http_code)" "red" "bold"
+									ECHO_FORMAT " $resource\n"
+# 					 				curl_error=1
+									moved=0
+								fi
+							else
+								if [ $moved -eq 1 ]
+								then
+									if echo "$resource" | grep --quiet "/yunohost/sso/"
+									then
+										ECHO_FORMAT "The previous resource is redirected to the YunoHost portal\n" "red"
+#	 					 				curl_error=1
+									fi
+								fi
+								moved=0
+							fi
+						fi
+					done <<< "$(cd "$package_path"; LC_ALL=C wget --adjust-extension --page-requisites --no-check-certificate $check_domain$curl_check_path 2>&1 | grep "^--.*--  http\|^HTTP request sent")"
+					echo ""
 				fi
 			fi
 		done
@@ -536,73 +596,129 @@ CHECK_SETUP () {
 CHECK_UPGRADE () {
 	# Try the upgrade script
 
-	unit_test_title "Upgrade..."
-
-	# Check if an install have previously work
-	local previous_install=$(is_install_failed)
-	# Abort if none install worked
-	[ "$previous_install" = "1" ] && return
-
-	# Copy original arguments
-	local manifest_args_mod="$manifest_arguments"
-
-	# Replace manifest key for the test
-	check_domain=$sub_domain
-	replace_manifest_key "domain" "$check_domain"
-	# Use a path according to previous succeeded installs
-	if [ "$previous_install" = "subdir" ]; then
-		local check_path=$test_path
-	elif [ "$previous_install" = "root" ]; then
-		local check_path=/
-	fi
-	replace_manifest_key "path" "$check_path"
-	replace_manifest_key "user" "$test_user"
-	replace_manifest_key "public" "$public_public_arg"
-
-	# Install the application in a LXC container
-	ECHO_FORMAT "\nPreliminary install...\n" "white" "bold" clog
-	STANDARD_SETUP_APP
-
-	# Check if the install had work
-	if [ $yunohost_result -ne 0 ]
-	then
-		ECHO_FORMAT "\nInstallation failed...\n" "red" "bold"
-	else
-		ECHO_FORMAT "\nUpgrade on the same version...\n" "white" "bold" clog
-
-		# Upgrade the application in a LXC container
-		LXC_START "sudo yunohost --debug app upgrade $ynh_app_id -f \"$package_dir\""
-
-		# yunohost_result gets the return code of the upgrade
-		yunohost_result=$?
-
-		# Print the result of the upgrade command
-		if [ $yunohost_result -eq 0 ]; then
-			ECHO_FORMAT "Upgrade successful. ($yunohost_result)\n" "white" clog
+	# Do an upgrade test for each commit in the upgrade list
+	while read <&4 commit
+	do
+		if [ "$commit" == "current" ]
+		then
+			unit_test_title "Upgrade from the same version..."
 		else
-			ECHO_FORMAT "Upgrade failed. ($yunohost_result)\n" "white" clog
+			# Get the specific section for this upgrade from the check_process
+			extract_section "^; commit=$commit" "^;" "$check_process"
+			# Get the name for this upgrade.
+			upgrade_name=$(grep "^name=" "$partial_check_process" | cut -d'=' -f2)
+			# Or use the commit if there's no name.
+			if [ -z "$upgrade_name" ]; then
+				unit_test_title "Upgrade from the commit $commit..."
+			else
+				unit_test_title "Upgrade from $upgrade_name..."
+			fi
 		fi
 
-		# Check all the witness files, to verify if them still here
-		check_witness_files
+		# Check if an install have previously work
+		local previous_install=$(is_install_failed)
+		# Abort if none install worked
+		[ "$previous_install" = "1" ] && return
 
-		# Analyse the log to extract "warning" and "error" lines
-		LOG_EXTRACTOR
+		# Copy original arguments
+		local manifest_args_mod="$manifest_arguments"
 
-		# Try to access the app by its url
-		CHECK_URL
-	fi
+		# Replace manifest key for the test
+		check_domain=$sub_domain
+		replace_manifest_key "domain" "$check_domain"
+		# Use a path according to previous succeeded installs
+		if [ "$previous_install" = "subdir" ]; then
+			local check_path=$test_path
+		elif [ "$previous_install" = "root" ]; then
+			local check_path=/
+		fi
+		replace_manifest_key "path" "$check_path"
+		replace_manifest_key "user" "$test_user"
+		replace_manifest_key "public" "$public_public_arg"
 
-	# Check the result and print SUCCESS or FAIL
-	if check_test_result
-	then	# Success
-		RESULT_check_upgrade=1	# Upgrade succeed
-	else	# Fail
-		RESULT_check_upgrade=-1	# Upgrade failed
-	fi
+		# Install the application in a LXC container
+		ECHO_FORMAT "\nPreliminary install...\n" "white" "bold" clog
+		if [ "$commit" == "current" ]
+		then
+			# If no commit is specified, use the current version.
+			STANDARD_SETUP_APP
+		else
+			# Otherwise, use a specific commit
+			# Backup the modified arguments
+			update_manifest_args="$manifest_args_mod"
+			# Get the arguments of the manifest for this upgrade.
+			manifest_args_mod=$(grep "^manifest_arg=" "$partial_check_process" | cut -d'=' -f2-)
+			if [ -z "$manifest_args_mod" ]; then
+				# If there's no specific arguments, use the previous one.
+				manifest_args_mod="$update_manifest_args"
+			else
+				# Otherwise, keep the new arguments, and replace the variables.
+				manifest_args_mod="${manifest_args_mod//DOMAIN/$check_domain}"
+				manifest_args_mod="${manifest_args_mod//PATH/$check_path}"
+				manifest_args_mod="${manifest_args_mod//USER/$test_user}"
+			fi
+			# Make a backup of the directory
+			sudo cp -a "$package_path" "${package_path}_back"
+			# Change to the specified commit
+			(cd "$package_path"; git checkout --force --quiet "$commit")
+			# Install the application
+			SETUP_APP
+			# Then replace the backup
+			sudo rm -r "$package_path"
+			sudo mv "${package_path}_back" "$package_path"
+			# And restore the arguments for the manifest
+			manifest_args_mod="$update_manifest_args"
+		fi
 
-	# Remove the application
-	REMOVE_APP
+		# Check if the install had work
+		if [ $yunohost_result -ne 0 ]
+		then
+			ECHO_FORMAT "\nInstallation failed...\n" "red" "bold"
+		else
+			ECHO_FORMAT "\nUpgrade...\n" "white" "bold" clog
+
+			# Upgrade the application in a LXC container
+			LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app upgrade $ynh_app_id -f \"$package_dir\""
+
+			# yunohost_result gets the return code of the upgrade
+			yunohost_result=$?
+
+			# Print the result of the upgrade command
+			if [ $yunohost_result -eq 0 ]; then
+				ECHO_FORMAT "Upgrade successful. ($yunohost_result)\n" "white" clog
+			else
+				ECHO_FORMAT "Upgrade failed. ($yunohost_result)\n" "white" clog
+			fi
+
+			# Check all the witness files, to verify if them still here
+			check_witness_files
+
+			# Analyse the log to extract "warning" and "error" lines
+			LOG_EXTRACTOR
+
+			# Try to access the app by its url
+			CHECK_URL
+		fi
+
+		# Check the result and print SUCCESS or FAIL
+		if check_test_result
+		then	# Success
+			# The global success for an upgrade can't be a success if another upgrade failed
+			if [ $RESULT_check_upgrade -ne -1 ]; then
+				RESULT_check_upgrade=1	# Upgrade succeed
+			fi
+		else	# Fail
+			RESULT_check_upgrade=-1	# Upgrade failed
+		fi
+
+		# Remove the application
+		REMOVE_APP
+
+		# Uses the default snapshot
+		current_snapshot=snap0
+		# Stop and restore the LXC container
+		LXC_STOP
+	done 4< "$script_dir/upgrade_list"
 }
 
 CHECK_PUBLIC_PRIVATE () {
@@ -735,48 +851,38 @@ CHECK_MULTI_INSTANCE () {
 
 	unit_test_title "Multi-instance installations..."
 
-	# Check if the sub path install have previously work
-	if [ $RESULT_check_sub_dir -ne 1 ] && [ $force_install_ok -ne 1 ]
-	then
-		# If subdir installation doesn't worked and force_install_ok not setted, aborted this test.
-		ECHO_FORMAT "Sub path install failed, impossible to perform this test...\n" "red" clog
-		return
-	fi
+	# Check if an install have previously work
+	local previous_install=$(is_install_failed)
+	# Abort if none install worked
+	[ "$previous_install" = "1" ] && return
 
 	# Copy original arguments
 	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
-	check_domain=$sub_domain
-	replace_manifest_key "domain" "$check_domain"
+	replace_manifest_key "path" "$test_path"
+	check_path=$test_path
 	replace_manifest_key "user" "$test_user"
 	replace_manifest_key "public" "$public_public_arg"
 
-	# Install 3 times the same app
+	# Install 2 times the same app
 	local i=0
-	for i in 1 2 3
+	for i in 1 2
 	do
 		# First installation
 		if [ $i -eq 1 ]
 		then
-			local path_1=$test_path
-			ECHO_FORMAT "First installation: path=$path_1\n" clog
-			check_path=$path_1
+			check_domain=$main_domain
+			ECHO_FORMAT "First installation: path=$check_domain$check_path\n" clog
 		# Second installation
 		elif [ $i -eq 2 ]
 		then
-			local path_2="/2${test_path#/}"
-			ECHO_FORMAT "Second installation: path=$path_2\n" clog
-			check_path=$path_2
-		# Third installation
-		else
-			local path_3="/3-${test_path#/}"
-			ECHO_FORMAT "Third installation: path=$path_3\n" clog
-			check_path=$path_3
+			check_domain=$sub_domain
+			ECHO_FORMAT "Second installation: path=$check_domain$check_path\n" clog
 		fi
 
-		# Replace path manifest key for the test
-		replace_manifest_key "path" "$check_path"
+		# Replace path and domain manifest keys for the test
+		replace_manifest_key "domain" "$check_domain"
 
 		# Install the application in a LXC container
 		SETUP_APP
@@ -786,36 +892,28 @@ CHECK_MULTI_INSTANCE () {
 		if [ $i -eq 1 ]
 		then
 			local multi_yunohost_result_1=$yunohost_result
-                        local ynh_app_id_1=$ynh_app_id
+			local ynh_app_id_1=$ynh_app_id
 		# Second installation
 		elif [ $i -eq 2 ]
 		then
 			local multi_yunohost_result_2=$yunohost_result
-                        local ynh_app_id_2=$ynh_app_id
-		# Third installation
-		else
-			local multi_yunohost_result_3=$yunohost_result
-                        local ynh_app_id_3=$ynh_app_id
+			local ynh_app_id_2=$ynh_app_id
 		fi
 	done
 
-	# Try to access to the 3 apps by theirs url
-	for i in 1 2 3
+	# Try to access to the 2 apps by theirs url
+	for i in 1 2
 	do
 		# First app
 		if [ $i -eq 1 ]
 		then
-			check_path=$path_1
-                        ynh_app_id=$ynh_app_id_1
+			check_domain=$main_domain
+			ynh_app_id=$ynh_app_id_1
 		# Second app
 		elif [ $i -eq 2 ]
 		then
-			check_path=$path_2
-                        ynh_app_id=$ynh_app_id_2
-		# Third app
-		else
-			check_path=$path_3
-                        ynh_app_id=$ynh_app_id_3
+			check_domain=$sub_domain
+			ynh_app_id=$ynh_app_id_2
 		fi
 
 		# Try to access the app by its url
@@ -833,16 +931,13 @@ CHECK_MULTI_INSTANCE () {
 			elif [ $i -eq 2 ]
 			then
 				multi_yunohost_result_2=1
-			# Third app
-			else
-				multi_yunohost_result_3=1
 			fi
 		fi
 	done
 
 	# Check the result and print SUCCESS or FAIL
-	# Succeed if first installation works, and either the second or the third works also
-	if [ $multi_yunohost_result_1 -eq 0 ] && ( [ $multi_yunohost_result_2 -eq 0 ] || [ $multi_yunohost_result_3 -eq 0 ] )
+	# Succeed if the 2 installations work;
+	if [ $multi_yunohost_result_1 -eq 0 ] && [ $multi_yunohost_result_2 -eq 0 ]
 	then	# Success
 		check_success
 		RESULT_check_multi_instance=1
@@ -1026,7 +1121,7 @@ CHECK_BACKUP_RESTORE () {
 			ECHO_FORMAT "\nBackup of the application...\n" "white" "bold" clog
 
 			# Made a backup of the application
-			LXC_START "sudo yunohost --debug backup create -n Backup_test --apps $ynh_app_id --system $backup_hooks"
+			LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug backup create -n Backup_test --apps $ynh_app_id --system $backup_hooks"
 
 			# yunohost_result gets the return code of the backup
 			yunohost_result=$?
@@ -1093,7 +1188,7 @@ CHECK_BACKUP_RESTORE () {
 			fi
 
 			# Restore the application from the previous backup
-			LXC_START "sudo yunohost --debug backup restore Backup_test --force --apps $ynh_app_id"
+			LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug backup restore Backup_test --force --apps $ynh_app_id"
 
 			# yunohost_result gets the return code of the restore
 			yunohost_result=$?
@@ -1231,7 +1326,7 @@ CHECK_CHANGE_URL () {
 			ECHO_FORMAT "Change the url from $sub_domain$check_path to $new_domain$new_path...\n" "white" "bold" clog
 
 			# Change the url
-			LXC_START "sudo yunohost --debug app change-url $ynh_app_id -d \"$new_domain\" -p \"$new_path\""
+			LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app change-url $ynh_app_id -d \"$new_domain\" -p \"$new_path\""
 
 			# yunohost_result gets the return code of the change-url script
 			yunohost_result=$?
