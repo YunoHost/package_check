@@ -727,6 +727,10 @@ TEST_RESULTS () {
 		global_level=0
 	fi
 
+	if [ $RESULT_alias_traversal -eq 1 ]
+	then
+		ECHO_FORMAT "Issue alias_traversal was detected ! Please see here https://github.com/YunoHost/example_ynh/pull/45 to fix that.\n" "red" "bold"
+	fi
 
 	# Then, print the levels
 	# Print the global level
@@ -789,6 +793,7 @@ LXC_INIT
 initialize_values() {
 	# Test results
 	RESULT_witness=0
+	RESULT_alias_traversal=0
 	RESULT_linter=0
 	RESULT_global_setup=0
 	RESULT_global_remove=0
