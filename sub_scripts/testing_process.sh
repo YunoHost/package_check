@@ -357,6 +357,11 @@ CHECK_URL () {
 			fi
 		done
 
+		# Detect the issue alias_traversal, https://github.com/yandex/gixy/blob/master/docs/en/plugins/aliastraversal.md
+		curl --location --insecure --silent $check_domain$check_path../html/index.nginx-debian.html \
+			| grep "title" | grep --quiet "Welcome to nginx on Debian" \
+			&& (ECHO_FORMAT "Issue alias_traversal detected ! Please see here https://github.com/YunoHost/example_ynh/pull/45 to fix that.\n" "red" "bold" && RESULT_alias_traversal=1)
+
 		# Remove the entries in /etc/hosts for the test domain
 		sudo sed --in-place '/#package_check/d' /etc/hosts
 	else
