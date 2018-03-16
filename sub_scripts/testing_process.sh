@@ -865,9 +865,9 @@ CHECK_MULTI_INSTANCE () {
 	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
-	if [ "$install_type" = "subdir" ]; then
+	if [ "$previous_install" = "subdir" ]; then
 		local check_path=$test_path
-	elif [ "$install_type" = "root" ]; then
+	elif [ "$previous_install" = "root" ]; then
 		local check_path=/
 	fi
 	replace_manifest_key "path" "$check_path"
