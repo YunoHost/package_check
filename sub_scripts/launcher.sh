@@ -11,6 +11,48 @@ snapshot_path="/var/lib/lxcsnaps/$lxc_name"
 current_snapshot=snap0
 
 #=================================================
+# Network usage
+#=================================================
+
+start_network_usage () {
+	start_rx_usage=0
+	start_tx_usage=0
+
+	# package_check initialization
+	if [ -e "/sys/class/net/${lxc_bridge}/statistics/rx_bytes" ]
+	then
+		start_rx_usage=$(cat "/sys/class/net/${lxc_bridge}/statistics/rx_bytes")
+		start_tx_usage=$(cat "/sys/class/net/${lxc_bridge}/statistics/tx_bytes")
+	fi
+}
+
+stop_network_usage () {
+	local stop_rx_usage=0
+	local stop_tx_usage=0
+
+	if [ -e "/sys/class/net/${lxc_bridge}/statistics/rx_bytes" ]
+	then
+		local stop_rx_usage=$(cat "/sys/class/net/${lxc_bridge}/statistics/rx_bytes")
+		local stop_tx_usage=$(cat "/sys/class/net/${lxc_bridge}/statistics/tx_bytes")
+	fi
+
+	local rx_usage=$(numfmt --to=iec-i --suffix=B --padding=7 $(($stop_rx_usage-$start_rx_usage)))
+	local tx_usage=$(numfmt --to=iec-i --suffix=B --padding=7 $(($stop_tx_usage-$start_tx_usage)))
+	local rx_tx_usage=$(numfmt --to=iec-i --suffix=B --padding=7 $(($stop_rx_usage+$stop_tx_usage-$start_rx_usage-$start_tx_usage)))
+
+	if [ $1 -eq 2 ]; then
+		ECHO_FORMAT "Nextwork usage for this test: " "blue"
+	elif [ $1 -eq 3 ]; then
+		ECHO_FORMAT "Global network usage for all tests: " "blue"
+	else
+		ECHO_FORMAT "Network usage: " "blue"
+	fi
+
+
+	ECHO_FORMAT "${rx_tx_usage} (rx: ${rx_usage}, tx: ${tx_usage}).\n" "blue"
+}
+
+#=================================================
 # TIMER
 #=================================================
 
@@ -69,6 +111,8 @@ create_temp_backup () {
 	snap_number=$1
 
 	start_timer
+	start_network_usage
+
 	# Check all the witness files, to verify if them still here
 	check_witness_files >&2
 
@@ -98,6 +142,7 @@ create_temp_backup () {
 	current_snapshot=snap$snap_number
 
 	stop_timer 1 >&2
+	stop_network_usage 1 >&2
 
 	# Restart the container, after the snapshot
 	LXC_START "true" >&2
@@ -109,6 +154,7 @@ use_temp_snapshot () {
 	current_snapshot=$1
 
 	start_timer
+	start_network_usage
 	# Fix the missing hostname in the hosts file...
 	echo "127.0.0.1 $lxc_name" | sudo tee --append "$snapshot_path/$current_snapshot/rootfs/etc/hosts" > /dev/null
 
@@ -116,6 +162,7 @@ use_temp_snapshot () {
 	sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$snapshot_path/$current_snapshot/rootfs/" "/var/lib/lxc/$lxc_name/rootfs/" > /dev/null 2>> "$test_result"
 
 	stop_timer 1
+	stop_network_usage 1
 
 	# Retrieve the app id in the log. To manage the app after
 	ynh_app_id=$(sudo tac "$yunohost_log" | grep --only-matching --max-count=1 "YNH_APP_INSTANCE_NAME=[^ ]*" | cut --delimiter='=' --fields=2)
@@ -142,6 +189,8 @@ LXC_INIT () {
 	sudo iptables --append FORWARD --in-interface $lxc_bridge --out-interface $main_iface --jump ACCEPT | tee --append "$test_result" 2>&1
 	sudo iptables --append FORWARD --in-interface $main_iface --out-interface $lxc_bridge --jump ACCEPT | tee --append "$test_result" 2>&1
 	sudo iptables --table nat --append POSTROUTING --source $ip_range.0/24 --jump MASQUERADE | tee --append "$test_result" 2>&1
+
+
 }
 
 LXC_START () {
@@ -149,6 +198,7 @@ LXC_START () {
 	# $1 = Command to execute in the container
 
 	start_timer
+	start_network_usage
 	# Try to start the container 3 times.
 	local max_try=3
 	local i=0
@@ -212,6 +262,7 @@ LXC_START () {
 			ECHO_FORMAT "Boot log:\n" clog
 			cat "$script_dir/lxc_boot.log" | tee --append "$test_result"
 			stop_timer 1
+			stop_network_usage 1
 			return 1
 		fi
 	done
@@ -231,6 +282,7 @@ LXC_START () {
 	sudo cat "/var/lib/lxc/$lxc_name/rootfs/home/pchecker/temp_yunohost-cli.log" >> "$temp_log"
 
 	stop_timer 1
+	stop_network_usage 1
 	# Return the exit code of the ssh command
 	return $returncode
 }
@@ -239,6 +291,7 @@ LXC_STOP () {
 	# Stop and restore the LXC container
 
 	start_timer
+	start_network_usage
 	# Stop the LXC container
 	if is_lxc_running; then
 		echo "Stop the LXC container" | tee --append "$test_result"
@@ -264,6 +317,7 @@ LXC_STOP () {
 	echo "Restore the previous snapshot." | tee --append "$test_result"
 	sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$snapshot_path/$current_snapshot/rootfs/" "/var/lib/lxc/$lxc_name/rootfs/" > /dev/null 2>> "$test_result"
 	stop_timer 1
+	stop_network_usage 1
 }
 
 LXC_TURNOFF () {
