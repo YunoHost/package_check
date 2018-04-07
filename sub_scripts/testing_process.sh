@@ -1418,6 +1418,12 @@ TEST_LAUNCHER () {
 	# And keep this value separately
 	local global_start_timer=$starttime
 
+	# Start the network usage followup
+	start_network_usage
+	# And keep these values separately
+	local complete_start_rx_usage=$start_rx_usage
+	local complete_start_tx_usage=$start_tx_usage
+
 	# Execute the test
 	$1 $2
 
@@ -1431,6 +1437,11 @@ TEST_LAUNCHER () {
 	starttime=$global_start_timer
 	# End the timer for the test
 	stop_timer 2
+
+	# Restore the orgin values
+	start_rx_usage=$complete_start_rx_usage
+	start_tx_usage=$complete_start_tx_usage
+	# End the followup
 	stop_network_usage 2
 
 	# Update the lock file with the date of the last finished test.
