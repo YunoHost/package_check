@@ -593,6 +593,9 @@ CHECK_SETUP () {
 		RESULT_check_root=$check_result_setup
 		RESULT_check_remove_root=$check_result_remove
 	fi
+
+	# Make a break if auto_remove is set
+	break_before_continue
 }
 
 CHECK_UPGRADE () {
@@ -862,8 +865,13 @@ CHECK_MULTI_INSTANCE () {
 	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
-	replace_manifest_key "path" "$test_path"
-	check_path=$test_path
+	if [ "$previous_install" = "subdir" ]; then
+		local check_path=$test_path
+	elif [ "$previous_install" = "root" ]; then
+		local check_path=/
+	fi
+	replace_manifest_key "path" "$check_path"
+
 	replace_manifest_key "user" "$test_user"
 	replace_manifest_key "public" "$public_public_arg"
 
@@ -1410,6 +1418,12 @@ TEST_LAUNCHER () {
 	# And keep this value separately
 	local global_start_timer=$starttime
 
+	# Start the network usage followup
+	start_network_usage
+	# And keep these values separately
+	local complete_start_rx_usage=$start_rx_usage
+	local complete_start_tx_usage=$start_tx_usage
+
 	# Execute the test
 	$1 $2
 
@@ -1423,6 +1437,12 @@ TEST_LAUNCHER () {
 	starttime=$global_start_timer
 	# End the timer for the test
 	stop_timer 2
+
+	# Restore the orgin values
+	start_rx_usage=$complete_start_rx_usage
+	start_tx_usage=$complete_start_tx_usage
+	# End the followup
+	stop_network_usage 2
 
 	# Update the lock file with the date of the last finished test.
 	echo "$1 $2:$(date +%s)" > "$lock_file"

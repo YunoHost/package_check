@@ -778,6 +778,16 @@ start_timer
 complete_start_timer=$starttime
 
 #=================================================
+# Set the network followup for all tests
+#=================================================
+
+# Start the network usage followup
+start_network_usage
+# And keep these values separately
+complete_start_rx_usage=$start_rx_usage
+complete_start_tx_usage=$start_tx_usage
+
+#=================================================
 # Initialize tests
 #=================================================
 
@@ -1211,6 +1221,16 @@ echo "You can find the complete log of these tests in $complete_log"
 starttime=$complete_start_timer
 # End the timer for the test
 stop_timer 3
+
+#=================================================
+# Ending the network usage followup
+#=================================================
+
+# Restore the orgin values
+start_rx_usage=$complete_start_rx_usage
+start_tx_usage=$complete_start_tx_usage
+# End the followup
+stop_network_usage 3
 
 #=================================================
 # Notification grade
