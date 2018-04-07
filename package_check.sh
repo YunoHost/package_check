@@ -1211,6 +1211,7 @@ echo "You can find the complete log of these tests in $complete_log"
 starttime=$complete_start_timer
 # End the timer for the test
 stop_timer 3
+stop_network_usage 3
 
 #=================================================
 # Notification grade

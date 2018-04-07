@@ -1431,6 +1431,7 @@ TEST_LAUNCHER () {
 	starttime=$global_start_timer
 	# End the timer for the test
 	stop_timer 2
+	stop_network_usage 2
 
 	# Update the lock file with the date of the last finished test.
 	echo "$1 $2:$(date +%s)" > "$lock_file"
