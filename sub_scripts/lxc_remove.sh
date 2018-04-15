@@ -14,26 +14,45 @@ if [ "$(whoami)" != "$(cat "$script_dir/setup_user")" ] && test -e "$script_dir/
 	exit 0
 fi
 
+echo_bold () {
+	if [ $quiet_remove -eq 0 ]
+	then
+		echo -e "\e[1m> $1\e[0m"
+	fi
+}
+
+quiet_remove=0
+# Check argument "quiet"
+if [ "$1" = "quiet" ]
+then
+	quiet_remove=1
+fi
+
 touch "$script_dir/../pcheck.lock" # Met en place le lock de Package check
 
-echo -e "\e[1m> Retire l'ip forwarding.\e[0m"
+echo_bold "Retire l'ip forwarding."
 sudo rm /etc/sysctl.d/lxc_pchecker.conf
 sudo sysctl -p
 
-echo -e "\e[1m> Désactive le bridge réseau\e[0m"
+echo_bold "Désactive le bridge réseau"
 sudo ifdown --force $LXC_BRIDGE
 
-echo -e "\e[1m> Supprime le brige réseau\e[0m"
+echo_bold "Supprime le brige réseau"
 sudo rm /etc/network/interfaces.d/$LXC_BRIDGE
 
-echo -e "\e[1m> Suppression de la machine et de son snapshots\e[0m"
+echo_bold "Suppression de la machine et de son snapshots"
 sudo lxc-snapshot -n $LXC_NAME -d snap0
+sudo lxc-snapshot -n $LXC_NAME -d snap1
+sudo lxc-snapshot -n $LXC_NAME -d snap2
 sudo rm -f /var/lib/lxcsnaps/$LXC_NAME/snap0.tar.gz
 sudo lxc-destroy -n $LXC_NAME -f
 
-echo -e "\e[1m> Remove lxc lxctl\e[0m"
-sudo apt-get remove lxc lxctl
+if [ $quiet_remove -eq 0 ]
+then
+	echo_bold "Remove lxc lxctl"
+	sudo apt-get remove lxc lxctl
+fi
 
-echo -e "\e[1m> Suppression des lignes de pchecker_lxc dans .ssh/config\e[0m"
-BEGIN_LINE=$(cat $HOME/.ssh/config | grep -n "^# ssh pchecker_lxc$" | cut -d':' -f 1)
+echo_bold "Suppression des lignes de pchecker_lxc dans $HOME/.ssh/config"
+BEGIN_LINE=$(cat $HOME/.ssh/config | grep -n "^# ssh pchecker_lxc$" | cut -d':' -f 1 | tail -n1)
 sed -i "$BEGIN_LINE,/^IdentityFile/d" $HOME/.ssh/config

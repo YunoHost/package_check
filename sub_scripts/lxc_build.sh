@@ -67,11 +67,11 @@ echo -e "# Nom du conteneur\nLXC_NAME=$LXC_NAME\n" >> "$pcheck_config"
 echo -e "# Nom du bridge\nLXC_BRIDGE=$LXC_BRIDGE\n" >> "$pcheck_config"
 echo -e "# Distribution debian\nDISTRIB=$DISTRIB\n" >> "$pcheck_config"
 
-echo -e "\e[1m> Update et install lxc lxctl\e[0m" | tee "$LOG_BUILD_LXC"
+echo -e "\e[1m> Update et install lxc lxctl\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo apt-get update >> "$LOG_BUILD_LXC" 2>&1
 sudo apt-get install -y lxc lxctl >> "$LOG_BUILD_LXC" 2>&1
 
-echo -e "\e[1m> Install git, curl and lynx\e[0m" | tee "$LOG_BUILD_LXC"
+echo -e "\e[1m> Install git, curl and lynx\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo apt-get install -y git curl lynx >> "$LOG_BUILD_LXC" 2>&1
 
 sudo mkdir -p /var/lib/lxcsnaps	# Créer le dossier lxcsnaps, pour s'assurer que lxc utilisera ce dossier, même avec lxc 2.
@@ -79,11 +79,7 @@ sudo mkdir -p /var/lib/lxcsnaps	# Créer le dossier lxcsnaps, pour s'assurer que
 if sudo lxc-info -n $LXC_NAME > /dev/null 2>&1
 then	# Si le conteneur existe déjà
 	echo -e "\e[1m> Suppression du conteneur existant.\e[0m" | tee -a "$LOG_BUILD_LXC"
-	sudo lxc-snapshot -n $LXC_NAME -d snap0 | tee -a "$LOG_BUILD_LXC"
-	sudo lxc-snapshot -n $LXC_NAME -d snap1 | tee -a "$LOG_BUILD_LXC"
-	sudo lxc-snapshot -n $LXC_NAME -d snap2 | tee -a "$LOG_BUILD_LXC"
-	sudo rm -f /var/lib/lxcsnaps/$LXC_NAME/snap0.tar.gz | tee -a "$LOG_BUILD_LXC"
-	sudo lxc-destroy -n $LXC_NAME -f | tee -a "$LOG_BUILD_LXC"
+	"$script_dir/lxc_remove.sh" quiet | tee -a "$LOG_BUILD_LXC"
 fi
 
 echo -e "\e[1m> Création d'une machine debian $DISTRIB minimaliste.\e[0m" | tee -a "$LOG_BUILD_LXC"
