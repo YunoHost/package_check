@@ -169,6 +169,13 @@ if [ "$?" -ne 0 ]; then	# Si l'utilisateur tarde trop, la connexion sera refusé
 	ssh $ARG_SSH $LXC_NAME "exit 0"	# Initie une premier connexion SSH pour valider la clé.
 fi
 
+# Fix ssh common issues with stretch "No supported key exchange algorithms"
+sudo lxc-attach -n $LXC_NAME -- dpkg-reconfigure openssh-server  >> "$LOG_BUILD_LXC" 2>&1
+
+# Fix locales issue
+sudo lxc-attach -n $LXC_NAME -- locale-gen en_US.UTF-8 >> "$LOG_BUILD_LXC" 2>&1
+sudo lxc-attach -n $LXC_NAME -- localedef -i en_US -f UTF-8 en_US.UTF-8 >> "$LOG_BUILD_LXC" 2>&1
+
 if [ "$DISTRIB" == "stretch" ]; then
 	branch="--branch stretch"
 else
