@@ -24,3 +24,5 @@ LXC_BRIDGE=
 
 # Distribution debian
 DISTRIB=
+# Branche à utiliser pour le script d'install de cette distribution (si non standard)
+BRANCH=

@@ -16,6 +16,7 @@ then
 	dnsforce=$(cat "$pcheck_config" | grep dnsforce= | cut -d '=' -f2)
 	main_iface=$(cat "$pcheck_config" | grep iface= | cut -d '=' -f2)
 	DISTRIB=$(cat "$pcheck_config" | grep DISTRIB= | cut -d '=' -f2)
+	branch=$(cat "$pcheck_config" | grep BRANCH= | cut -d '=' -f2)
 fi
 
 LOG_BUILD_LXC="$script_dir/Build_lxc.log"
@@ -27,6 +28,7 @@ test -n "$LXC_NAME" || LXC_NAME=pchecker_lxc
 test -n "$LXC_BRIDGE" || LXC_BRIDGE=lxc-pchecker
 test -n "$dnsforce" || dnsforce=1
 test -n "$DISTRIB" || DISTRIB=jessie
+test -n "$branch" || branch=""
 ARG_SSH="-t"
 
 # Tente de définir l'interface réseau principale
@@ -65,7 +67,8 @@ echo -e "# Domaine de test\nDOMAIN=$DOMAIN\n" >> "$pcheck_config"
 echo -e "# Mot de passe\nYUNO_PWD=$YUNO_PWD\n" >> "$pcheck_config"
 echo -e "# Nom du conteneur\nLXC_NAME=$LXC_NAME\n" >> "$pcheck_config"
 echo -e "# Nom du bridge\nLXC_BRIDGE=$LXC_BRIDGE\n" >> "$pcheck_config"
-echo -e "# Distribution debian\nDISTRIB=$DISTRIB\n" >> "$pcheck_config"
+echo -e "# Distribution debian\nDISTRIB=$DISTRIB" >> "$pcheck_config"
+echo -e "# Branche à utiliser pour le script d'install de cette distribution (si non standard)\nBRANCH=$branch\n" >> "$pcheck_config"
 
 echo -e "\e[1m> Update et install lxc lxctl\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo apt-get update >> "$LOG_BUILD_LXC" 2>&1
@@ -176,11 +179,10 @@ sudo lxc-attach -n $LXC_NAME -- dpkg-reconfigure openssh-server  >> "$LOG_BUILD_
 sudo lxc-attach -n $LXC_NAME -- locale-gen en_US.UTF-8 >> "$LOG_BUILD_LXC" 2>&1
 sudo lxc-attach -n $LXC_NAME -- localedef -i en_US -f UTF-8 en_US.UTF-8 >> "$LOG_BUILD_LXC" 2>&1
 
-if [ "$DISTRIB" == "stretch" ]; then
-	branch="--branch stretch"
-else
-	branch=""
+if [ -n "$branch" ]; then
+	branch="--branch $branch"
 fi
+
 ssh $ARG_SSH $LXC_NAME "git clone https://github.com/YunoHost/install_script $branch /tmp/install_script" >> "$LOG_BUILD_LXC" 2>&1
 echo -e "\e[1m> Installation de Yunohost...\e[0m" | tee -a "$LOG_BUILD_LXC"
 ssh $ARG_SSH $LXC_NAME "cd /tmp/install_script; sudo ./install_yunohost -a" | tee -a "$LOG_BUILD_LXC" 2>&1
