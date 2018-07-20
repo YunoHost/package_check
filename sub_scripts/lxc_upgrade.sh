@@ -67,12 +67,6 @@ sudo lxc-start -n $LXC_NAME -d
 sleep 3
 sudo lxc-ls -f
 
-### FIX
-echo -e "\e[1m> Temporary fix...\e[0m"
-sudo lxc-attach -n $LXC_NAME -- apt-get remove dns-root-data
-sudo lxc-attach -n $LXC_NAME -- systemctl restart dnsmasq
-### FIX
-
 echo -e "\e[1m> Update\e[0m"
 update_apt=0
 sudo lxc-attach -n $LXC_NAME -- apt-get update
