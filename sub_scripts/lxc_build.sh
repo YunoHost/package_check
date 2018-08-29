@@ -27,7 +27,7 @@ test -n "$YUNO_PWD" || YUNO_PWD=admin
 test -n "$LXC_NAME" || LXC_NAME=pchecker_lxc
 test -n "$LXC_BRIDGE" || LXC_BRIDGE=lxc-pchecker
 test -n "$dnsforce" || dnsforce=1
-test -n "$DISTRIB" || DISTRIB=jessie
+test -n "$DISTRIB" || DISTRIB=stretch
 test -n "$branch" || branch=""
 ARG_SSH="-t"
 
