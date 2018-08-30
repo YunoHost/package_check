@@ -76,6 +76,8 @@ sudo apt-get install -y lxc lxctl >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Install git, curl and lynx\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo apt-get install -y git curl lynx >> "$LOG_BUILD_LXC" 2>&1
+# For those who have disabled APT::Install-Recommends we need to manually install the following packages.
+sudo apt-get install -y debootstrap rsync bridge-utils >> "$LOG_BUILD_LXC" 2>&1
 
 sudo mkdir -p /var/lib/lxcsnaps	# Créer le dossier lxcsnaps, pour s'assurer que lxc utilisera ce dossier, même avec lxc 2.
 
