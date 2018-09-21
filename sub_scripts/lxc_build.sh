@@ -119,6 +119,7 @@ sudo iptables -A FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT >> "$LOG_BUILD_
 sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Vérification du contenu du resolv.conf\e[0m" | tee -a "$LOG_BUILD_LXC"
+sudo cp -a /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf.origin
 if ! sudo cat /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf | grep -q nameserver; then
 	dnsforce=1	# Le resolv.conf est vide, on force l'ajout d'un dns.
 	sed -i "s/dnsforce=.*/dnsforce=$dnsforce/" "$pcheck_config"
@@ -134,6 +135,43 @@ echo -e "\e[1m> Démarrage de la machine\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo lxc-start -n $LXC_NAME -d --logfile "$script_dir/lxc_boot.log" >> "$LOG_BUILD_LXC" 2>&1
 sleep 3
 sudo lxc-ls -f >> "$LOG_BUILD_LXC" 2>&1
+
+echo -e "\e[1m> Test la configuration dns\e[0m" | tee -a "$LOG_BUILD_LXC"
+broken_dns=0
+while ! sudo lxc-attach -n $LXC_NAME -- getent hosts debian.org > /dev/null 2>&1
+do
+        echo -e "\e[1m>>> The dns isn't working (Current dns = $(sudo cat /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf | grep nameserver |$
+
+        if [ $broken_dns -eq 2 ]
+        then
+                echo -e "\e[1m>>>The dns is still broken, use FDN dns\e[0m" | tee -a "$LOG_BUILD_LXC"
+                echo "nameserver 80.67.169.12" | sudo tee /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf
+                dnsforce=0
+                ((broken_dns++))
+        elif [ $dnsforce -eq 0 ]
+        then
+                echo -e "\e[1m>>>Force to use the dns from the config file\e[0m" | tee -a "$LOG_BUILD_LXC"
+                echo "nameserver $dns" | sudo tee /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf
+                new_dns="$dns"
+                dnsforce=1
+                ((broken_dns++))
+        else
+                echo -e "\e[1m>>>Force to use the default dns\e[0m" | tee -a "$LOG_BUILD_LXC"
+                sudo cp -a /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf.origin /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf
+                new_dns="$(sudo cat /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf | grep nameserver | awk '{print $2}')"
+                dnsforce=0
+                ((broken_dns++))
+        fi
+        echo -e "\e[1m>>> Try to use the dns address $new_dns\e[0m" | tee -a "$LOG_BUILD_LXC"
+
+        # Change the value of dnsforce into the config file
+        sed -i "s/dnsforce=.*/dnsforce=$dnsforce/" "$pcheck_config"
+
+        if [ $broken_dns -eq 3 ]; then
+                # Break the loop if all the possibilities have been tried.
+                break
+        fi
+done
 
 echo -e "\e[1m> Update et install aptitude sudo git\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo lxc-attach -n $LXC_NAME -- apt-get update
