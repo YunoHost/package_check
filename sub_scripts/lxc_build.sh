@@ -140,7 +140,7 @@ echo -e "\e[1m> Test la configuration dns\e[0m" | tee -a "$LOG_BUILD_LXC"
 broken_dns=0
 while ! sudo lxc-attach -n $LXC_NAME -- getent hosts debian.org > /dev/null 2>&1
 do
-        echo -e "\e[1m>>> The dns isn't working (Current dns = $(sudo cat /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf | grep nameserver |$
+        echo -e "\e[1m>>> The dns isn't working (Current dns = $(sudo cat /var/lib/lxc/$LXC_NAME/rootfs/etc/resolv.conf | grep nameserver | awk '{print $2}'))"
 
         if [ $broken_dns -eq 2 ]
         then
