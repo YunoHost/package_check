@@ -1281,7 +1281,21 @@ then
 
 	# Build the log path (and replace all space by %20 in the job name)
 	if [ -n "$job" ]; then
-		job_log="/job/${job// /%20}/lastBuild/console"
+		if systemctl list-units | grep --quiet jenkins
+		then
+			job_log="/job/${job// /%20}/lastBuild/console"
+		elif systemctl list-units | grep --quiet yunorunner
+		then
+			# Get the directory of YunoRunner
+			ci_dir="$(grep WorkingDirectory= /etc/systemd/system/yunorunner.service | cut -d= -f2)"
+			# List the jobs from YunoRunner and grep the job (without Community or Official).
+			job_id="$(cd "$ci_dir"; ve3/bin/python ciclic list | grep ${job%% *} | head -n1)"
+			# Keep only the id of the job, by removing everything after -
+			job_id="${job_id%% -*}"
+			# And remove any space before the id.
+			job_id="${job_id##* }"
+			job_log="/job/$job_id"
+		fi
 	fi
 
 	# If it's a test on testing or unstable
