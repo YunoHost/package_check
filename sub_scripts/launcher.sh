@@ -208,11 +208,56 @@ LXC_START () {
 		# Fail if the container failed to start
 		if [ $i -eq $max_try ] && [ $failstart -eq 1 ]
 		then
-			ECHO_FORMAT "The container failed to start $max_try times...\nIf this problem is persistent, try to fix it with lxc_check.sh.\n" "red" "bold"
+			send_email () {
+				# Send an email only if it's a CI environment
+				if [ $type_exec_env -ne 0 ]
+				then
+					ci_path=$(grep "CI_URL=" "$script_dir/../config" | cut -d= -f2)
+					local subject="[YunoHost] Container in trouble on $ci_path."
+					local message="The container failed to start $max_try times on $ci_path.
+$lxc_check_result
+\n\nPlease have a look to the log of lxc_check:\n$(cat "$script_dir/lxc_check.log")"
+					if [ $lxc_check -eq 2 ]; then
+						# Add the log of lxc_build
+						message="\nHere the log of lxc_build:\n$(cat "$script_dir/sub_scripts/Build_lxc.log")"
+					fi
+
+					dest=$(grep '\"dest\": ' "$script_dir/../config" | cut -d= -f2)
+					mail -s "$subject" "$dest" <<< "$message"
+				fi
+			}
+
+			ECHO_FORMAT "The container failed to start $max_try times...\n" "red" "bold"
 			ECHO_FORMAT "Boot log:\n" clog
 			cat "$script_dir/lxc_boot.log" | tee --append "$test_result"
 			stop_timer 1
-			return 1
+			ECHO_FORMAT "lxc_check will try to fix the container...\n" "red" "bold"
+			local lxc_check="$($script_dir/sub_scripts/lxc_check.sh --no-lock >&2 | tee "$script_dir/lxc_check.log")"
+			if [ $lxc_check -eq 0 ]; then
+				local lxc_check_result="But the container seems to be ok, according to lxc_check."
+				ECHO_FORMAT "$lxc_check_result\n" "lgreen" "bold"
+				send_email
+				i=0
+				continue
+			elif [ $lxc_check -eq 1 ]; then
+				local lxc_check_result="An error has happened with the host. Please check the configuration."
+				ECHO_FORMAT "$lxc_check_result\n" "red" "bold"
+				send_email
+				return 1
+			elif [ $lxc_check -eq 2 ]; then
+				local lxc_check_result="The container is broken, it will be rebuilt."
+				ECHO_FORMAT "$lxc_check_result\n" "red" "bold"
+				$script_dir/sub_scripts/lxc_build.sh
+				send_email
+				i=0
+				continue
+			elif [ $lxc_check -eq 3 ]; then
+				local lxc_check_result="The container has been fixed by lxc_check."
+				ECHO_FORMAT "$lxc_check_result\n" "lgreen" "bold"
+				send_email
+				i=0
+				continue
+			fi
 		fi
 	done
 
