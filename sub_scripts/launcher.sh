@@ -171,7 +171,7 @@ LXC_START () {
 		do
 			echo -n .
 			# Try to connect with ssh to check if the container is ready to work.
-			if ssh $arg_ssh $lxc_name "exit 0" > /dev/null 2>&1; then
+			if ssh $arg_ssh -o ConnectTimeout=10 $lxc_name "exit 0" > /dev/null 2>&1; then
 				# Break the for loop if the container is ready.
 				break
 			fi
@@ -188,7 +188,7 @@ LXC_START () {
 				ECHO_FORMAT "Rebooting the container...\n" "red" "bold"
 			fi
 			LXC_STOP	# Stop the LXC container
-		elif ! ssh $arg_ssh $lxc_name "sudo ping -q -c 2 security.debian.org > /dev/null 2>&1; exit \$?" >> "$test_result" 2>&1
+		elif ! ssh $arg_ssh -o ConnectTimeout=60 $lxc_name "sudo ping -q -c 2 security.debian.org > /dev/null 2>&1; exit \$?" >> "$test_result" 2>&1
 		then
 			# Try to ping security.debian.org to check the connectivity from the container
 			ECHO_FORMAT "The container failed to connect to internet...\n" "red" "bold"
