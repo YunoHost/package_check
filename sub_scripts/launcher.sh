@@ -152,8 +152,9 @@ LXC_START () {
 	# Try to start the container 3 times.
 	local max_try=3
 	local i=0
-	for i in `seq 1 $max_try`
+	while [ $i -lt $max_try ]
 	do
+		i=$(( $i +1 ))
 		# Start the container and log the booting process in $script_dir/lxc_boot.log
 		# Try to start only if the container is not already started
 		if ! is_lxc_running; then
@@ -165,13 +166,13 @@ LXC_START () {
 			local avoid_witness=1
 		fi
 
-		# Check during 20 seconds if the container has finished to start.
+		# Try to connect 5 times
 		local j=0
-		for j in `seq 1 20`
+		for j in `seq 1 5`
 		do
 			echo -n .
 			# Try to connect with ssh to check if the container is ready to work.
-			if ssh $arg_ssh $lxc_name "exit 0" > /dev/null 2>&1; then
+			if ssh $arg_ssh -o ConnectTimeout=10 $lxc_name "exit 0" > /dev/null 2>&1; then
 				# Break the for loop if the container is ready.
 				break
 			fi
@@ -188,7 +189,7 @@ LXC_START () {
 				ECHO_FORMAT "Rebooting the container...\n" "red" "bold"
 			fi
 			LXC_STOP	# Stop the LXC container
-		elif ! ssh $arg_ssh $lxc_name "sudo ping -q -c 2 security.debian.org > /dev/null 2>&1; exit \$?" >> "$test_result" 2>&1
+		elif ! ssh $arg_ssh -o ConnectTimeout=60 $lxc_name "sudo ping -q -c 2 security.debian.org > /dev/null 2>&1; exit \$?" >> "$test_result" 2>&1
 		then
 			# Try to ping security.debian.org to check the connectivity from the container
 			ECHO_FORMAT "The container failed to connect to internet...\n" "red" "bold"
@@ -208,13 +209,66 @@ LXC_START () {
 		# Fail if the container failed to start
 		if [ $i -eq $max_try ] && [ $failstart -eq 1 ]
 		then
-			ECHO_FORMAT "The container failed to start $max_try times...\nIf this problem is persistent, try to fix it with lxc_check.sh.\n" "red" "bold"
+			send_email () {
+				# Send an email only if it's a CI environment
+				if [ $type_exec_env -ne 0 ]
+				then
+					ci_path=$(grep "CI_URL=" "$script_dir/../config" | cut -d= -f2)
+					local subject="[YunoHost] Container in trouble on $ci_path."
+					local message="The container failed to start $max_try times on $ci_path.
+$lxc_check_result
+
+Please have a look to the log of lxc_check:
+$(cat "$script_dir/lxc_check.log")"
+					if [ $lxc_check -eq 2 ]; then
+						# Add the log of lxc_build
+						message="$message
+
+Here the log of lxc_build:
+$(cat "$script_dir/sub_scripts/Build_lxc.log")"
+					fi
+
+					dest=$(grep 'dest=' "$script_dir/../config" | cut -d= -f2)
+					mail -s "$subject" "$dest" <<< "$message"
+				fi
+			}
+
+			ECHO_FORMAT "The container failed to start $max_try times...\n" "red" "bold"
 			ECHO_FORMAT "Boot log:\n" clog
 			cat "$script_dir/lxc_boot.log" | tee --append "$test_result"
-			stop_timer 1
-			return 1
+			ECHO_FORMAT "lxc_check will try to fix the container...\n" "red" "bold"
+			$script_dir/sub_scripts/lxc_check.sh --no-lock | tee "$script_dir/lxc_check.log"
+			# PIPESTATUS is an array with the exit code of each command followed by a pipe
+			local lxc_check=${PIPESTATUS[0]}
+			LXC_INIT
+			if [ $lxc_check -eq 0 ]; then
+				local lxc_check_result="The container seems to be ok, according to lxc_check."
+				ECHO_FORMAT "$lxc_check_result\n" "lgreen" "bold"
+				send_email
+				i=0
+			elif [ $lxc_check -eq 1 ]; then
+				local lxc_check_result="An error has happened with the host. Please check the configuration."
+				ECHO_FORMAT "$lxc_check_result\n" "red" "bold"
+				send_email
+				stop_timer 1
+				return 1
+			elif [ $lxc_check -eq 2 ]; then
+				local lxc_check_result="The container is broken, it will be rebuilt."
+				ECHO_FORMAT "$lxc_check_result\n" "red" "bold"
+				$script_dir/sub_scripts/lxc_build.sh
+				LXC_INIT
+				send_email
+				i=0
+			elif [ $lxc_check -eq 3 ]; then
+				local lxc_check_result="The container has been fixed by lxc_check."
+				ECHO_FORMAT "$lxc_check_result\n" "lgreen" "bold"
+				send_email
+				i=0
+			fi
 		fi
 	done
+	stop_timer 1
+	start_timer
 
 	# Count the number of lines of the current yunohost log file.
 	COPY_LOG 1

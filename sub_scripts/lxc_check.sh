@@ -6,6 +6,11 @@
 # Récupère le dossier du script
 if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
 
+no_lock=0
+if [ "$1" == "--no-lock" ]; then
+	no_lock=1
+fi
+
 ARG_SSH="-t"
 # Récupère les informations depuis le fichier de conf (Ou le complète le cas échéant)
 pcheck_config="$script_dir/../config"
@@ -19,6 +24,34 @@ then
 	LXC_BRIDGE=$(cat "$pcheck_config" | grep LXC_BRIDGE= | cut -d '=' -f2)
 	main_iface=$(cat "$pcheck_config" | grep iface= | cut -d '=' -f2)
 fi
+
+# Exit with the correct exit code
+remove_lock () {
+	if [ $no_lock -eq 1 ]
+	then
+		sudo rm -f "$script_dir/../pcheck.lock"
+	fi
+}
+
+exit_failure () {
+	remove_lock
+	exit 1
+}
+
+exit_rebuild () {
+	remove_lock
+	exit 2
+}
+
+exit_retry () {
+	remove_lock
+	exit 3
+}
+
+exit_sane () {
+	remove_lock
+	exit 0
+}
 
 # Use the default value and set it in the config file
 replace_default_value () {
@@ -54,7 +87,7 @@ if [ -z "$main_iface" ]; then
 	main_iface=$(sudo ip route | grep default | awk '{print $5;}')	# Prend l'interface réseau défini par default
 	if [ -z $main_iface ]; then
 		echo -e "\e[91mImpossible de déterminer le nom de l'interface réseau de l'hôte.\e[0m"
-		exit 1
+		exit_failure
 	fi
 	# Store the main iface in the config file
 	if grep -q iface= "$pcheck_config"
@@ -157,8 +190,7 @@ RESTORE_CONTAINER () {
 	# Résultats finaux
 	if [ $START_STATUS -eq 1 ]; then
 		echo -e "\e[91m\n> Le conteneur $LXC_NAME1 n'a pas pu être réparé...\nIl est nécessaire de détruire et de reconstruire le conteneur.\e[0m"
-		sudo rm "$script_dir/../pcheck.lock" # Retire le lock
-		exit 1
+		exit_rebuild
 	else
 		echo -e "\e[92m\n> Le conteneur démarre correctement.\e[0m"
 	fi
@@ -240,7 +272,9 @@ LXC_NETWORK_CONFIG () {
 	fi
 }
 
-touch "$script_dir/../pcheck.lock" # Met en place le lock de Package check
+if [ $no_lock -eq 0 ]; then
+	touch "$script_dir/../pcheck.lock" # Met en place le lock de Package check
+fi
 
 STOP_CONTAINER
 STOP_NETWORK
@@ -250,12 +284,12 @@ check_repair=0
 echo -e "\e[1m> Test de la configuration réseau du côté de l'hôte:\e[0m"
 CREATE_BRIDGE () {
 	echo | sudo tee /etc/network/interfaces.d/$LXC_BRIDGE <<EOF
-	auto $LXC_BRIDGE
-	iface $LXC_BRIDGE inet static
-		address $PLAGE_IP.1/24
-		bridge_ports none
-		bridge_fd 0
-		bridge_maxwait 0
+auto $LXC_BRIDGE
+iface $LXC_BRIDGE inet static
+        address $PLAGE_IP.1/24
+        bridge_ports none
+        bridge_fd 0
+        bridge_maxwait 0
 EOF
 }
 
@@ -292,8 +326,7 @@ do
 			else
 				sudo ip address
 				echo -e "\e[91mLe bridge n'obtient pas la bonne adresse IP après réparation. Tenter une réinstallation complète de Package_checker...\e[0m"
-				sudo rm "$script_dir/../pcheck.lock" # Retire le lock
-				exit 1
+				exit_rebuild
 			fi
 		fi
 	else
@@ -307,8 +340,7 @@ do
 		else
 			sudo ip address
 			echo -e "\e[91mLe bridge ne démarre pas après réparation. Tenter une réinstallation complète de Package_checker...\e[0m"
-			sudo rm "$script_dir/../pcheck.lock" # Retire le lock
-			exit 1
+			exit_rebuild
 		fi
 	fi
 	bridge=1
@@ -324,8 +356,7 @@ then
 	echo -e "\e[92mLes règles iptables sont appliquées correctement.\e[0m"
 else
 	echo -e "\e[91mLes règles iptables ne sont pas appliquées correctement, vérifier la configuration du système...\e[0m"
-	sudo rm "$script_dir/../pcheck.lock" # Retire le lock
-	exit 1
+	exit_failure
 fi
 
 # Arrête le réseau du conteneur
@@ -352,8 +383,7 @@ if [ "$?" -ne 0 ]; then	# En cas d'échec de connexion, tente de pinger un autre
 	ping -q -c 2 framasoft.org > /dev/null 2>&1
 	if [ "$?" -ne 0 ]; then	# En cas de nouvel échec de connexion. On considère que la connexion est down...
 		echo -e "\e[91mL'hôte semble ne pas avoir accès à internet. La connexion internet est indispensable.\e[0m"
-		sudo rm "$script_dir/../pcheck.lock" # Retire le lock
-		exit 1
+		exit_failure
 	fi
 fi
 echo -e "\e[92mL'hôte dispose d'un accès à internet.\e[0m"
@@ -384,8 +414,7 @@ do
 		if [ "$lxc_net_check" -eq 4 ]
 		then
 			echo -e "\e[91mImpossible de rétablir la connexion internet du conteneur.\e[0m"
-			sudo rm "$script_dir/../pcheck.lock" # Retire le lock
-			exit 1
+			exit_rebuild
 		fi
 		echo -e "\e[91mLe conteneur LXC n'accède pas à internet...\e[0m"
 		check_repair=1
@@ -446,8 +475,7 @@ echo -e "\e[1m\n> Test de l'accès ssh:\e[0m"
 # Check user
 if [ "$(whoami)" != "$(cat "$script_dir/setup_user")" ] && test -e "$script_dir/setup_user"; then
 	echo -e "\e[91mPour tester l'accès ssh, le script doit être exécuté avec l'utilisateur $(cat "$script_dir/setup_user") !\nL'utilisateur actuel est $(whoami).\e[0m"
-	sudo rm "$script_dir/../pcheck.lock" # Retire le lock
-	exit 1
+	exit_failure
 fi
 
 sudo lxc-ls -f
@@ -496,8 +524,7 @@ echo -e "\e[1m\n> Vérifie que Yunohost est installé dans le conteneur:\e[0m"
 sudo lxc-attach -n $LXC_NAME -- sudo yunohost -v
 if [ "$?" -ne 0 ]; then	# Si la commande échoue, il y a un problème avec Yunohost
 	echo -e "\e[91mYunohost semble mal installé. Il est nécessaire de détruire et de reconstruire le conteneur.\e[0m"
-	sudo rm "$script_dir/../pcheck.lock" # Retire le lock
-	exit 1
+	exit_rebuild
 else
 	echo -e "\e[92mYunohost est installé correctement.\e[0m"
 fi
@@ -508,6 +535,7 @@ STOP_NETWORK
 echo -e "\e[92m\nLe conteneur ne présente aucune erreur.\e[0m"
 if [ "$check_repair" -eq 1 ]; then
 	echo -e "\e[91mMais des réparations ont été nécessaires. Refaire un test pour s'assurer que tout est correct...\e[0m"
+	exit_retry
 fi
 
-sudo rm "$script_dir/../pcheck.lock" # Retire le lock
+exit_sane
