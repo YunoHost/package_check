@@ -284,12 +284,12 @@ check_repair=0
 echo -e "\e[1m> Test de la configuration réseau du côté de l'hôte:\e[0m"
 CREATE_BRIDGE () {
 	echo | sudo tee /etc/network/interfaces.d/$LXC_BRIDGE <<EOF
-	auto $LXC_BRIDGE
-	iface $LXC_BRIDGE inet static
-		address $PLAGE_IP.1/24
-		bridge_ports none
-		bridge_fd 0
-		bridge_maxwait 0
+auto $LXC_BRIDGE
+iface $LXC_BRIDGE inet static
+        address $PLAGE_IP.1/24
+        bridge_ports none
+        bridge_fd 0
+        bridge_maxwait 0
 EOF
 }
 
