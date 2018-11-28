@@ -227,7 +227,11 @@ ssh $ARG_SSH $LXC_NAME "git clone https://github.com/YunoHost/install_script $br
 echo -e "\e[1m> Installation de Yunohost...\e[0m" | tee -a "$LOG_BUILD_LXC"
 ssh $ARG_SSH $LXC_NAME "cd /tmp/install_script; sudo ./install_yunohost -a" | tee -a "$LOG_BUILD_LXC" 2>&1
 echo -e "\e[1m> Post install Yunohost\e[0m" | tee -a "$LOG_BUILD_LXC"
-ssh $ARG_SSH $LXC_NAME "sudo yunohost tools postinstall --domain $DOMAIN --password $YUNO_PWD" | tee -a "$LOG_BUILD_LXC" 2>&1
+ssh $ARG_SSH $LXC_NAME "sudo yunohost tools postinstall --domain $DOMAIN --password $YUNO_PWD --force-password" | tee -a "$LOG_BUILD_LXC" 2>&1
+
+# Disable password strength check
+ssh $ARG_SSH $LXC_NAME "sudo yunohost settings set security.password.admin.strength -v -1" | tee -a "$LOG_BUILD_LXC" 2>&1
+ssh $ARG_SSH $LXC_NAME "sudo yunohost settings set security.password.user.strength -v -1" | tee -a "$LOG_BUILD_LXC" 2>&1
 
 USER_TEST=$(cat "$(dirname "$script_dir")/package_check.sh" | grep test_user= | cut -d '=' -f2)
 SOUS_DOMAIN="sous.$DOMAIN"

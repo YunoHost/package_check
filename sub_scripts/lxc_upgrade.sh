@@ -86,6 +86,10 @@ then	# Print les numéros de version de Yunohost, si il y a eu un upgrade
 	(sudo lxc-attach -n $LXC_NAME -- yunohost -v) | sudo tee "$script_dir/ynh_version"
 fi
 
+# Disable password strength check
+ssh $ARG_SSH $LXC_NAME "sudo yunohost settings set security.password.admin.strength -v -1" | tee -a "$LOG_BUILD_LXC" 2>&1
+ssh $ARG_SSH $LXC_NAME "sudo yunohost settings set security.password.user.strength -v -1" | tee -a "$LOG_BUILD_LXC" 2>&1
+
 echo -e "\e[1m> Arrêt de la machine virtualisée\e[0m"
 sudo lxc-stop -n $LXC_NAME
 
