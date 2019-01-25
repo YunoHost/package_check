@@ -31,7 +31,7 @@ PRINT_YUNOHOST_VERSION () {
 	ssh $arg_ssh $lxc_name "sudo yunohost --version"
 
 	# Get the version of YunoHost from the LXC container
-	ynh_version=$(ssh -q $lxc_name "sudo yunohost --version --output-as plain | grep -A4 moulinette | tail -n1 | sed 's@\.@@g'")
+	ynh_version=$(ssh -q $lxc_name "sudo yunohost --version --output-as plain | grep -A4 moulinette | tail -n1 | sed 's@\.@@g' | cut -d+ -f1")
 }
 
 #=================================================
