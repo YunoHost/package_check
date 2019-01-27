@@ -76,6 +76,12 @@ PARSE_LOG () {
 			# And print the warning itself
 			ECHO_FORMAT " $(echo "$log_read_line\n" | sed 's/^>WARNING: //')" "lyellow"
 		fi
+		if echo "$log_read_line" | grep --quiet "^>INFO: "; then
+			# Print a white "Info:"
+			ECHO_FORMAT "Info:" "white" "underlined"
+			# And print the info itself
+			ECHO_FORMAT " $(echo "$log_read_line\n" | sed 's/^>INFO: //')" "white"
+		fi
 	done < "$temp_result"
 }
 
@@ -92,6 +98,11 @@ CLEAR_LOG () {
 	# Useless warning from yunohost backup.
 	sed --in-place '/^>WARNING: yunohost.backup backup_restore - \[[[:digit:].]*\] YunoHost est déjà installé$/d' "$temp_result"
 
+	# "processing action" INFO lines
+	sed --in-place '/^>INFO: .* - processing action/d' "$temp_result"
+	# Clean INFO lines
+	sed --in-place 's/^\(>INFO: \)yunohost\.hook <lambda> - \[[[:digit:].]*\]/\1/g' "$temp_result"
+
 	# Empty lines
 	sed --in-place '/^$/d' "$temp_result"
 }
@@ -106,10 +117,11 @@ LOG_EXTRACTOR () {
 	> "$temp_result"
 	# Duplicate the part of the yunohost log into the complete log.
 	cat "$temp_log" >> "$complete_log"
-	# Find all errors and warnings in the log file
-	grep --extended-regexp " ERROR    | WARNING  |yunohost.*: error:" "$temp_log" >> "$temp_result"
+	# Find all errors, warnings and infos in the log file
+	grep --extended-regexp " ERROR    | WARNING  | INFO     |yunohost.*: error:" "$temp_log" >> "$temp_result"
 	sed -i 's/^.* ERROR */>ERROR: /' "$temp_result"
 	sed -i 's/^.* WARNING */>WARNING: /' "$temp_result"
+	sed -i 's/^.* INFO */>INFO: /' "$temp_result"
 
 	CLEAR_LOG	# Remove all knew useless warning lines.
 	PARSE_LOG	# Print all errors and warning found in the log.
