@@ -703,7 +703,7 @@ TEST_RESULTS () {
 	# Evaluate the eighth level
 	# -> High quality package.
 	# This level can't be forced to 1
-	if [ "${level[8}" != "auto" ] && [ "${level[8]}" -ne 0 ]
+	if [ "${level[8]}" != "auto" ] && [ "${level[8]}" -ne 0 ]
 		level[8]=auto
 	fi
 	# TODO Not implemented yet...
