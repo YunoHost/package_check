@@ -565,7 +565,7 @@ TEST_RESULTS () {
 	test -n "${level[1]}" || level[1]=auto
 	test -n "${level[2]}" || level[2]=auto
 	test -n "${level[3]}" || level[3]=auto
-	test -n "${level[4]}" || level[4]=0
+	test -n "${level[4]}" || level[4]=auto
 	test -n "${level[5]}" || level[5]=auto
 	test -n "${level[6]}" || level[6]=auto
 	test -n "${level[7]}" || level[7]=auto
@@ -626,6 +626,21 @@ TEST_RESULTS () {
 		fi
 	fi
 
+	# Evaluate the fourth level
+	# -> The package can be backup and restore without error
+	if level_can_change 4
+	then
+		# Validated if backup and restore are ok. Or if backup and restore have been not tested but already validated before.
+		if 	( [ $RESULT_check_backup -eq 1 ] && \
+			[ $RESULT_check_restore -eq 1 ] ) || \
+			( [ $RESULT_check_backup -ne -1 ] && \
+			[ $RESULT_check_restore -ne -1 ] && \
+			[ "${level[4]}" == "2" ] )
+		then level[4]=2
+		else level[4]=0
+		fi
+	fi
+
 	# Evaluate the fifth level
 	# -> The package have no error with package linter
 	if level_can_change 5
@@ -654,13 +669,8 @@ TEST_RESULTS () {
 			[ $YEP17 -eq 1 ] || ECHO_FORMAT "This app doesn't respect the YEP 1.7 ! (https://yunohost.org/#/packaging_apps_guidelines_fr)\n" "red"
 		fi
 
-		# Validated if backup and restore are ok. Or if backup and restore have been not tested but already validated before.
-		if 	( [ $RESULT_check_backup -eq 1 ] && \
-			[ $RESULT_check_restore -eq 1 ] ) || \
-			( [ $RESULT_check_backup -ne -1 ] && \
-			[ $RESULT_check_restore -ne -1 ] && \
-			[ "${level[6]}" == "2" ] ) && \
-			[ $YEP17 -ne 0 ]
+		# Validated if YEP 1.7 respected
+		if 	[ $YEP17 -ne 0 ]
 		then level[6]=2
 		else level[6]=0
 		fi
@@ -689,6 +699,24 @@ TEST_RESULTS () {
 		else level[7]=0
 		fi
 	fi
+
+	# Evaluate the eighth level
+	# -> High quality package.
+	# This level can't be forced to 1
+	if [ "${level[8}" != "auto" ] && [ "${level[8]}" -ne 0 ]
+		level[8]=auto
+	fi
+	# TODO Not implemented yet...
+	# The level 8 can be validated only by the official list of app.
+	level[8]=0
+
+	# Evaluate the ninth level
+	# -> Not available yet...
+	level[9]=0
+
+	# Evaluate the tenth level
+	# -> Not available yet...
+	level[10]=0
 
 	# Initialize the global level
 	global_level=0
