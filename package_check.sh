@@ -702,13 +702,38 @@ TEST_RESULTS () {
 
 	# Evaluate the eighth level
 	# -> High quality package.
-	# This level can't be forced to 1
-	if [ "${level[8]}" != "auto" ] && [ "${level[8]}" -ne 0 ]
-		level[8]=auto
-	fi
-	# TODO Not implemented yet...
 	# The level 8 can be validated only by the official list of app.
 	level[8]=0
+	# Define the level 8 only if we're working on a repository. Otherwise, we can't assert that this is the correct app.
+	if echo "$app_arg" | grep --extended-regexp --quiet "https?:\/\/"
+	then
+		# Get the last version of the app list
+		wget -nv https://raw.githubusercontent.com/YunoHost/apps/master/community.json  -O "$script_dir/list.json"
+
+		# Get the name of the app from the repository name.
+		app_name="$(basename --multiple --suffix=_ynh "$app_arg")"
+		# Extract the app part from the json file. From the name line to the url line.
+		json_app_part=$(sed -n "/$app_name/,/${app_arg//\//.}/p" "$script_dir/list.json")
+		if [ -z "$json_app_part" ]
+		then
+			echo "$app_name for the repository $app_arg can't be found in the app list."
+		else
+			# Get high_quality tag for this app.
+			high_quality=$(echo "$json_app_part" | grep high_quality | awk '{print $2}')
+			if [ "${high_quality//,/}" == "true" ]
+			then
+				# This app is tag as a High Quality app.
+				level[8]=2
+			fi
+			# Get maintained tag for this app.
+			maintained=$(echo "$json_app_part" | grep maintained | awk '{print $2}')
+			# If maintained isn't empty or at true. This app can't be tag as a High Quality app.
+			if [ "${maintained//,/}" != "true" ] && [ -n "$maintained" ]
+			then
+				level[8]=0
+			fi
+		fi
+	fi
 
 	# Evaluate the ninth level
 	# -> Not available yet...
