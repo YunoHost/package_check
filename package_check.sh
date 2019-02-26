@@ -708,7 +708,7 @@ TEST_RESULTS () {
 	if echo "$app_arg" | grep --extended-regexp --quiet "https?:\/\/"
 	then
 		# Get the last version of the app list
-		wget -nv https://raw.githubusercontent.com/YunoHost/apps/master/community.json  -O "$script_dir/list.json"
+		wget -nv https://raw.githubusercontent.com/YunoHost/apps/master/apps.json  -O "$script_dir/list.json"
 
 		# Get the name of the app from the repository name.
 		app_name="$(basename --multiple --suffix=_ynh "$app_arg")"
