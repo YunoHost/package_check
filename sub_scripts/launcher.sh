@@ -179,7 +179,7 @@ LXC_START () {
 			sleep 1
 		done
 		echo ""
-
+		sleep 30
 		local failstart=0
 		# Check if the container is running
 		if ! is_lxc_running; then
