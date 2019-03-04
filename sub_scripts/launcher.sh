@@ -181,7 +181,7 @@ LXC_START () {
 		echo ""
 		if [ "$(uname -m)" == "aarch64" ]
 		then
-            sleep 30
+			sleep 30
 		fi
 		
 		local failstart=0
