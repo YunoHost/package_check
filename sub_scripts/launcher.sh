@@ -179,7 +179,11 @@ LXC_START () {
 			sleep 1
 		done
 		echo ""
-
+		if [ "$(uname -m)" == "aarch64" ]
+		then
+			sleep 30
+		fi
+		
 		local failstart=0
 		# Check if the container is running
 		if ! is_lxc_running; then
