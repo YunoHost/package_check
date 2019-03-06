@@ -76,16 +76,7 @@ package_check/package_check.sh APP_ynh
 		port_already_use=1 (XXXX)
 		change_url=1
 ;;; Levels
-	Level 1=auto
-	Level 2=auto
-	Level 3=auto
-	Level 4=0
 	Level 5=auto
-	Level 6=auto
-	Level 7=auto
-	Level 8=0
-	Level 9=0
-	Level 10=0
 ;;; Options
 Email=
 Notification=none
@@ -133,27 +124,11 @@ If a test is not in the list, it will be ignored. It's similar to marked at 0.
 - `change_url`: Try to change the url by 6 different way. Root to path, path to another path and path to root. And the same thing, with another domain.
 
 ### `;;; Levels`
-Allow to choose how [each level](https://yunohost.org/#/packaging_apps_levels_fr) is determined  
-Each level at *auto* will be determinate by the script. It's also possible to fixate the level at *1* or *0* to respectively validate or invalidate it.  
-The level 4, 8, 9 and 10 shouldn't be fixed at *auto*, because they don't be tested by the script and they need a manuel check. However, it's allowed to force them at *na* to inform that a level is not applicable (example for the level 4 when a app not permit to use SSO or LDAP). A level at *na* will be ignored in the sum of final level.
-
-For levels forced, please add a comment before the level containing a link toward a ticket explaining why this level have been forced.
-Like :
-```
-# https://github.com/YunoHost-Apps/$app_ynh/issues/5
-Level 4=1
-```
-
-- Level 1 : The application installs and uninstalls correctly. -- Can be checked by package_check
-- Level 2 : The application installs and uninstalls correctly in all standard configurations. -- Can be checked by package_check
-- Level 3 : The application may upgrade from an old version. -- Can be checked by package_check
-- Level 4 : The application manages LDAP and/or HTTP Auth. -- Must be validated manually
-- Level 5 : No errors with package_linter. -- Can be checked by package_check
-- Level 6 : The application may be saved and restored without any errors on the same server or an another. -- Can be checked by package_check
-- Level 7 : No errors with package check. -- Can be checked by package_check
-- Level 8 : The application respects all recommended YEP. -- Must be validated manually
-- Level 9 : The application respects all optionnal YEP. -- Must be validated manually
-- Level 10 : The application has judged as perfect. -- Must be validated manually
+From [levels](https://yunohost.org/#/packaging_apps_levels_fr) 1 to 7, levels are determined automatically.  
+Except for the level 5, you can't force a value for a level anymore.  
+The level 5 is determined by the results of [package linter](https://github.com/YunoHost/package_linter).  
+The default value for this level is `auto`, however, if needed, you can force the value for this level by setting it at `1`, for a positive result, or at `0`, for a negative one.  
+If you do so, please add a comment to justify why you force this level.
 
 ### `;;; Options`
 Supplementary options available in the check_process.  

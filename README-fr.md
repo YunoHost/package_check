@@ -76,16 +76,7 @@ package_check/package_check.sh APP_ynh
 		port_already_use=1 (XXXX)
 		change_url=1
 ;;; Levels
-	Level 1=auto
-	Level 2=auto
-	Level 3=auto
-	Level 4=0
 	Level 5=auto
-	Level 6=auto
-	Level 7=auto
-	Level 8=0
-	Level 9=0
-	Level 10=0
 ;;; Options
 Email=
 Notification=none
@@ -133,27 +124,12 @@ Si un test est absent de la liste, il sera ignoré. Cela revient à le noter à 
 - `change_url`: Test le script change_url de 6 manières différentes, Root vers un path, path vers un autre path et path vers root. Et la même chose avec un autre domaine.
 
 ### `;;; Levels`
-Permet de choisir comment [chaque niveau](https://yunohost.org/#/packaging_apps_levels_fr) est déterminé.  
-Chaque niveau fixé à *auto* sera déterminé par le script. Il est également possible de fixer le niveau à *1* ou à *0* pour respectivement le valider ou l'invalider.  
-Il est à noter que les niveaux 4, 8, 9 et 10 ne peuvent être fixés à *auto* car ils ne peuvent être testés par le script et nécessitent une vérification manuelle. Il est toutefois possible de les fixer à *na* pour indiquer que le niveau n'est pas applicable (par exemple pour le niveau 4 quand une app ne propose pas de SSO LDAP). Un niveau *na* sera tout simplement ignoré dans le calcul du niveau final.
 
-Pour le forçage des niveaux, merci d’ajouter, avant la déclaration du niveau, un commentaire contenant un lien vers un ticket qui explique pourquoi le niveau a été forcé.
-Comme :
-```
-# https://github.com/YunoHost-Apps/$app_ynh/issues/5
-Level 4=1
-```
-
-- Niveau 1 : L'application s'installe et se désinstalle correctement. -- Peut être vérifié par package_check
-- Niveau 2 : L'application s'installe et se désinstalle dans toutes les configurations communes. -- Peut être vérifié par package_check
-- Niveau 3 : L'application supporte l'upgrade depuis une ancienne version du package. -- Peut être vérifié par package_check
-- Niveau 4 : L'application prend en charge de LDAP et/ou HTTP Auth. -- Doit être vérifié manuellement
-- Niveau 5 : Aucune erreur dans package_linter. -- Peut être vérifié par package_check
-- Niveau 6 : L'application peut-être sauvegardée et restaurée sans erreurs sur la même machine ou une autre. -- Peut être vérifié par package_check
-- Niveau 7 : Aucune erreur dans package check. -- Peut être vérifié par package_check
-- Niveau 8 : L'application respecte toutes les YEP recommandées. -- Doit être vérifié manuellement
-- Niveau 9 : L'application respecte toutes les YEP optionnelles. -- Doit être vérifié manuellement
-- Niveau 10 : L'application est jugée parfaite. -- Doit être vérifié manuellement
+Les [niveaux](https://yunohost.org/#/packaging_apps_levels_fr) 1 à 7 sont déterminés automatiquement.  
+A l'exception du niveau 5, vous ne pouvez plus forcer une valeur pour un niveau.  
+Le niveau 5 est déterminé par les résultats de [package linter](https://github.com/YunoHost/package_linter).  
+La valeur par défaut pour ce niveau est `auto`, cependant, si nécessaire, vous pouvez forcer la valeur pour ce niveau en la fixant à `1`, pour un résultat positif, ou à `0`, pour un résultat négatif.  
+Si vous le faites, veuillez ajouter un commentaire pour justifier pourquoi vous forcez ce niveau.
 
 ### `;;; Options`
 Options supplémentaires disponible dans le check_process.  
