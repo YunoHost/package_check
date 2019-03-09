@@ -11,6 +11,12 @@ LXC_NAME=$(cat "$pcheck_config" | grep LXC_NAME= | cut -d '=' -f2)
 LXC_BRIDGE=$(cat "$pcheck_config" | grep LXC_BRIDGE= | cut -d '=' -f2)
 main_iface=$(cat "$pcheck_config" | grep iface= | cut -d '=' -f2)
 
+echo "> Arrêt de package_check"
+# Kill package_check
+# Retrieve the pid of Package check
+package_check_pid="$(cat "$script_dir/../pcheck.lock" | cut -d: -f3)"
+sudo kill --signal 15 $package_check_pid
+
 echo "> Arrêt du conteneur"
 if [ $(sudo lxc-info --name $LXC_NAME | grep -c "STOPPED") -eq 0 ]; then
 	echo "Arrêt du conteneur $LXC_NAME"
@@ -39,3 +45,5 @@ then
 fi
 
 sudo lxc-ls -f
+
+sudo rm "$script_dir/../pcheck.lock"

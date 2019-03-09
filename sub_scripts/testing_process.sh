@@ -1455,7 +1455,8 @@ TEST_LAUNCHER () {
 	stop_timer 2
 
 	# Update the lock file with the date of the last finished test.
-	echo "$1 $2:$(date +%s)" > "$lock_file"
+	# $$ is the PID of package_check itself.
+	echo "$1 $2:$(date +%s):$$" > "$lock_file"
 }
 
 set_witness_files () {

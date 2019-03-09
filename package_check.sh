@@ -193,7 +193,8 @@ then
 	fi
 fi
 # Create the lock file
-echo "start:$(date +%s)" > "$lock_file"
+# $$ is the PID of package_check itself.
+echo "start:$(date +%s):$$" > "$lock_file"
 
 #=================================================
 # Check the internet connectivity
