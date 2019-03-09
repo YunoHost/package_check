@@ -406,7 +406,12 @@ lxc_net_check=0 # Passe sur les différents tests
 while test "$lxc_net" -eq 1   # Boucle tant que la connexion internet du conteneur n'est pas réparée.
 do
 	REBOOT_CONTENEUR
-	sleep 3
+	if [ "$(uname -m)" == "aarch64" ]
+	then
+		sleep 30
+	else
+		sleep 3
+	fi
 	sudo lxc-ls -f
 	CHECK_LXC_NET
 	lxc_net=$?
