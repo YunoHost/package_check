@@ -562,19 +562,18 @@ TEST_RESULTS () {
 	# auto -> This level has not a value yet.
 	# na   -> This level will not be checked, but it'll be ignored in the final sum
 
-	# Set default values for level.
-	# All levels are forced to default values. Except the level 5.
-	level[1]=auto
-	level[2]=auto
-	level[3]=auto
-	level[4]=auto
-	# Level 5 can have a value forced into the check_process
+	# Set default values for level, if they're empty.
+	test -n "${level[1]}" || level[1]=auto
+	test -n "${level[2]}" || level[2]=auto
+	test -n "${level[3]}" || level[3]=auto
+	test -n "${level[4]}" || level[4]=auto
 	test -n "${level[5]}" || level[5]=auto
-	level[6]=auto
-	level[7]=auto
-	level[8]=0
-	level[9]=0
-	level[10]=0
+	test -n "${level[5]}" || level[5]=auto
+	test -n "${level[6]}" || level[6]=auto
+	test -n "${level[7]}" || level[7]=auto
+	test -n "${level[8]}" || level[8]=0
+	test -n "${level[9]}" || level[9]=0
+	test -n "${level[10]}" || level[10]=0
 
 	# Check if the level can be changed
 	level_can_change () {
@@ -944,13 +943,15 @@ then
 	extract_section "^;;; Levels" ";; " "$check_process"
 
 	# Get the value associated to each level
-	for i in `seq 1 10`
-	do
+	# Get only the value for the level 5 from the check_process
+# 	for i in `seq 1 10`
+# 	do
 		# Find the line for this level
-		line=$(find_string "^Level $i=")
+# 		line=$(find_string "^Level $i=")
+		line=$(find_string "^Level 5=")
 		# And get the value
 		level[$i]=$(echo "$line" | cut -d'=' -f2)
-	done
+# 	done
 
 
 	# Extract the Options section
