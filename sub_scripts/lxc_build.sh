@@ -114,7 +114,7 @@ echo -e "\e[1m> Active le bridge réseau\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo ifup $LXC_BRIDGE --interfaces=/etc/network/interfaces.d/$LXC_BRIDGE >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Configuration réseau du conteneur\e[0m" | tee -a "$LOG_BUILD_LXC"
-sudo sed -i "s/^lxc.network.type = empty$/lxc.network.type = veth\nlxc.network.flags = up\nlxc.network.link = $LXC_BRIDGE\nlxc.network.name = eth0\nlxc.network.hwaddr = 00:FF:AA:00:00:01/" /var/lib/lxc/$LXC_NAME/config >> "$LOG_BUILD_LXC" 2>&1
+sudo sed -i "s/^lxc.net.[0].type = empty$/lxc.net.[0].type = veth\nlxc.net.[0].flags = up\nlxc.net.[0].link = $LXC_BRIDGE\nlxc.net.[0].name = eth0\nlxc.net.[0].hwaddr = 00:FF:AA:00:00:01/" /var/lib/lxc/$LXC_NAME/config >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Configuration réseau de la machine virtualisée\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo sed -i "s@iface eth0 inet dhcp@iface eth0 inet static\n\taddress $PLAGE_IP.2/24\n\tgateway $PLAGE_IP.1@" /var/lib/lxc/$LXC_NAME/rootfs/etc/network/interfaces >> "$LOG_BUILD_LXC" 2>&1
@@ -135,7 +135,7 @@ if [ $dnsforce -eq 1 ]; then	# Force la réécriture du resolv.conf
 fi
 
 # Fix an issue with apparmor when the container start.
-echo -e "\n# Fix apparmor issues\nlxc.aa_profile = unconfined" | sudo tee -a /var/lib/lxc/$LXC_NAME/config >> "$LOG_BUILD_LXC" 2>&1
+echo -e "\n# Fix apparmor issues\nlxc.apparmor.profile = unconfined" | sudo tee -a /var/lib/lxc/$LXC_NAME/config >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Démarrage de la machine\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo lxc-start -n $LXC_NAME -d --logfile "$script_dir/lxc_boot.log" >> "$LOG_BUILD_LXC" 2>&1
