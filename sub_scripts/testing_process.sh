@@ -380,8 +380,16 @@ CHECK_URL () {
 		done
 
 		# Detect the issue alias_traversal, https://github.com/yandex/gixy/blob/master/docs/en/plugins/aliastraversal.md
-		curl --location --insecure --silent $check_domain$check_path../html/index.nginx-debian.html \
-			| grep "title" | grep --quiet "Welcome to nginx on Debian" \
+
+		# Create a file to get for alias_traversal
+		echo "<!DOCTYPE html><html><head>
+<title>alias_traversal test</title>
+</head><body><h1>alias_traversal test</h1>
+If you see this page, you have failed the test for alias_traversal issue.</body></html>" \
+		| sudo tee /var/lib/lxc/$lxc_name/rootfs/var/www/html/alias_traversal.html > /dev/null
+
+		curl --location --insecure --silent $check_domain$check_path../html/alias_traversal.html \
+			| grep "title" | grep --quiet "alias_traversal test" \
 			&& ECHO_FORMAT "Issue alias_traversal detected ! Please see here https://github.com/YunoHost/example_ynh/pull/45 to fix that.\n" "red" "bold" && RESULT_alias_traversal=1
 
 		# Remove the entries in /etc/hosts for the test domain
