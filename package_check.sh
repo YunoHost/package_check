@@ -730,8 +730,13 @@ TEST_RESULTS () {
 			# Get maintained tag for this app.
 			maintained=$(echo "$json_app_part" | grep maintained | awk '{print $2}')
 			# If maintained isn't empty or at true. This app can't be tag as a High Quality app.
-			if [ "${maintained//,/}" != "true" ] && [ -n "$maintained" ]
+			# An app tagged as 'request_help' can still be High Quality, but not an app tagged as 'request_adoption'
+			if [ "${maintained//,/}" != "true" ] && [ "${maintained//[,\"]/}" != "request_help" ] && [ -n "$maintained" ]
 			then
+				if [ ${level[8]} -ge 1 ]
+				then
+					echo "As this app isn't maintained, it can't reach the level 8."
+				fi
 				level[8]=0
 			fi
 		fi
