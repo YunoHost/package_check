@@ -57,6 +57,32 @@ COPY_LOG () {
 	fi
 }
 
+FALSE_ERRORS_DETECTION () {
+    # Detect false positive errors.
+    false_positive_error=0
+
+    # Detect network error
+    if grep --quiet "Network is unreachable" "$temp_result"
+    then
+        false_positive_error=1
+        false_positive_error_cond="network"
+    fi
+
+    # Detect DNS error
+    if grep --quiet "Temporary failure resolving" "$temp_result"
+    then
+        false_positive_error=1
+        false_positive_error_cond="DNS failure"
+    fi
+
+    # Detect Corrupt source
+    if grep --quiet "Corrupt source" "$temp_result"
+    then
+        false_positive_error=1
+        false_positive_error_cond="corrupt source"
+    fi
+}
+
 PARSE_LOG () {
 	# Print all errors and warning found in the log.
 
@@ -125,4 +151,5 @@ LOG_EXTRACTOR () {
 
 	CLEAR_LOG	# Remove all knew useless warning lines.
 	PARSE_LOG	# Print all errors and warning found in the log.
+	FALSE_ERRORS_DETECTION	# Detect if there's a temporary error that shouldn't impact the test.
 }

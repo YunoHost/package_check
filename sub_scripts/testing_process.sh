@@ -21,6 +21,19 @@ break_before_continue () {
 	fi
 }
 
+check_false_positive_error () {
+    # Check if FALSE_ERRORS_DETECTION has detected an false positive error.
+
+    # We will use
+    # check_false_positive_error || return $?
+    # to check the result of the function of propagate the result to parent functions.
+
+    if [ $false_positive_error -eq 1 ] && [ $false_positive_error_loop -lt $max_false_positive_error_loop ]; then
+        # Return 75, for EX_TEMPFAIL from sysexits.h
+        return 75
+    fi
+}
+
 #=================================================
 
 PRINT_YUNOHOST_VERSION () {
@@ -96,6 +109,7 @@ SETUP_APP () {
 
 	# Analyse the log to extract "warning" and "error" lines
 	LOG_EXTRACTOR
+	check_false_positive_error || return $?
 }
 
 STANDARD_SETUP_APP () {
@@ -109,6 +123,7 @@ STANDARD_SETUP_APP () {
 		then
 			# Make an installation
 			SETUP_APP
+            check_false_positive_error || return $?
 		else
 			# Or uses an existing snapshot
 			ECHO_FORMAT "Uses an existing snapshot for root installation.\n" "white" clog
@@ -122,6 +137,7 @@ STANDARD_SETUP_APP () {
 		then
 			# Make an installation
 			SETUP_APP
+            check_false_positive_error || return $?
 		else
 			# Or uses an existing snapshot
 			ECHO_FORMAT "Uses an existing snapshot for sub path installation.\n" "white" clog
@@ -534,6 +550,7 @@ CHECK_SETUP () {
 
 	# Install the application in a LXC container
 	SETUP_APP
+	check_false_positive_error || return $?
 
 	# Try to access the app by its url
 	CHECK_URL
@@ -580,6 +597,7 @@ CHECK_SETUP () {
 
 	# Analyse the log to extract "warning" and "error" lines
 	LOG_EXTRACTOR
+	check_false_positive_error || return $?
 
 	# Check the result and print SUCCESS or FAIL
 	if check_test_result_remove
@@ -601,6 +619,7 @@ CHECK_SETUP () {
 		ECHO_FORMAT "\nReinstall the application after a removing.\n" "white" "bold" clog
 		
 		SETUP_APP
+        check_false_positive_error || return $?
 
 		# Try to access the app by its url
 		CHECK_URL
@@ -677,6 +696,7 @@ CHECK_UPGRADE () {
 		then
 			# If no commit is specified, use the current version.
 			STANDARD_SETUP_APP
+            check_false_positive_error || return $?
 		else
 			# Otherwise, use a specific commit
 			# Backup the modified arguments
@@ -698,6 +718,7 @@ CHECK_UPGRADE () {
 			(cd "$package_path"; git checkout --force --quiet "$commit")
 			# Install the application
 			SETUP_APP
+            check_false_positive_error || return $?
 			# Then replace the backup
 			sudo rm -r "$package_path"
 			sudo mv "${package_path}_back" "$package_path"
@@ -730,6 +751,7 @@ CHECK_UPGRADE () {
 
 			# Analyse the log to extract "warning" and "error" lines
 			LOG_EXTRACTOR
+			check_false_positive_error || return $?
 
 			# Try to access the app by its url
 			CHECK_URL
@@ -831,6 +853,7 @@ CHECK_PUBLIC_PRIVATE () {
 
 		# Install the application in a LXC container
 		SETUP_APP
+        check_false_positive_error || return $?
 
 		# Try to access the app by its url
 		CHECK_URL
@@ -926,6 +949,7 @@ CHECK_MULTI_INSTANCE () {
 
 		# Install the application in a LXC container
 		SETUP_APP
+        check_false_positive_error || return $?
 
 		# Store the result in the correct variable
 		# First installation
@@ -1065,6 +1089,7 @@ CHECK_COMMON_ERROR () {
 
 	# Install the application in a LXC container
 	SETUP_APP
+	check_false_positive_error || return $?
 
 	# Try to access the app by its url
 	CHECK_URL
@@ -1147,6 +1172,7 @@ CHECK_BACKUP_RESTORE () {
 
 		# Install the application in a LXC container
 		STANDARD_SETUP_APP
+        check_false_positive_error || return $?
 
 		# Remove the previous residual backups
 		sudo rm -rf /var/lib/lxc/$lxc_name/rootfs/home/yunohost.backup/archives
@@ -1178,6 +1204,7 @@ CHECK_BACKUP_RESTORE () {
 
 			# Analyse the log to extract "warning" and "error" lines
 			LOG_EXTRACTOR
+			check_false_positive_error || return $?
 		fi
 
 		# Check the result and print SUCCESS or FAIL
@@ -1245,6 +1272,7 @@ CHECK_BACKUP_RESTORE () {
 
 			# Analyse the log to extract "warning" and "error" lines
 			LOG_EXTRACTOR
+			check_false_positive_error || return $?
 
 			# Try to access the app by its url
 			CHECK_URL
@@ -1357,6 +1385,7 @@ CHECK_CHANGE_URL () {
 		# Install the application in a LXC container
 		ECHO_FORMAT "\nPreliminary install...\n" "white" "bold" clog
 		STANDARD_SETUP_APP
+        check_false_positive_error || return $?
 
 		# Check if the install had work
 		if [ $yunohost_result -ne 0 ]
@@ -1383,6 +1412,7 @@ CHECK_CHANGE_URL () {
 
 			# Analyse the log to extract "warning" and "error" lines
 			LOG_EXTRACTOR
+			check_false_positive_error || return $?
 
 			# Try to access the app by its url
 			check_path=$new_path
@@ -1442,29 +1472,50 @@ TEST_LAUNCHER () {
 	# Intialize values
 	yunohost_result=-1
 	yunohost_remove=-1
+    false_positive_error=0
+    max_false_positive_error_loop=3
 
-	# Start the timer for this test
-	start_timer
-	# And keep this value separately
-	local global_start_timer=$starttime
+    for false_positive_error_loop in $( seq 1 $max_false_positive_error_loop )
+    do
+        # Start the timer for this test
+        start_timer
+        # And keep this value separately
+        local global_start_timer=$starttime
 
-	# Execute the test
-	$1 $2
+        # Execute the test
+        $1 $2
 
-	# Uses the default snapshot
-	current_snapshot=snap0
+        if [ $false_positive_error -eq 1 ]
+        then
+            ECHO_FORMAT "This test was aborted because of a $false_positive_error_cond error.\n" "red" "bold" clog
+            if [ $false_positive_error_loop -lt $max_false_positive_error_loop ]
+            then
+                ECHO_FORMAT "The test will restart.\n" "lyellow" "bold" clog
+                cur_test=$((cur_test-1))
+            fi
+        fi
 
-	# Stop and restore the LXC container
-	LXC_STOP
+        # Uses the default snapshot
+        current_snapshot=snap0
 
-	# Restore the started time for the timer
-	starttime=$global_start_timer
-	# End the timer for the test
-	stop_timer 2
+        # Stop and restore the LXC container
+        LXC_STOP
 
-	# Update the lock file with the date of the last finished test.
-	# $$ is the PID of package_check itself.
-	echo "$1 $2:$(date +%s):$$" > "$lock_file"
+        # Restore the started time for the timer
+        starttime=$global_start_timer
+        # End the timer for the test
+        stop_timer 2
+
+        # Update the lock file with the date of the last finished test.
+        # $$ is the PID of package_check itself.
+        echo "$1 $2:$(date +%s):$$" > "$lock_file"
+
+        # Exit the loop if there's no temporary errors detected.
+        if [ $false_positive_error -eq 0 ]
+        then
+            break
+        fi
+    done
 }
 
 set_witness_files () {
