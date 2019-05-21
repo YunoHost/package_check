@@ -518,20 +518,35 @@ check_test_result_remove () {
 is_install_failed () {
 	# Check if an install have previously work
 
-	if [ $RESULT_check_sub_dir -eq 1 ]
-	then
-		# If subdir installation worked.
-		echo subdir
-	elif [ $RESULT_check_root -eq 1 ] || [ $force_install_ok -eq 1 ]
-	then
-		# If root installation worked, return root or force_install_ok setted, return root.
-		echo root
-    elif [ $RESULT_check_sub_dir -ne -1 ] && [ $RESULT_check_root -ne 1 ]
+    # If the test for install in sub dir isn't desactivated
+    if [ $setup_sub_dir -ne 0 ]
     then
-		# If no installation has been done, return root
-		echo root
-	else
-		ECHO_FORMAT "All installs failed, impossible to perform this test...\n" "red" clog >&2
+        # If a test succeed or if force_install_ok is set
+        if [ $RESULT_check_sub_dir -eq 1 ] || [ $force_install_ok -eq 1 ]
+        then
+            # Validate installation in sub dir.
+            sub_dir_install=1
+        fi
+    else
+        sub_dir_install=0
+    fi
+
+    # If the test for install on root isn't desactivated
+    if [ $setup_root -ne 0 ]
+    then
+        # If a test succeed or if force_install_ok is set
+        if [ $RESULT_check_root -eq 1 ] || [ $force_install_ok -eq 1 ]
+        then
+            # Validate installation on root.
+            root_install=1
+        fi
+    else
+        root_install=0
+    fi
+
+    if [ $sub_dir_install -eq 0 ] && [ $root_install -eq 0 ]
+    then
+		ECHO_FORMAT "All installs have failed, impossible to perform this test...\n" "red" clog
 		return 1
 	fi
 }
@@ -594,6 +609,30 @@ CHECK_SETUP () {
 			RESULT_global_setup=-1	# Installation failed
 		fi
 		local check_result_setup=-1	# Installation failed
+	fi
+
+	# Create a snapshot for this installation, to be able to reuse it instead of a new installation.
+	# But only if this installation has worked fine
+	if [ $check_result_setup -eq 1 ]; then
+		if [ "$check_path" = "/" ]
+		then
+			# Check if a snapshot already exist for a root install
+			if [ -z "$root_snapshot" ]
+			then
+				ECHO_FORMAT "Create a snapshot for root installation.\n" "white" clog
+				create_temp_backup 2
+				root_snapshot=snap2
+			fi
+		else
+			# Check if a snapshot already exist for a subpath (or no_url) install
+			if [ -z "$subpath_snapshot" ]
+			then
+				# Then create a snapshot
+				ECHO_FORMAT "Create a snapshot for sub path installation.\n" "white" clog
+				create_temp_backup 1
+				subpath_snapshot=snap1
+			fi
+		fi
 	fi
 
 	# Remove the application
@@ -674,9 +713,8 @@ CHECK_UPGRADE () {
 		fi
 
 		# Check if an install have previously work
-		local previous_install=$(is_install_failed)
 		# Abort if none install worked
-		[ "$previous_install" = "1" ] && return
+		is_install_failed || return
 
 		# Copy original arguments
 		local manifest_args_mod="$manifest_arguments"
@@ -685,9 +723,9 @@ CHECK_UPGRADE () {
 		check_domain=$sub_domain
 		replace_manifest_key "domain" "$check_domain"
 		# Use a path according to previous succeeded installs
-		if [ "$previous_install" = "subdir" ]; then
+		if [ $sub_dir_install -eq 1 ]; then
 			local check_path=$test_path
-		elif [ "$previous_install" = "root" ]; then
+        else
 			local check_path=/
 		fi
 		replace_manifest_key "path" "$check_path"
@@ -799,9 +837,7 @@ CHECK_PUBLIC_PRIVATE () {
 	check_manifest_key "public_private" || return
 
 	# Check if an install have previously work
-	local previous_install=$(is_install_failed)
-	# Abort if none install worked
-	[ "$previous_install" = "1" ] && return
+	is_install_failed || return
 
 	# Copy original arguments
 	local manifest_args_mod="$manifest_arguments"
@@ -827,8 +863,8 @@ CHECK_PUBLIC_PRIVATE () {
 		# First, try with a root install
 		if [ $i -eq 0 ]
 		then
-			# Check if root installation worked, or if force_install_ok is setted.
-			if [ $RESULT_check_root -eq 1 ] || [ $force_install_ok -eq 1 ]
+			# Check if root installation worked
+			if [ $root_install -eq 1 ]
 			then
 				# Replace manifest key for path
 				local check_path=/
@@ -843,7 +879,7 @@ CHECK_PUBLIC_PRIVATE () {
 		elif [ $i -eq 1 ]
 		then
 			# Check if sub path installation worked, or if force_install_ok is setted.
-			if [ $RESULT_check_sub_dir -eq 1 ] || [ $force_install_ok -eq 1 ]
+			if [ $sub_dir_install -eq 1 ]
 			then
 				# Replace manifest key for path
 				local check_path=$test_path
@@ -914,17 +950,15 @@ CHECK_MULTI_INSTANCE () {
 	unit_test_title "Multi-instance installations..."
 
 	# Check if an install have previously work
-	local previous_install=$(is_install_failed)
-	# Abort if none install worked
-	[ "$previous_install" = "1" ] && return
+	is_install_failed || return
 
 	# Copy original arguments
 	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
-	if [ "$previous_install" = "subdir" ]; then
+	if [ $sub_dir_install -eq 1 ]; then
 		local check_path=$test_path
-	elif [ "$previous_install" = "root" ]; then
+	else
 		local check_path=/
 	fi
 	replace_manifest_key "path" "$check_path"
@@ -1034,9 +1068,7 @@ CHECK_COMMON_ERROR () {
 	fi
 
 	# Check if an install have previously work
-	local previous_install=$(is_install_failed)
-	# Abort if none install worked
-	[ "$previous_install" = "1" ] && return
+	is_install_failed || return
 
 	# Copy original arguments
 	local manifest_args_mod="$manifest_arguments"
@@ -1056,7 +1088,7 @@ CHECK_COMMON_ERROR () {
 		local check_path=$test_path
 	else [ "$install_type" = "port_already_use" ]
 		# Use a path according to previous succeeded installs
-		if [ "$previous_install" = "subdir" ]; then
+		if [ $sub_dir_install -eq 1 ]; then
 			local check_path=$test_path
 		else
 			local check_path=/
@@ -1124,9 +1156,7 @@ CHECK_BACKUP_RESTORE () {
 	unit_test_title "Backup/Restore..."
 
 	# Check if an install have previously work
-	local previous_install=$(is_install_failed)
-	# Abort if none install worked
-	[ "$previous_install" = "1" ] && return
+	is_install_failed || return
 
 	# Copy original arguments
 	local manifest_args_mod="$manifest_arguments"
@@ -1145,7 +1175,7 @@ CHECK_BACKUP_RESTORE () {
 		if [ $i -eq 0 ]
 		then
 			# Check if root installation worked, or if force_install_ok is setted.
-			if [ $RESULT_check_root -eq 1 ] || [ $force_install_ok -eq 1 ]
+			if [ $root_install -eq 1 ]
 			then
 				# Replace manifest key for path
 				local check_path=/
@@ -1161,7 +1191,7 @@ CHECK_BACKUP_RESTORE () {
 		elif [ $i -eq 1 ]
 		then
 			# Check if sub path installation worked, or if force_install_ok is setted.
-			if [ $RESULT_check_sub_dir -eq 1 ] || [ $force_install_ok -eq 1 ]
+			if [ $sub_dir_install -eq 1 ]
 			then
 				# Replace manifest key for path
 				local check_path=$test_path
@@ -1310,9 +1340,7 @@ CHECK_CHANGE_URL () {
 	check_manifest_key "domain" || return
 
 	# Check if an install have previously work
-	local previous_install=$(is_install_failed)
-	# Abort if none install worked
-	[ "$previous_install" = "1" ] && return
+	is_install_failed || return
 
 	# Copy original arguments
 	local manifest_args_mod="$manifest_arguments"
@@ -1327,7 +1355,7 @@ CHECK_CHANGE_URL () {
 	# Without modify the domain, root to path, path to path and path to root.
 	# And then, same with a domain change
 	local i=0
-	for i in ` seq 1 6`
+	for i in `seq 1 6`
 	do
 		if [ $i -eq 1 ]; then
 			# Same domain, root to path
@@ -1364,27 +1392,24 @@ CHECK_CHANGE_URL () {
 		replace_manifest_key "path" "$check_path"
 
 		# Check if root or subpath installation worked, or if force_install_ok is setted.
-		if [ $force_install_ok -eq 1 ]
-		then
-			# Try with a sub path install
-			if [ "$check_path" = "/" ]
-			then
-				if [ $RESULT_check_root -ne 1 ] && [ $force_install_ok -ne 1 ]
-				then
-					# Jump this test
-					ECHO_FORMAT "Root install failed, impossible to perform this test...\n" "lyellow" clog
-					continue
-				fi
-			# And with a sub path install
-			else
-				if [ $RESULT_check_sub_dir -ne 1 ] && [ $force_install_ok -ne 1 ]
-				then
-					# Jump this test
-					ECHO_FORMAT "Sub path install failed, impossible to perform this test...\n" "lyellow" clog
-					continue
-				fi
-			fi
-		fi
+        # Try with a sub path install
+        if [ "$check_path" = "/" ]
+        then
+            if [ $root_install -eq 0 ]
+            then
+                # Jump this test
+                ECHO_FORMAT "Root install failed, impossible to perform this test...\n" "lyellow" clog
+                continue
+            fi
+        # And with a sub path install
+        else
+            if [ $sub_dir_install -eq 0 ]
+            then
+                # Jump this test
+                ECHO_FORMAT "Sub path install failed, impossible to perform this test...\n" "lyellow" clog
+                continue
+            fi
+        fi
 
 		# Install the application in a LXC container
 		ECHO_FORMAT "\nPreliminary install...\n" "white" "bold" clog
@@ -1438,6 +1463,8 @@ CHECK_CHANGE_URL () {
 		# Make a break if auto_remove is set
 		break_before_continue
 
+		# Uses the default snapshot
+		current_snapshot=snap0
 		# Stop and restore the LXC container
 		LXC_STOP
 	done
