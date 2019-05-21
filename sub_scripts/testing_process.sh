@@ -124,6 +124,18 @@ STANDARD_SETUP_APP () {
 			# Make an installation
 			SETUP_APP
             check_false_positive_error || return $?
+
+            # Create a snapshot for this installation, to be able to reuse it instead of a new installation.
+            # But only if this installation has worked fine
+            if [ $yunohost_result -eq 0 ]; then
+                # Check if a snapshot already exist for a root install
+                if [ -z "$root_snapshot" ]
+                then
+                    ECHO_FORMAT "\nCreate a snapshot for root installation.\n" "white" clog
+                    create_temp_backup 2
+                    root_snapshot=snap2
+                fi
+            fi
 		else
 			# Or uses an existing snapshot
 			ECHO_FORMAT "Uses an existing snapshot for root installation.\n" "white" clog
@@ -138,6 +150,18 @@ STANDARD_SETUP_APP () {
 			# Make an installation
 			SETUP_APP
             check_false_positive_error || return $?
+
+            # Create a snapshot for this installation, to be able to reuse it instead of a new installation.
+            # But only if this installation has worked fine
+            if [ $yunohost_result -eq 0 ]; then
+                # Check if a snapshot already exist for a subpath (or no_url) install
+                if [ -z "$subpath_snapshot" ]
+                then
+                    ECHO_FORMAT "\nCreate a snapshot for sub path installation.\n" "white" clog
+                    create_temp_backup 1
+                    root_snapshot=snap1
+                fi
+            fi
 		else
 			# Or uses an existing snapshot
 			ECHO_FORMAT "Uses an existing snapshot for sub path installation.\n" "white" clog
@@ -502,8 +526,12 @@ is_install_failed () {
 	then
 		# If root installation worked, return root or force_install_ok setted, return root.
 		echo root
+    elif [ $RESULT_check_sub_dir -ne -1 ] && [ $RESULT_check_root -ne 1 ]
+    then
+		# If no installation has been done, return root
+		echo root
 	else
-		ECHO_FORMAT "All installs failed, impossible to perform this test...\n" "red" clog
+		ECHO_FORMAT "All installs failed, impossible to perform this test...\n" "red" clog >&2
 		return 1
 	fi
 }
@@ -566,30 +594,6 @@ CHECK_SETUP () {
 			RESULT_global_setup=-1	# Installation failed
 		fi
 		local check_result_setup=-1	# Installation failed
-	fi
-
-	# Create a snapshot for this installation, to be able to reuse it instead of a new installation.
-	# But only if this installation has worked fine
-	if [ $check_result_setup -eq 1 ]; then
-		if [ "$check_path" = "/" ]
-		then
-			# Check if a snapshot already exist for a root install
-			if [ -z "$root_snapshot" ]
-			then
-				ECHO_FORMAT "Create a snapshot for root installation.\n" "white" clog
-				create_temp_backup 2
-				root_snapshot=snap2
-			fi
-		else
-			# Check if a snapshot already exist for a subpath (or no_url) install
-			if [ -z "$subpath_snapshot" ]
-			then
-				# Then create a snapshot
-				ECHO_FORMAT "Create a snapshot for sub path installation.\n" "white" clog
-				create_temp_backup 1
-				subpath_snapshot=snap1
-			fi
-		fi
 	fi
 
 	# Remove the application
