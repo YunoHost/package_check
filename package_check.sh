@@ -50,6 +50,7 @@ interrupt=0
 notice=0
 build_lxc=0
 bash_mode=0
+show_resources=0
 
 # If no arguments provided
 if [ "$#" -eq 0 ]
@@ -70,6 +71,7 @@ else
 		arguments[$i]=${arguments[$i]//--help/-h}
 		arguments[$i]=${arguments[$i]//--build-lxc/-l}
 		arguments[$i]=${arguments[$i]//--bash-mode/-y}
+		arguments[$i]=${arguments[$i]//--show-resources/-r}
 	done
 
 	# Read and parse all the arguments
@@ -83,7 +85,7 @@ else
 				# Initialize the index of getopts
 				OPTIND=1
 				# Parse with getopts only if the argument begin by -
-				getopts ":b:fihly" parameter || true
+				getopts ":b:fihlyr" parameter || true
 				case $parameter in
 					b)
 						# --branch=branch-name
@@ -113,6 +115,11 @@ else
 					y)
 						# --bash-mode
 						bash_mode=1
+						shift_value=1
+						;;
+					r)
+						# --show-resources
+						show_resources=1
 						shift_value=1
 						;;
 					\?)
@@ -166,6 +173,8 @@ package_check.sh [OPTION]... PACKAGE_TO_CHECK
 		Install LXC and build the container if necessary.
 	-y, --bash-mode
 		Do not ask for continue check. Ignore auto_remove.
+	-r, --show-resources
+		Show the unavailable resources when accessing the url.
 EOF
 	exit 0
 fi
