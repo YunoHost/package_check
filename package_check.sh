@@ -1146,8 +1146,11 @@ then
 			then
 				# Add the commit to the upgrade list
 				line="${line##*from_commit=}"
-				echo "$line" >> "$script_dir/upgrade_list"
-			else
+                # Add the upgrade to the list only if the test is set to 1
+                if [ $temp_upgrade -eq 1 ]; then
+                    echo "$line" >> "$script_dir/upgrade_list"
+                fi
+			elif [ $temp_upgrade -eq 1 ]; then
 				# Or simply 'current' for a standard upgrade.
 				echo "current" >> "$script_dir/upgrade_list"
 			fi
