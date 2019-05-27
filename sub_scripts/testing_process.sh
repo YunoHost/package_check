@@ -525,7 +525,8 @@ is_install_failed () {
     if [ $setup_sub_dir -ne 0 ]
     then
         # If a test succeed or if force_install_ok is set
-        if [ $RESULT_check_sub_dir -eq 1 ] || [ $force_install_ok -eq 1 ]
+        # Or if $setup_sub_dir isn't set in the check_process
+        if [ $RESULT_check_sub_dir -eq 1 ] || [ $force_install_ok -eq 1 ] || [ $setup_sub_dir -eq -1 ]
         then
             # Validate installation in sub dir.
             sub_dir_install=1
@@ -535,10 +536,12 @@ is_install_failed () {
     fi
 
     # If the test for install on root isn't desactivated
+
     if [ $setup_root -ne 0 ] || [ $setup_nourl -eq 1 ]
     then
         # If a test succeed or if force_install_ok is set
-        if [ $RESULT_check_root -eq 1 ] || [ $force_install_ok -eq 1 ]
+        # Or if $setup_root isn't set in the check_process
+        if [ $RESULT_check_root -eq 1 ] || [ $force_install_ok -eq 1 ] || [ $setup_root -eq -1 ]
         then
             # Validate installation on root.
             root_install=1
