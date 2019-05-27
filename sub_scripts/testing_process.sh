@@ -535,7 +535,7 @@ is_install_failed () {
     fi
 
     # If the test for install on root isn't desactivated
-    if [ $setup_root -ne 0 ]
+    if [ $setup_root -ne 0 ] || [ $setup_nourl -eq 1 ]
     then
         # If a test succeed or if force_install_ok is set
         if [ $RESULT_check_root -eq 1 ] || [ $force_install_ok -eq 1 ]
