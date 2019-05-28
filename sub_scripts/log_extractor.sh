@@ -74,6 +74,11 @@ FALSE_ERRORS_DETECTION () {
         false_positive_error=1
         false_positive_error_cond="DNS failure"
     fi
+    if grep --quiet "unable to resolve host address" "$temp_result"
+    then
+        false_positive_error=1
+        false_positive_error_cond="DNS failure"
+    fi
 
     # Detect Corrupt source
     if grep --quiet "Corrupt source" "$temp_result"
