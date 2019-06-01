@@ -672,16 +672,22 @@ TEST_RESULTS () {
 		# Check the YEP 1.7 (https://github.com/YunoHost/doc/blob/master/packaging_apps_guidelines_fr.md#yep-17---ajouter-lapp-%C3%A0-lorganisation-yunohost-apps---valid%C3%A9--manuel--official-)
 		# Default value, YEP 1.7 not checked
 		YEP17=-1
+		YEP17_labriqueinternet=-1
 		if echo "$app_arg" | grep --extended-regexp --quiet "https?:\/\/"
 		then
 			# If the app have been picked from github, check if this app was under the YunoHost-Apps organisation
 			# YEP17 will be equal to 1 if the app was under the YunoHost-Apps organisation
 			YEP17=$(echo "$app_arg" | grep --ignore-case --count "github.com/YunoHost-Apps/")
-			[ $YEP17 -eq 1 ] || ECHO_FORMAT "This app doesn't respect the YEP 1.7 ! (https://yunohost.org/#/packaging_apps_guidelines_fr)\n" "red"
+			# If the app have been picked from github, check if this app was under the labriqueinternet organisation
+			# YEP17_labriqueinternet will be equal to 1 if the app was under the labriqueinternet organisation
+			YEP17_labriqueinternet=$(echo "$app_arg" | grep --ignore-case --count "github.com/labriqueinternet/")
+			if [ $YEP17 -ne 1 ] && [ $YEP17_labriqueinternet -ne 1 ]; then
+				ECHO_FORMAT "This app doesn't respect the YEP 1.7 ! (https://yunohost.org/#/packaging_apps_guidelines_fr)\n" "red"
+			fi
 		fi
 
 		# Validated if YEP 1.7 respected
-		if 	[ $YEP17 -ne 0 ]
+		if [ $YEP17 -ne 0 ] && [ $YEP17_labriqueinternet -ne 0 ]
 		then level[6]=2
 		else level[6]=0
 		fi
