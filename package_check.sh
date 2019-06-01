@@ -672,13 +672,13 @@ TEST_RESULTS () {
 			# If the app have been picked from github, check if this app was under the labriqueinternet organisation
 			# YEP17_labriqueinternet will be equal to 1 if the app was under the labriqueinternet organisation
 			YEP17_labriqueinternet=$(echo "$app_arg" | grep --ignore-case --count "github.com/labriqueinternet/")
-			if ( [ $YEP17 -eq 1 ] && [ $YEP17_labriqueinternet -eq 1 ] )
-			then ECHO_FORMAT "This app doesn't respect the YEP 1.7 ! (https://yunohost.org/#/packaging_apps_guidelines_fr)\n" "red"
-		    fi
+			if [ $YEP17 -ne 1 ] && [ $YEP17_labriqueinternet -ne 1 ]; then
+				ECHO_FORMAT "This app doesn't respect the YEP 1.7 ! (https://yunohost.org/#/packaging_apps_guidelines_fr)\n" "red"
+			fi
 		fi
 
 		# Validated if YEP 1.7 respected
-		if ( [ $YEP17 -ne 0 ] || [ $YEP17_labriqueinternet -ne 0 ] )
+		if [ $YEP17 -ne 0 ] && [ $YEP17_labriqueinternet -ne 0 ]
 		then level[6]=2
 		else level[6]=0
 		fi
