@@ -75,6 +75,14 @@ create_temp_backup () {
 	# Stop the container, before its snapshot
 	sudo lxc-stop --name $lxc_name >&2
 
+	# Remove swap files to avoid killing the CI with huge snapshots.
+	local swap_file="/var/lib/lxc/$lxc_name/rootfs/swap_$ynh_app_id"
+	if [ -e "$swap_file" ]
+	then
+        sudo swapoff "$swap_file"
+        sudo rm "$swap_file"
+	fi
+
 	# Check if the snapshot already exist
 	if [ ! -e "$snapshot_path/snap$snap_number" ]
 	then
