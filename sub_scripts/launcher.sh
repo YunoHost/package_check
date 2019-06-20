@@ -77,7 +77,7 @@ create_temp_backup () {
 
 	# Remove swap files to avoid killing the CI with huge snapshots.
 	local swap_file="/var/lib/lxc/$lxc_name/rootfs/swap_$ynh_app_id"
-	if [ -e "$swap_file" ]
+	if sudo test -e "$swap_file"
 	then
         sudo swapoff "$swap_file"
         sudo rm "$swap_file"
