@@ -522,6 +522,7 @@ is_install_failed () {
 	# Check if an install have previously work
 
     # If the test for install in sub dir isn't desactivated
+    sub_dir_install=0
     if [ $setup_sub_dir -ne 0 ]
     then
         # If a test succeed or if force_install_ok is set
