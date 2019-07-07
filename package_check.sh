@@ -50,6 +50,7 @@ interrupt=0
 notice=0
 build_lxc=0
 bash_mode=0
+show_resources=0
 
 # If no arguments provided
 if [ "$#" -eq 0 ]
@@ -70,6 +71,7 @@ else
 		arguments[$i]=${arguments[$i]//--help/-h}
 		arguments[$i]=${arguments[$i]//--build-lxc/-l}
 		arguments[$i]=${arguments[$i]//--bash-mode/-y}
+		arguments[$i]=${arguments[$i]//--show-resources/-r}
 	done
 
 	# Read and parse all the arguments
@@ -83,7 +85,7 @@ else
 				# Initialize the index of getopts
 				OPTIND=1
 				# Parse with getopts only if the argument begin by -
-				getopts ":b:fihly" parameter || true
+				getopts ":b:fihlyr" parameter || true
 				case $parameter in
 					b)
 						# --branch=branch-name
@@ -113,6 +115,11 @@ else
 					y)
 						# --bash-mode
 						bash_mode=1
+						shift_value=1
+						;;
+					r)
+						# --show-resources
+						show_resources=1
 						shift_value=1
 						;;
 					\?)
@@ -166,6 +173,8 @@ package_check.sh [OPTION]... PACKAGE_TO_CHECK
 		Install LXC and build the container if necessary.
 	-y, --bash-mode
 		Do not ask for continue check. Ignore auto_remove.
+	-r, --show-resources
+		Show the unavailable resources when accessing the url.
 EOF
 	exit 0
 fi
@@ -663,16 +672,22 @@ TEST_RESULTS () {
 		# Check the YEP 1.7 (https://github.com/YunoHost/doc/blob/master/packaging_apps_guidelines_fr.md#yep-17---ajouter-lapp-%C3%A0-lorganisation-yunohost-apps---valid%C3%A9--manuel--official-)
 		# Default value, YEP 1.7 not checked
 		YEP17=-1
+		YEP17_labriqueinternet=-1
 		if echo "$app_arg" | grep --extended-regexp --quiet "https?:\/\/"
 		then
 			# If the app have been picked from github, check if this app was under the YunoHost-Apps organisation
 			# YEP17 will be equal to 1 if the app was under the YunoHost-Apps organisation
 			YEP17=$(echo "$app_arg" | grep --ignore-case --count "github.com/YunoHost-Apps/")
-			[ $YEP17 -eq 1 ] || ECHO_FORMAT "This app doesn't respect the YEP 1.7 ! (https://yunohost.org/#/packaging_apps_guidelines_fr)\n" "red"
+			# If the app have been picked from github, check if this app was under the labriqueinternet organisation
+			# YEP17_labriqueinternet will be equal to 1 if the app was under the labriqueinternet organisation
+			YEP17_labriqueinternet=$(echo "$app_arg" | grep --ignore-case --count "github.com/labriqueinternet/")
+			if [ $YEP17 -ne 1 ] && [ $YEP17_labriqueinternet -ne 1 ]; then
+				ECHO_FORMAT "This app doesn't respect the YEP 1.7 ! (https://yunohost.org/#/packaging_apps_guidelines_fr)\n" "red"
+			fi
 		fi
 
 		# Validated if YEP 1.7 respected
-		if 	[ $YEP17 -ne 0 ]
+		if [ $YEP17 -ne 0 ] && [ $YEP17_labriqueinternet -ne 0 ]
 		then level[6]=2
 		else level[6]=0
 		fi
@@ -1070,8 +1085,11 @@ then
 			if [ "${value:0:1}" = "1" ]
 			then
 				echo 1
-			else
+			elif [ "${value:0:1}" = "0" ]
+			then
 				echo 0
+            else
+                echo -1
 			fi
 		}
 
@@ -1134,8 +1152,11 @@ then
 			then
 				# Add the commit to the upgrade list
 				line="${line##*from_commit=}"
-				echo "$line" >> "$script_dir/upgrade_list"
-			else
+                # Add the upgrade to the list only if the test is set to 1
+                if [ $temp_upgrade -eq 1 ]; then
+                    echo "$line" >> "$script_dir/upgrade_list"
+                fi
+			elif [ $temp_upgrade -eq 1 ]; then
 				# Or simply 'current' for a standard upgrade.
 				echo "current" >> "$script_dir/upgrade_list"
 			fi

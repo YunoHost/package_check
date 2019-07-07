@@ -21,6 +21,19 @@ break_before_continue () {
 	fi
 }
 
+check_false_positive_error () {
+    # Check if FALSE_ERRORS_DETECTION has detected an false positive error.
+
+    # We will use
+    # check_false_positive_error || return $?
+    # to check the result of the function of propagate the result to parent functions.
+
+    if [ $false_positive_error -eq 1 ] && [ $false_positive_error_loop -lt $max_false_positive_error_loop ]; then
+        # Return 75, for EX_TEMPFAIL from sysexits.h
+        return 75
+    fi
+}
+
 #=================================================
 
 PRINT_YUNOHOST_VERSION () {
@@ -96,6 +109,7 @@ SETUP_APP () {
 
 	# Analyse the log to extract "warning" and "error" lines
 	LOG_EXTRACTOR
+	check_false_positive_error || return $?
 }
 
 STANDARD_SETUP_APP () {
@@ -109,6 +123,19 @@ STANDARD_SETUP_APP () {
 		then
 			# Make an installation
 			SETUP_APP
+            check_false_positive_error || return $?
+
+            # Create a snapshot for this installation, to be able to reuse it instead of a new installation.
+            # But only if this installation has worked fine
+            if [ $yunohost_result -eq 0 ]; then
+                # Check if a snapshot already exist for a root install
+                if [ -z "$root_snapshot" ]
+                then
+                    ECHO_FORMAT "\nCreate a snapshot for root installation.\n" "white" clog
+                    create_temp_backup 2
+                    root_snapshot=snap2
+                fi
+            fi
 		else
 			# Or uses an existing snapshot
 			ECHO_FORMAT "Uses an existing snapshot for root installation.\n" "white" clog
@@ -122,6 +149,19 @@ STANDARD_SETUP_APP () {
 		then
 			# Make an installation
 			SETUP_APP
+            check_false_positive_error || return $?
+
+            # Create a snapshot for this installation, to be able to reuse it instead of a new installation.
+            # But only if this installation has worked fine
+            if [ $yunohost_result -eq 0 ]; then
+                # Check if a snapshot already exist for a subpath (or no_url) install
+                if [ -z "$subpath_snapshot" ]
+                then
+                    ECHO_FORMAT "\nCreate a snapshot for sub path installation.\n" "white" clog
+                    create_temp_backup 1
+                    root_snapshot=snap1
+                fi
+            fi
 		else
 			# Or uses an existing snapshot
 			ECHO_FORMAT "Uses an existing snapshot for sub path installation.\n" "white" clog
@@ -316,64 +356,67 @@ CHECK_URL () {
 					lynx -dump -force_html "$script_dir/url_output" | head --lines 20 | tee --append "$test_result"
 					echo -e "\e[0m"
 
-					# Get all the resources for the main page of the app.
-					local HTTP_return
-					local moved=0
-					local ignored=0
-					while read HTTP_return
-					do
-						# Ignore robots.txt and ynhpanel.js. They always redirect to the portal.
-						if echo "$HTTP_return" | grep --quiet "$check_domain/robots.txt\|$check_domain/ynhpanel.js"; then
-							ECHO_FORMAT "Ressource ignored:" "white"
-							ECHO_FORMAT " ${HTTP_return##*http*://}\n"
-							ignored=1
-						fi
+					if [ $show_resources -eq 1 ]
+					then
+                        # Get all the resources for the main page of the app.
+                        local HTTP_return
+                        local moved=0
+                        local ignored=0
+                        while read HTTP_return
+                        do
+                            # Ignore robots.txt and ynhpanel.js. They always redirect to the portal.
+                            if echo "$HTTP_return" | grep --quiet "$check_domain/robots.txt\|$check_domain/ynhpanel.js"; then
+                                ECHO_FORMAT "Ressource ignored:" "white"
+                                ECHO_FORMAT " ${HTTP_return##*http*://}\n"
+                                ignored=1
+                            fi
 
-						# If it's the line with the resource to get
-						if echo "$HTTP_return" | grep --quiet "^--.*--  http"
-						then
-							# Get only the resource itself.
-							local resource=${HTTP_return##*http*://}
+                            # If it's the line with the resource to get
+                            if echo "$HTTP_return" | grep --quiet "^--.*--  http"
+                            then
+                                # Get only the resource itself.
+                                local resource=${HTTP_return##*http*://}
 
-						# Else, if would be the HTTP return code.
-						else
-							# If the return code is different than 200.
-							if ! echo "$HTTP_return" | grep --quiet "200 OK$"
-							then
-								# Skipped the check of ignored ressources.
-								if [ $ignored -eq 1 ]
-								then
-									ignored=0
-									continue
-								fi
-								# Isolate the http return code.
-								http_code="${HTTP_return##*awaiting response... }"
-								http_code="${http_code:0:3}"
-								# If the return code is 301 or 302, let's check the redirection.
-								if echo "$HTTP_return" | grep --quiet "30[12] Moved"
-								then
-									ECHO_FORMAT "Ressource moved:" "white"
-									ECHO_FORMAT " $resource\n"
-									moved=1
-								else
-									ECHO_FORMAT "Resource unreachable (Code $http_code)" "red" "bold"
-									ECHO_FORMAT " $resource\n"
-# 					 				curl_error=1
-									moved=0
-								fi
-							else
-								if [ $moved -eq 1 ]
-								then
-									if echo "$resource" | grep --quiet "/yunohost/sso/"
-									then
-										ECHO_FORMAT "The previous resource is redirected to the YunoHost portal\n" "red"
-#	 					 				curl_error=1
-									fi
-								fi
-								moved=0
-							fi
-						fi
-					done <<< "$(cd "$package_path"; LC_ALL=C wget --adjust-extension --page-requisites --no-check-certificate $check_domain$curl_check_path 2>&1 | grep "^--.*--  http\|^HTTP request sent")"
+                            # Else, if would be the HTTP return code.
+                            else
+                                # If the return code is different than 200.
+                                if ! echo "$HTTP_return" | grep --quiet "200 OK$"
+                                then
+                                    # Skipped the check of ignored ressources.
+                                    if [ $ignored -eq 1 ]
+                                    then
+                                        ignored=0
+                                        continue
+                                    fi
+                                    # Isolate the http return code.
+                                    http_code="${HTTP_return##*awaiting response... }"
+                                    http_code="${http_code:0:3}"
+                                    # If the return code is 301 or 302, let's check the redirection.
+                                    if echo "$HTTP_return" | grep --quiet "30[12] Moved"
+                                    then
+                                        ECHO_FORMAT "Ressource moved:" "white"
+                                        ECHO_FORMAT " $resource\n"
+                                        moved=1
+                                    else
+                                        ECHO_FORMAT "Resource unreachable (Code $http_code)" "red" "bold"
+                                        ECHO_FORMAT " $resource\n"
+#    					 				curl_error=1
+                                        moved=0
+                                    fi
+                                else
+                                    if [ $moved -eq 1 ]
+                                    then
+                                        if echo "$resource" | grep --quiet "/yunohost/sso/"
+                                        then
+                                            ECHO_FORMAT "The previous resource is redirected to the YunoHost portal\n" "red"
+#   	 					 				curl_error=1
+                                        fi
+                                    fi
+                                    moved=0
+                                fi
+                            fi
+                        done <<< "$(cd "$package_path"; LC_ALL=C wget --adjust-extension --page-requisites --no-check-certificate $check_domain$curl_check_path 2>&1 | grep "^--.*--  http\|^HTTP request sent")"
+                    fi
 					echo ""
 				fi
 			fi
@@ -478,16 +521,40 @@ check_test_result_remove () {
 is_install_failed () {
 	# Check if an install have previously work
 
-	if [ $RESULT_check_sub_dir -eq 1 ]
-	then
-		# If subdir installation worked.
-		echo subdir
-	elif [ $RESULT_check_root -eq 1 ] || [ $force_install_ok -eq 1 ]
-	then
-		# If root installation worked, return root or force_install_ok setted, return root.
-		echo root
-	else
-		ECHO_FORMAT "All installs failed, impossible to perform this test...\n" "red" clog
+    # If the test for install in sub dir isn't desactivated
+    sub_dir_install=0
+    if [ $setup_sub_dir -ne 0 ]
+    then
+        # If a test succeed or if force_install_ok is set
+        # Or if $setup_sub_dir isn't set in the check_process
+        if [ $RESULT_check_sub_dir -eq 1 ] || [ $force_install_ok -eq 1 ] || [ $setup_sub_dir -eq -1 ]
+        then
+            # Validate installation in sub dir.
+            sub_dir_install=1
+        fi
+    else
+        sub_dir_install=0
+    fi
+
+    # If the test for install on root isn't desactivated
+
+    root_install=0
+    if [ $setup_root -ne 0 ] || [ $setup_nourl -eq 1 ]
+    then
+        # If a test succeed or if force_install_ok is set
+        # Or if $setup_root isn't set in the check_process
+        if [ $RESULT_check_root -eq 1 ] || [ $force_install_ok -eq 1 ] || [ $setup_root -eq -1 ]
+        then
+            # Validate installation on root.
+            root_install=1
+        fi
+    else
+        root_install=0
+    fi
+
+    if [ $sub_dir_install -eq 0 ] && [ $root_install -eq 0 ]
+    then
+		ECHO_FORMAT "All installs have failed, impossible to perform this test...\n" "red" clog
 		return 1
 	fi
 }
@@ -534,6 +601,7 @@ CHECK_SETUP () {
 
 	# Install the application in a LXC container
 	SETUP_APP
+	check_false_positive_error || return $?
 
 	# Try to access the app by its url
 	CHECK_URL
@@ -580,6 +648,7 @@ CHECK_SETUP () {
 
 	# Analyse the log to extract "warning" and "error" lines
 	LOG_EXTRACTOR
+	check_false_positive_error || return $?
 
 	# Check the result and print SUCCESS or FAIL
 	if check_test_result_remove
@@ -601,6 +670,7 @@ CHECK_SETUP () {
 		ECHO_FORMAT "\nReinstall the application after a removing.\n" "white" "bold" clog
 		
 		SETUP_APP
+        check_false_positive_error || return $?
 
 		# Try to access the app by its url
 		CHECK_URL
@@ -651,9 +721,8 @@ CHECK_UPGRADE () {
 		fi
 
 		# Check if an install have previously work
-		local previous_install=$(is_install_failed)
 		# Abort if none install worked
-		[ "$previous_install" = "1" ] && return
+		is_install_failed || return
 
 		# Copy original arguments
 		local manifest_args_mod="$manifest_arguments"
@@ -662,9 +731,9 @@ CHECK_UPGRADE () {
 		check_domain=$sub_domain
 		replace_manifest_key "domain" "$check_domain"
 		# Use a path according to previous succeeded installs
-		if [ "$previous_install" = "subdir" ]; then
+		if [ $sub_dir_install -eq 1 ]; then
 			local check_path=$test_path
-		elif [ "$previous_install" = "root" ]; then
+        else
 			local check_path=/
 		fi
 		replace_manifest_key "path" "$check_path"
@@ -677,6 +746,7 @@ CHECK_UPGRADE () {
 		then
 			# If no commit is specified, use the current version.
 			STANDARD_SETUP_APP
+            check_false_positive_error || return $?
 		else
 			# Otherwise, use a specific commit
 			# Backup the modified arguments
@@ -698,6 +768,7 @@ CHECK_UPGRADE () {
 			(cd "$package_path"; git checkout --force --quiet "$commit")
 			# Install the application
 			SETUP_APP
+            check_false_positive_error || return $?
 			# Then replace the backup
 			sudo rm -r "$package_path"
 			sudo mv "${package_path}_back" "$package_path"
@@ -730,6 +801,7 @@ CHECK_UPGRADE () {
 
 			# Analyse the log to extract "warning" and "error" lines
 			LOG_EXTRACTOR
+			check_false_positive_error || return $?
 
 			# Try to access the app by its url
 			CHECK_URL
@@ -773,9 +845,7 @@ CHECK_PUBLIC_PRIVATE () {
 	check_manifest_key "public_private" || return
 
 	# Check if an install have previously work
-	local previous_install=$(is_install_failed)
-	# Abort if none install worked
-	[ "$previous_install" = "1" ] && return
+	is_install_failed || return
 
 	# Copy original arguments
 	local manifest_args_mod="$manifest_arguments"
@@ -801,8 +871,8 @@ CHECK_PUBLIC_PRIVATE () {
 		# First, try with a root install
 		if [ $i -eq 0 ]
 		then
-			# Check if root installation worked, or if force_install_ok is setted.
-			if [ $RESULT_check_root -eq 1 ] || [ $force_install_ok -eq 1 ]
+			# Check if root installation worked
+			if [ $root_install -eq 1 ]
 			then
 				# Replace manifest key for path
 				local check_path=/
@@ -817,7 +887,7 @@ CHECK_PUBLIC_PRIVATE () {
 		elif [ $i -eq 1 ]
 		then
 			# Check if sub path installation worked, or if force_install_ok is setted.
-			if [ $RESULT_check_sub_dir -eq 1 ] || [ $force_install_ok -eq 1 ]
+			if [ $sub_dir_install -eq 1 ]
 			then
 				# Replace manifest key for path
 				local check_path=$test_path
@@ -831,6 +901,7 @@ CHECK_PUBLIC_PRIVATE () {
 
 		# Install the application in a LXC container
 		SETUP_APP
+        check_false_positive_error || return $?
 
 		# Try to access the app by its url
 		CHECK_URL
@@ -887,17 +958,15 @@ CHECK_MULTI_INSTANCE () {
 	unit_test_title "Multi-instance installations..."
 
 	# Check if an install have previously work
-	local previous_install=$(is_install_failed)
-	# Abort if none install worked
-	[ "$previous_install" = "1" ] && return
+	is_install_failed || return
 
 	# Copy original arguments
 	local manifest_args_mod="$manifest_arguments"
 
 	# Replace manifest key for the test
-	if [ "$previous_install" = "subdir" ]; then
+	if [ $sub_dir_install -eq 1 ]; then
 		local check_path=$test_path
-	elif [ "$previous_install" = "root" ]; then
+	else
 		local check_path=/
 	fi
 	replace_manifest_key "path" "$check_path"
@@ -926,6 +995,7 @@ CHECK_MULTI_INSTANCE () {
 
 		# Install the application in a LXC container
 		SETUP_APP
+        check_false_positive_error || return $?
 
 		# Store the result in the correct variable
 		# First installation
@@ -1006,9 +1076,7 @@ CHECK_COMMON_ERROR () {
 	fi
 
 	# Check if an install have previously work
-	local previous_install=$(is_install_failed)
-	# Abort if none install worked
-	[ "$previous_install" = "1" ] && return
+	is_install_failed || return
 
 	# Copy original arguments
 	local manifest_args_mod="$manifest_arguments"
@@ -1028,7 +1096,7 @@ CHECK_COMMON_ERROR () {
 		local check_path=$test_path
 	else [ "$install_type" = "port_already_use" ]
 		# Use a path according to previous succeeded installs
-		if [ "$previous_install" = "subdir" ]; then
+		if [ $sub_dir_install -eq 1 ]; then
 			local check_path=$test_path
 		else
 			local check_path=/
@@ -1065,6 +1133,7 @@ CHECK_COMMON_ERROR () {
 
 	# Install the application in a LXC container
 	SETUP_APP
+	check_false_positive_error || return $?
 
 	# Try to access the app by its url
 	CHECK_URL
@@ -1095,9 +1164,7 @@ CHECK_BACKUP_RESTORE () {
 	unit_test_title "Backup/Restore..."
 
 	# Check if an install have previously work
-	local previous_install=$(is_install_failed)
-	# Abort if none install worked
-	[ "$previous_install" = "1" ] && return
+	is_install_failed || return
 
 	# Copy original arguments
 	local manifest_args_mod="$manifest_arguments"
@@ -1116,7 +1183,7 @@ CHECK_BACKUP_RESTORE () {
 		if [ $i -eq 0 ]
 		then
 			# Check if root installation worked, or if force_install_ok is setted.
-			if [ $RESULT_check_root -eq 1 ] || [ $force_install_ok -eq 1 ]
+			if [ $root_install -eq 1 ]
 			then
 				# Replace manifest key for path
 				local check_path=/
@@ -1132,7 +1199,7 @@ CHECK_BACKUP_RESTORE () {
 		elif [ $i -eq 1 ]
 		then
 			# Check if sub path installation worked, or if force_install_ok is setted.
-			if [ $RESULT_check_sub_dir -eq 1 ] || [ $force_install_ok -eq 1 ]
+			if [ $sub_dir_install -eq 1 ]
 			then
 				# Replace manifest key for path
 				local check_path=$test_path
@@ -1147,6 +1214,7 @@ CHECK_BACKUP_RESTORE () {
 
 		# Install the application in a LXC container
 		STANDARD_SETUP_APP
+        check_false_positive_error || return $?
 
 		# Remove the previous residual backups
 		sudo rm -rf /var/lib/lxc/$lxc_name/rootfs/home/yunohost.backup/archives
@@ -1178,6 +1246,7 @@ CHECK_BACKUP_RESTORE () {
 
 			# Analyse the log to extract "warning" and "error" lines
 			LOG_EXTRACTOR
+			check_false_positive_error || return $?
 		fi
 
 		# Check the result and print SUCCESS or FAIL
@@ -1245,6 +1314,7 @@ CHECK_BACKUP_RESTORE () {
 
 			# Analyse the log to extract "warning" and "error" lines
 			LOG_EXTRACTOR
+			check_false_positive_error || return $?
 
 			# Try to access the app by its url
 			CHECK_URL
@@ -1278,9 +1348,7 @@ CHECK_CHANGE_URL () {
 	check_manifest_key "domain" || return
 
 	# Check if an install have previously work
-	local previous_install=$(is_install_failed)
-	# Abort if none install worked
-	[ "$previous_install" = "1" ] && return
+	is_install_failed || return
 
 	# Copy original arguments
 	local manifest_args_mod="$manifest_arguments"
@@ -1295,7 +1363,7 @@ CHECK_CHANGE_URL () {
 	# Without modify the domain, root to path, path to path and path to root.
 	# And then, same with a domain change
 	local i=0
-	for i in ` seq 1 6`
+	for i in `seq 1 6`
 	do
 		if [ $i -eq 1 ]; then
 			# Same domain, root to path
@@ -1332,31 +1400,29 @@ CHECK_CHANGE_URL () {
 		replace_manifest_key "path" "$check_path"
 
 		# Check if root or subpath installation worked, or if force_install_ok is setted.
-		if [ $force_install_ok -eq 1 ]
-		then
-			# Try with a sub path install
-			if [ "$check_path" = "/" ]
-			then
-				if [ $RESULT_check_root -ne 1 ] && [ $force_install_ok -ne 1 ]
-				then
-					# Jump this test
-					ECHO_FORMAT "Root install failed, impossible to perform this test...\n" "lyellow" clog
-					continue
-				fi
-			# And with a sub path install
-			else
-				if [ $RESULT_check_sub_dir -ne 1 ] && [ $force_install_ok -ne 1 ]
-				then
-					# Jump this test
-					ECHO_FORMAT "Sub path install failed, impossible to perform this test...\n" "lyellow" clog
-					continue
-				fi
-			fi
-		fi
+        # Try with a sub path install
+        if [ "$check_path" = "/" ]
+        then
+            if [ $root_install -eq 0 ]
+            then
+                # Jump this test
+                ECHO_FORMAT "Root install failed, impossible to perform this test...\n" "lyellow" clog
+                continue
+            fi
+        # And with a sub path install
+        else
+            if [ $sub_dir_install -eq 0 ]
+            then
+                # Jump this test
+                ECHO_FORMAT "Sub path install failed, impossible to perform this test...\n" "lyellow" clog
+                continue
+            fi
+        fi
 
 		# Install the application in a LXC container
 		ECHO_FORMAT "\nPreliminary install...\n" "white" "bold" clog
 		STANDARD_SETUP_APP
+        check_false_positive_error || return $?
 
 		# Check if the install had work
 		if [ $yunohost_result -ne 0 ]
@@ -1383,6 +1449,7 @@ CHECK_CHANGE_URL () {
 
 			# Analyse the log to extract "warning" and "error" lines
 			LOG_EXTRACTOR
+			check_false_positive_error || return $?
 
 			# Try to access the app by its url
 			check_path=$new_path
@@ -1404,6 +1471,8 @@ CHECK_CHANGE_URL () {
 		# Make a break if auto_remove is set
 		break_before_continue
 
+		# Uses the default snapshot
+		current_snapshot=snap0
 		# Stop and restore the LXC container
 		LXC_STOP
 	done
@@ -1442,29 +1511,50 @@ TEST_LAUNCHER () {
 	# Intialize values
 	yunohost_result=-1
 	yunohost_remove=-1
+    false_positive_error=0
+    max_false_positive_error_loop=3
 
-	# Start the timer for this test
-	start_timer
-	# And keep this value separately
-	local global_start_timer=$starttime
+    for false_positive_error_loop in $( seq 1 $max_false_positive_error_loop )
+    do
+        # Start the timer for this test
+        start_timer
+        # And keep this value separately
+        local global_start_timer=$starttime
 
-	# Execute the test
-	$1 $2
+        # Execute the test
+        $1 $2
 
-	# Uses the default snapshot
-	current_snapshot=snap0
+        if [ $false_positive_error -eq 1 ]
+        then
+            ECHO_FORMAT "This test was aborted because of a $false_positive_error_cond error.\n" "red" "bold" clog
+            if [ $false_positive_error_loop -lt $max_false_positive_error_loop ]
+            then
+                ECHO_FORMAT "The test will restart.\n" "lyellow" "bold" clog
+                cur_test=$((cur_test-1))
+            fi
+        fi
 
-	# Stop and restore the LXC container
-	LXC_STOP
+        # Uses the default snapshot
+        current_snapshot=snap0
 
-	# Restore the started time for the timer
-	starttime=$global_start_timer
-	# End the timer for the test
-	stop_timer 2
+        # Stop and restore the LXC container
+        LXC_STOP
 
-	# Update the lock file with the date of the last finished test.
-	# $$ is the PID of package_check itself.
-	echo "$1 $2:$(date +%s):$$" > "$lock_file"
+        # Restore the started time for the timer
+        starttime=$global_start_timer
+        # End the timer for the test
+        stop_timer 2
+
+        # Update the lock file with the date of the last finished test.
+        # $$ is the PID of package_check itself.
+        echo "$1 $2:$(date +%s):$$" > "$lock_file"
+
+        # Exit the loop if there's no temporary errors detected.
+        if [ $false_positive_error -eq 0 ]
+        then
+            break
+        fi
+    done
 }
 
 set_witness_files () {
