@@ -715,7 +715,7 @@ TEST_RESULTS () {
 		# Get the name of the app from the repository name.
 		app_name="$(basename --multiple --suffix=_ynh "$app_arg")"
 		# Extract the app part from the json file. From the name line to the url line.
-		json_app_part=$(sed -n "/${app_name}/,/${app_arg//\//.}/{p; /${app_arg//\//.}/q}" "$script_dir/list.json")
+		json_app_part=$(sed -n "/\"$app_name\"/,/}/p" "$script_dir/list.json")
 		if [ -z "$json_app_part" ]
 		then
 			echo "$app_name for the repository $app_arg can't be found in the app list."
