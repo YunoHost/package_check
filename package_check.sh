@@ -714,7 +714,7 @@ TEST_RESULTS () {
 
 		# Get the name of the app from the repository name.
 		app_name="$(basename --multiple --suffix=_ynh "$app_arg")"
-		# Extract the app part from the json file. From the name line to the url line.
+		# Extract the app part from the json file. From the name line to the next "}" line.
 		json_app_part=$(sed -n "/\"$app_name\"/,/}/p" "$script_dir/list.json")
 		if [ -z "$json_app_part" ]
 		then
