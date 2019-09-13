@@ -25,14 +25,14 @@ The script is able to perform following tests:
 - Test port already use
 - Test of change_url script
 
-Package_check script use an LXC container to manipulate the package in a non parasited environnement by previous installs.
+Package_check script use an LXC container to manipulate the package in a non parasited environment by previous installs.
 
 Usage:  
 For an app in a dir: `./package_check.sh APP_ynh`  
 For an app on github: `./package_check.sh https://github.com/USER/APP_ynh`
 
 It's necessary to provide, at the root of package to be tested, a `check_process` file for inform the script of needed arguments and tests to perform.  
-If this file is not present, package_check will be used in downgraded mode. It try to retrieve domain, path and admin user arguments in the manifest for execute some tests, based on arguments found.
+If this file is not present, package_check will be used in downgraded mode. It will try to retrieve domain, path and admin user arguments in the manifest and execute some tests, based on the arguments found.
 
 ---
 ## Deploying test script
@@ -87,11 +87,11 @@ Notification=none
 ```
 ### `;; Test name`
 Name of tests series that will be perform.  
-It's possible to create multiples tests series, all with the same syntax.  
+It's possible to create multiple tests series, all with the same syntax.  
 All different tests series will be perform sequentialy.
 
 ### `; pre-install`
-*Optionnal instruction*  
+*Optional instruction*  
 If you have to execute a command or a group of commands before the installation. You can use this instruction.  
 All the commands added after the instruction `; pre-install` will be executed in the container before each installation of the app.
 
