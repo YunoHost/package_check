@@ -804,6 +804,13 @@ TEST_RESULTS () {
 		global_level=0
 	fi
 
+	# If the package linter returned a critical error, the app is flagged as broken / level 0
+	if [ $RESULT_linter -eq -2 ]
+	then
+		ECHO_FORMAT "The package linter reported a critical failure ! App is considered broken !\n" "red" "bold"
+		global_level=0
+	fi
+
 	if [ $RESULT_alias_traversal -eq 1 ]
 	then
 		ECHO_FORMAT "Issue alias_traversal was detected ! Please see here https://github.com/YunoHost/example_ynh/pull/45 to fix that.\n" "red" "bold"

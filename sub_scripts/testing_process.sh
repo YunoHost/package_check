@@ -1500,6 +1500,12 @@ PACKAGE_LINTER () {
 	else	# Fail
 		check_failed
 		RESULT_linter=-1
+
+        # If return code is 2, this is critical failure, app should be considered as broken (level 0)
+        if [ $linter_result -eq 2 ]
+        then
+            RESULT_linter=-2
+        fi
 	fi
 }
 
