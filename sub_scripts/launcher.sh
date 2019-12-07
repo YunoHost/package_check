@@ -286,7 +286,7 @@ $(cat "$script_dir/sub_scripts/Build_lxc.log")"
 	COPY_LOG 1
 
 	# Copy the package into the container.
-	scp -rq "$package_path" "$lxc_name": >> "$test_result" 2>&1
+	rsync -rq --delete "$package_path" "$lxc_name": >> "$test_result" 2>&1
 
 	# Execute the command given in argument in the container and log its results.
 	ssh $arg_ssh $lxc_name "$1 > /dev/null 2>> temp_yunohost-cli.log; exit \$?" >> "$test_result" 2>&1
