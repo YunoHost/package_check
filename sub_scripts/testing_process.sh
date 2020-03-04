@@ -79,17 +79,8 @@ SETUP_APP () {
 		ECHO_FORMAT "$(cat "$temp_log")\n" clog
 	fi
 
-	# Force installation of 3rd party apps without asking for confirmation.
-	# Only with the version 3.4.1 or later.
-	if [ $ynh_version -ge 341 ]
-	then
-		local force_3rd="--force"
-	else
-		local force_3rd=""
-	fi
-
 	# Install the application in a LXC container
-	LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app install $force_3rd \"$package_dir\" -a \"$manifest_args_mod\""
+	LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app install --force \"$package_dir\" -a \"$manifest_args_mod\""
 
 	# yunohost_result gets the return code of the installation
 	yunohost_result=$?
