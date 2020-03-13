@@ -70,6 +70,17 @@ sudo lxc-ls -f
 echo -e "\e[1m> Update\e[0m"
 update_apt=0
 sudo lxc-attach -n $LXC_NAME -- apt-get update
+# Wait for apt to be available before the upgrade.
+for try in `seq 1 17`
+do
+        # Check if /var/lib/dpkg/lock is used by another process
+        if sudo lxc-attach -n $LXC_NAME -- lsof /var/lib/dpkg/lock > /dev/null
+        then
+            echo "apt is already in use..."
+            # Sleep an exponential time at each round
+            sleep $(( try * try ))
+        fi
+done
 sudo lxc-attach -n $LXC_NAME -- apt-get dist-upgrade --dry-run | grep -q "^Inst "	# Vérifie si il y aura des mises à jour.
 
 if [ "$?" -eq 0 ]; then
