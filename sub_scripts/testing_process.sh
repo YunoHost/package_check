@@ -1585,10 +1585,10 @@ set_witness_files () {
 	create_witness_file "/var/log/witnessfile" file
 
 	# Config fpm
-	if [ -d "${lxc_dir}/etc/php5" ]; then
+	if [ -d "${lxc_dir}/etc/php5/fpm" ]; then
 		create_witness_file "/etc/php5/fpm/pool.d/witnessfile.conf" file
 	fi
-	if [ -d "${lxc_dir}/etc/php/7.0" ]; then
+	if [ -d "${lxc_dir}/etc/php/7.0/fpm" ]; then
 		create_witness_file "/etc/php/7.0/fpm/pool.d/witnessfile.conf" file
 	fi
 
