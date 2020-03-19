@@ -1636,10 +1636,10 @@ check_witness_files () {
 	check_file_exist "/var/log/witnessfile"
 
 	# Config fpm
-	if [ -d "${lxc_dir}/etc/php5" ]; then
+	if [ -d "${lxc_dir}/etc/php5/fpm" ]; then
 		check_file_exist "/etc/php5/fpm/pool.d/witnessfile.conf" file
 	fi
-	if [ -d "${lxc_dir}/etc/php/7.0" ]; then
+	if [ -d "${lxc_dir}/etc/php/7.0/fpm" ]; then
 		check_file_exist "/etc/php/7.0/fpm/pool.d/witnessfile.conf" file
 	fi
 
