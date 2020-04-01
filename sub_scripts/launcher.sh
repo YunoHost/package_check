@@ -79,8 +79,8 @@ create_temp_backup () {
 	local swap_file="/var/lib/lxc/$lxc_name/rootfs/swap_$ynh_app_id"
 	if sudo test -e "$swap_file"
 	then
-        sudo swapoff "$swap_file"
-        sudo rm "$swap_file"
+		sudo swapoff "$swap_file"
+		sudo rm "$swap_file"
 	fi
 
 	# Check if the snapshot already exist
@@ -139,6 +139,16 @@ is_lxc_running () {
 }
 
 LXC_INIT () {
+	# Clean previous remaining swap files
+	sudo swapoff /var/lib/lxc/$lxc_name/rootfs/swap_* 2>/dev/null
+	sudo rm --force /var/lib/lxc/$lxc_name/rootfs/swap_*
+	sudo swapoff /var/lib/lxcsnaps/$lxc_name/snap0/rootfs/swap_* 2>/dev/null
+	sudo rm --force /var/lib/lxcsnaps/$lxc_name/snap0/rootfs/swap_*
+	sudo swapoff /var/lib/lxcsnaps/$lxc_name/snap1/rootfs/swap_* 2>/dev/null
+	sudo rm --force /var/lib/lxcsnaps/$lxc_name/snap1/rootfs/swap_*
+	sudo swapoff /var/lib/lxcsnaps/$lxc_name/snap2/rootfs/swap_* 2>/dev/null
+	sudo rm --force /var/lib/lxcsnaps/$lxc_name/snap2/rootfs/swap_*
+
 	# Initialize LXC network
 
 	# Activate the bridge
