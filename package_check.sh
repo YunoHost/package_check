@@ -654,6 +654,7 @@ TEST_RESULTS () {
 
 	# Evaluate the fifth level
 	# -> The package have no error with package linter
+	# -> The package does not have any alias_traversal error
 	if level_can_change 5
 	then
 		# Validated if Linter is ok. Or if Linter has been not tested but already validated before.
@@ -662,6 +663,10 @@ TEST_RESULTS () {
 			[ "${level[5]}" == "2" ] )
 		then level[5]=2
 		else level[5]=0
+		fi
+		if [ $RESULT_alias_traversal -eq 1 ]
+		then
+			level[5]=0
 		fi
 	fi
 
