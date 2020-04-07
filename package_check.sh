@@ -559,6 +559,7 @@ TEST_RESULTS () {
 	print_result "Backup" $RESULT_check_backup
 	print_result "Restore" $RESULT_check_restore
 	print_result "Change URL" $RESULT_change_url
+	print_result "Actions and config-panel" $RESULT_action_config_panel
 
 
 
@@ -718,7 +719,8 @@ TEST_RESULTS () {
 			[ $RESULT_check_port -ne -1 ] && \
 			[ $RESULT_check_backup -ne -1 ] && \
 			[ $RESULT_check_restore -ne -1 ] && \
-			[ $RESULT_change_url -ne -1 ]
+			[ $RESULT_change_url -ne -1 ] && \
+			[ $RESULT_action_config_panel -ne -1 ]
 		then level[7]=2
 		else level[7]=0
 		fi
@@ -899,6 +901,7 @@ initialize_values() {
 	RESULT_check_path=0
 	RESULT_check_port=0
 	RESULT_change_url=0
+	RESULT_action_config_panel=0
 
 	# auto_remove parameter
 	if [ $interrupt -eq 1 ]; then
@@ -912,6 +915,10 @@ initialize_values() {
 
 	# Default path
 	test_path=/
+
+	# CHECK_URL default values
+	curl_error=0
+	yuno_portal=0
 }
 
 #=================================================
@@ -1086,6 +1093,38 @@ then
 			LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
 		fi
 
+		# Parse all infos about arguments of actions.toml
+		# Extract the actions arguments section from the second partial file
+		extract_section "^; Actions" "^; " "$partial2"
+
+		# Initialize the arguments list
+		actions_arguments=""
+
+		# Read each arguments and store them
+		while read line
+		do
+			# Remove all double quotes
+			add_arg="${line//\"/}"
+			# Then add this argument and follow it by :
+			actions_arguments="${actions_arguments}${add_arg}:"
+		done < "$partial_check_process"
+
+		# Parse all infos about arguments of config-panel.toml
+		# Extract the config_panel arguments section from the second partial file
+		extract_section "^; Config_panel" "^; " "$partial2"
+
+		# Initialize the arguments list
+		config_panel_arguments=""
+
+		# Read each arguments and store them
+		while read line
+		do
+			# Remove all double quotes
+			add_arg="${line//\"/}"
+			# Then add this argument and follow it by :
+			config_panel_arguments="${config_panel_arguments}${add_arg}:"
+		done < "$partial_check_process"
+
 		# Parse all tests to perform
 		# Extract the checks options section from the second partial file
 		extract_section "^; Checks" "^; " "$partial2"
@@ -1135,6 +1174,10 @@ then
 		count_test $port_already_use
 		change_url=$(read_check_option change_url)
 		count_test $change_url
+		actions=$(read_check_option actions)
+		count_test $actions
+		config_panel=$(read_check_option config_panel)
+		count_test $config_panel
 
 		# For port_already_use, check if there is also a port number
 		if [ $port_already_use -eq 1 ]

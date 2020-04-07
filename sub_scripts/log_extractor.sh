@@ -134,6 +134,12 @@ CLEAR_LOG () {
 	# Clean INFO lines
 	sed --in-place 's/^\(>INFO: \)yunohost\.hook <lambda> - \[[[:digit:].]*\]/\1/g' "$temp_result"
 
+	# "This feature is experimental"
+	sed --in-place '/^>WARNING: .* This feature is experimental and not considered stable/d' "$temp_result"
+
+	# "moulinette.core translate"
+	sed --in-place '/^>ERROR: moulinette.core translate/d' "$temp_result"
+
 	# Empty lines
 	sed --in-place '/^$/d' "$temp_result"
 }

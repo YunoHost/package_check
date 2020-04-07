@@ -1469,6 +1469,323 @@ CHECK_CHANGE_URL () {
 	done
 }
 
+# Define a function to split a file in multiple parts. Used for actions and config-panel toml
+splitterAA()
+{
+    local bound="$1"
+    local file="$2"
+
+    # If $2 is a real file
+    if [ -e "$file" ]
+    then
+        # Replace name of the file by its content
+        file="$(cat "$file")"
+    fi
+
+    local file_lenght=$(echo "$file" | wc --lines | awk '{print $1}')
+
+    bounds=($(echo "$file" | grep --line-number --extended-regexp "$bound" | cut -d':' -f1))
+
+    # Go for each line number (boundary) into the array
+    for line_number in $(seq 0 $(( ${#bounds[@]} -1 )))
+    do
+        # The first bound is the next line number in the array
+        # That the low bound on which we cut
+        first_bound=$(( ${bounds[$line_number+1]} - 1 ))
+        # If there's no next cell in the array, we got -1, in such case, use the lenght of the file.
+        # We cut at the end of the file
+        test $first_bound -lt 0 && first_bound=$file_lenght
+        # The second bound is the current line number in the array minus the next one.
+        # The the upper bound in the file.
+        second_bound=$(( ${bounds[$line_number]} - $first_bound - 1 ))
+        # Cut the file a first time from the beginning to the first bound
+        # And a second time from the end, back to the second bound.
+        parts[line_number]="$(echo "$file" | head --lines=$first_bound \
+            | tail --lines=$second_bound)"
+    done
+}
+
+ACTIONS_CONFIG_PANEL () {
+    # Try the actions and config-panel features
+
+    test_type=$1
+    if [ "$test_type" == "actions" ]
+    then
+        unit_test_title "Actions..."
+
+        toml_file="$package_path/actions.toml"
+        if [ ! -e "$toml_file" ]
+        then
+            ECHO_FORMAT "\nNo actions.toml found !\n" "red" "bold"
+            return 1
+        fi
+
+    elif [ "$test_type" == "config_panel" ]
+    then
+        unit_test_title "Config-panel..."
+
+        toml_file="$package_path/config_panel.toml"
+        if [ ! -e "$toml_file" ]
+        then
+            ECHO_FORMAT "\nNo config_panel.toml found !\n" "red" "bold"
+            return 1
+        fi
+    fi
+
+    # Check if the needed manifest key are set or abort the test
+    check_manifest_key "domain" || return
+
+    # Check if an install have previously work
+    is_install_failed || return
+
+    # Copy original arguments
+    local manifest_args_mod="$manifest_arguments"
+
+    # Replace manifest key for the test
+    check_domain=$sub_domain
+    replace_manifest_key "domain" "$check_domain"
+    replace_manifest_key "user" "$test_user"
+    replace_manifest_key "public" "$public_public_arg"
+    # Use a path according to previous succeeded installs
+    if [ $sub_dir_install -eq 1 ]; then
+        local check_path=$test_path
+    else
+        local check_path=/
+    fi
+    replace_manifest_key "path" "$check_path"
+
+    # Install the application in a LXC container
+    ECHO_FORMAT "\nPreliminary install...\n" "white" "bold" clog
+    STANDARD_SETUP_APP
+    check_false_positive_error || return $?
+
+    validate_action_config_panel()
+    {
+        # yunohost_result gets the return code of the command
+        yunohost_result=$?
+
+        local message="$1"
+
+        # Print the result of the command
+        if [ $yunohost_result -eq 0 ]; then
+            ECHO_FORMAT "$message succeed. ($yunohost_result)\n" "white" clog
+        else
+            ECHO_FORMAT "$message failed. ($yunohost_result)\n" "white" clog
+        fi
+
+        # Check all the witness files, to verify if they're still there
+        check_witness_files
+
+        # Analyse the log to extract "warning" and "error" lines
+        LOG_EXTRACTOR
+        check_false_positive_error || return $?
+
+        # Check the result and print SUCCESS or FAIL
+        if check_test_result
+        then	# Success
+            # The global success for a actions can't be a success if another iteration failed
+            if [ $RESULT_action_config_panel -ne -1 ]; then
+                RESULT_action_config_panel=1	# Actions succeed
+            fi
+        else	# Fail
+            RESULT_action_config_panel=-1	# Actions failed
+        fi
+
+        # Make a break if auto_remove is set
+        break_before_continue
+    }
+
+    # List first, then execute
+    local i=0
+    for i in `seq 1 2`
+    do
+        # Do a test if the installation succeed
+        if [ $yunohost_result -ne 0 ]
+        then
+            ECHO_FORMAT "\nThe previous test has failed...\n" "red" "bold"
+        else
+            if [ $i -eq 1 ]
+            then
+                if [ "$test_type" == "actions" ]
+                then
+                    ECHO_FORMAT "\n> List the available actions...\n" "white" "bold" clog
+
+                    # List the actions
+                    LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app action list $ynh_app_id"
+
+                    validate_action_config_panel "yunohost app action list"
+                elif [ "$test_type" == "config_panel" ]
+                then
+                    ECHO_FORMAT "\n> Show the config panel...\n" "white" "bold" clog
+
+                    # Show the config-panel
+                    LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app config show-panel $ynh_app_id"
+                    validate_action_config_panel "yunohost app config show-panel"
+                fi
+            elif [ $i -eq 2 ]
+            then
+                local parts
+                if [ "$test_type" == "actions" ]
+                then
+                    ECHO_FORMAT "\n> Execute the actions...\n" "white" "bold" clog
+
+                    # Split the actions.toml file to separate each actions
+                    splitterAA "^[[:blank:]]*\[[^.]*\]" "$toml_file"
+                elif [ "$test_type" == "config_panel" ]
+                then
+                    ECHO_FORMAT "\n> Apply configurations...\n" "white" "bold" clog
+
+                    # Split the config_panel.toml file to separate each configurations
+                    splitterAA "^[[:blank:]]*\[.*\]" "$toml_file"
+                fi
+
+                # Read each part, each action, one by one
+                for part in $(seq 0 $(( ${#parts[@]} -1 )))
+                do
+                    local action_config_argument_name=""
+                    local action_config_argument_type=""
+                    local action_config_argument_default=""
+                    local actions_config_arguments_specifics=""
+                    local nb_actions_config_arguments_specifics=1
+
+                    # Ignore part of the config_panel which are only titles
+                    if [ "$test_type" == "config_panel" ]
+                    then
+                        # A real config_panel part should have a `ask = ` line. Ignore the part if not.
+                        if ! echo "${parts[$part]}" | grep --quiet --extended-regexp "^[[:blank:]]*ask ="
+                        then
+                            continue
+                        fi
+                        # Get the name of the config. ask = "Config ?"
+                        local action_config_name="$(echo "${parts[$part]}" | grep "ask" | sed 's/^.* = \"\(.*\)\"/\1/')"
+
+                        # Get the config argument name "YNH_CONFIG_part1_part2.part3.partx"
+                        local action_config_argument_name="$(echo "${parts[$part]}" | grep "^[[:blank:]]*\[.*\]$")"
+                        # Remove []
+                        action_config_argument_name="${action_config_argument_name//[\[\]]/}"
+                        # And remove spaces
+                        action_config_argument_name="${action_config_argument_name// /}"
+
+                    elif [ "$test_type" == "actions" ]
+                    then
+                        # Get the name of the action. name = "Name of the action"
+                        local action_config_name="$(echo "${parts[$part]}" | grep "name" | sed 's/^.* = \"\(.*\)\"/\1/')"
+
+                        # Get the action. [action]
+                        local action_config_action="$(echo "${parts[$part]}" | grep "^\[.*\]$" | sed 's/\[\(.*\)\]/\1/')"
+                    fi
+
+                    # Check if there's any [action.arguments]
+                    # config_panel always have arguments.
+                    if echo "${parts[$part]}" | grep --quiet "$action_config_action\.arguments" || [ "$test_type" == "config_panel" ]
+                    then local action_config_has_arguments=1
+                    else local action_config_has_arguments=0
+                    fi
+                    # If there's arguments for this action.
+                    if [ $action_config_has_arguments -eq 1 ]
+                    then
+                        if [ "$test_type" == "actions" ]
+                        then
+                            # Get the argument [action.arguments.name_of_the_argument]
+                            action_config_argument_name="$(echo "${parts[$part]}" | grep "$action_config_action\.arguments\." | sed 's/.*\.\(.*\)]/\1/')"
+                        fi
+
+                        # Get the type of the argument. type = "type"
+                        action_config_argument_type="$(echo "${parts[$part]}" | grep "type" | sed 's/^.* = \"\(.*\)\"/\1/')"
+                        # Get the default value of this argument. default = true
+                        action_config_argument_default="$(echo "${parts[$part]}" | grep "default" | sed 's/^.* = \(.*\)/\1/')"
+                        # Do not use true or false, use 1/0 instead
+                        if [ "$action_config_argument_default" == "true" ] && [ "$action_config_argument_type" == "boolean" ]; then
+                            action_config_argument_default=1
+                        elif [ "$action_config_argument_default" == "false" ] && [ "$action_config_argument_type" == "boolean" ]; then
+                            action_config_argument_default=0
+                        fi
+
+                        if [ "$test_type" == "config_panel" ]
+                        then
+                            local check_process_arguments="$config_panel_arguments"
+                        elif [ "$test_type" == "actions" ]
+                        then
+                            local check_process_arguments="$actions_arguments"
+                        fi
+                        # Look for arguments into the check_process
+                        if echo "$check_process_arguments" | grep --quiet "$action_config_argument_name"
+                        then
+                            # If there's arguments for this actions into the check_process
+                            # Isolate the values
+                            actions_config_arguments_specifics="$(echo "$check_process_arguments" | sed "s/.*$action_config_argument_name=\(.*\)/\1/")"
+                            # And remove values of the following action
+                            actions_config_arguments_specifics="${actions_config_arguments_specifics%%\:*}"
+                            nb_actions_config_arguments_specifics=$(( $(echo "$actions_config_arguments_specifics" | tr --complement --delete "|" | wc --chars) + 1 ))
+                        fi
+
+                        if [ "$test_type" == "config_panel" ]
+                        then
+                            # Finish to format the name
+                            # Remove . by _
+                            action_config_argument_name="${action_config_argument_name//./_}"
+                            # Move all characters to uppercase
+                            action_config_argument_name="${action_config_argument_name^^}"
+                            # Add YNH_CONFIG_
+                            action_config_argument_name="YNH_CONFIG_$action_config_argument_name"
+                        fi
+                    fi
+
+                    # Loop on the number of values into the check_process.
+                    # Or loop once for the default value
+                    for j in `seq 1 $nb_actions_config_arguments_specifics`
+                    do
+                        local action_config_argument_built=""
+                        if [ $action_config_has_arguments -eq 1 ]
+                        then   
+                            # If there's values into the check_process
+                            if [ -n "$actions_config_arguments_specifics" ]
+                            then
+                                # Build the argument from a value from the check_process
+                                local action_config_actual_argument="$(echo "$actions_config_arguments_specifics" | cut -d'|' -f $j)"
+                                action_config_argument_built="--args $action_config_argument_name=$action_config_actual_argument"
+                            elif [ -n "$action_config_argument_default" ]
+                            then
+                                # Build the argument from the default value
+                                local action_config_actual_argument="$action_config_argument_default"
+                                action_config_argument_built="--args $action_config_argument_name=$action_config_actual_argument"
+                            else
+                                ECHO_FORMAT "\n> No argument into the check_process to use or default argument for \"$action_config_name\"..." "lyellow" "bold" clog
+                                action_config_actual_argument=""
+                            fi
+                            if [ "$test_type" == "config_panel" ]
+                            then
+                                ECHO_FORMAT "\n> Apply the configuration for \"$action_config_name\" with the argument \"$action_config_actual_argument\"...\n" "white" "bold" clog
+                            elif [ "$test_type" == "actions" ]
+                            then
+                                ECHO_FORMAT "\n> Execute the action \"$action_config_name\" with the argument \"$action_config_actual_argument\"...\n" "white" "bold" clog
+                            fi
+                        else
+                            ECHO_FORMAT "\n> Execute the action \"$action_config_name\"...\n" "white" "bold" clog
+                        fi
+
+                        if [ "$test_type" == "config_panel" ]
+                        then
+                            # Aply a configuration
+                            LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app config apply $ynh_app_id $action_config_action $action_config_argument_built"
+                        elif [ "$test_type" == "actions" ]
+                        then
+                            # Execute an action
+                            LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app action run $ynh_app_id $action_config_action $action_config_argument_built"
+                        fi
+                        validate_action_config_panel "yunohost action $action_config_action"
+                    done
+                done
+            fi
+        fi
+    done
+
+    # Uses the default snapshot
+    current_snapshot=snap0
+    # Stop and restore the LXC container
+    LXC_STOP
+}
+
 PACKAGE_LINTER () {
 	# Package linter
 
@@ -1733,5 +2050,15 @@ TESTING_PROCESS () {
 	# Try the change_url script
 	if [ $change_url -eq 1 ]; then
 		TEST_LAUNCHER CHECK_CHANGE_URL
+	fi
+
+	# Try the actions
+	if [ $actions -eq 1 ]; then
+		TEST_LAUNCHER ACTIONS_CONFIG_PANEL actions
+	fi
+
+	# Try the config-panel
+	if [ $config_panel -eq 1 ]; then
+		TEST_LAUNCHER ACTIONS_CONFIG_PANEL config_panel
 	fi
 }

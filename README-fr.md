@@ -1,7 +1,7 @@
-Package checker for YunoHost
+Package checker pour YunoHost
 ==================
 
-[Yunohost project](https://yunohost.org/#/)
+[Projet YunoHost](https://yunohost.org/#/)
 
 > [Read this readme in english](README.md)
 
@@ -14,16 +14,19 @@ Le script est capable d'effectuer les tests suivant:
 - Installation en sous-dossier
 - Installation à la racine du domaine
 - Installation sans accès par url (Pour les applications n'ayant pas d'interface web)
+- Désinstallation
+- Réinstallation après désinstallation
 - Installation en privé
 - Installation en public
-- Upgrade sur la même version du package
+- Upgrade depuis la même version du package
+- Upgrade depuis une précédente version du package
 - Backup
 - Restore après suppression de l'application
 - Restore sans installation préalable
 - Installation multi-instance
-- Test de path mal formé (path/ au lieu de /path)
 - Test de port déjà utilisé
 - Test du script change_url
+- Test des actions et configurations disponible dans le config-panel
 
 Package check utilise un conteneur LXC pour créer un environnement de test propre sans résidus d'installations précédentes.
 
@@ -35,11 +38,12 @@ Il est nécessaire de fournir, à la racine du package de l'app à tester, un fi
 Si ce fichier n'est pas présent, package_check sera utilisé en mode dégradé. Il va tenter de repérer les arguments domain, path et admin dans le manifest pour exécuter un nombre restreint de test, en fonction des arguments trouvés.
 
 ---
-## Déploiement du script de test
+## Déploiement de package_check
 
 ```
 git clone https://github.com/YunoHost/package_check
 package_check/sub_scripts/lxc_build.sh
+
 package_check/package_check.sh APP_ynh
 ```
 
@@ -61,6 +65,15 @@ package_check/package_check.sh APP_ynh
 		is_public=1	(PUBLIC|public=1|private=0)
 		password="password"
 		port="666"	(PORT)
+	; Actions
+		action_argument=arg1|arg2
+		is_public=1|0
+	; Config_panel
+		main.categorie.config_example=arg1|arg2
+		main.overwrite_files.overwrite_phpfpm=1|0
+		main.php_fpm_config.footprint=low|medium|high|specific
+		main.php_fpm_config.free_footprint=20
+		main.php_fpm_config.usage=low|medium|high
 	; Checks
 		pkg_linter=1
 		setup_sub_dir=1
@@ -72,9 +85,10 @@ package_check/package_check.sh APP_ynh
 		upgrade=1	from_commit=65c382d138596fcb32b4c97c39398815a1dcd4e8
 		backup_restore=1
 		multi_instance=1
-		incorrect_path=1
 		port_already_use=1 (XXXX)
 		change_url=1
+		actions=1
+		config_panel=1
 ;;; Levels
 	Level 5=auto
 ;;; Options
@@ -99,16 +113,31 @@ Toutes les commandes ajoutées après l'instruction `; pre-install` seront exéc
 Ensemble des clés du manifest.  
 Toutes les clés du manifest doivent être renseignée afin de procéder à l'installation.
 > Les clés de manifest données ici ne le sont qu'à titre d'exemple. Voir le manifest de l'application.
+
 Certaines clés de manifest sont indispensables au script pour effectuer certains test. Ces clés doivent être mises en évidence afin que le script soit capable de les retrouver et de changer leur valeur.  
 `(DOMAIN)`, `(PATH)`, `(USER)` et `(PORT)` doivent être mis en bout de ligne des clés correspondantes. Ces clés seront modifiées par le script.  
 `(PUBLIC|public=1|private=0)` doit, en plus de correspondre à la clé de visibilité public, indiquer les valeurs du manifest pour public et privé.
+
+### `; Actions`
+List des arguments pour chaque action nécessitant un argument.  
+`action_argument` est le nom de l'argument, ainsi que vous pouvez le trouver à la fin de [action.arguments.**action_argument**].  
+`arg1|arg2` sont les différents arguments à utiliser pour les test. Vous pouvez mettre autant d'arguments que désiré, séparé par `|`.
+
+*Seul `actions.toml` peut être testé par package_check, pas `actions.json`.*
+
+### `; Config_panel`
+List des arguments pour chaque configuration de config_panel.  
+`main.categorie.config_example` est l'entrée toml complète pour l'argument de cette configuration.  
+`arg1|arg2` sont les différents arguments à utiliser pour les test. Vous pouvez mettre autant d'arguments que désiré, séparé par `|`.
+
+*Seul `config_panel.toml` peut être testé par package_check, pas `config_panel.json`.*
 
 ### `; Checks`
 Ensemble des tests à effectuer.  
 Chaque test marqué à 1 sera effectué par le script.  
 Si un test est absent de la liste, il sera ignoré. Cela revient à le noter à 0.
 - `pkg_linter`: Vérification du package avec [package linter](https://github.com/YunoHost/package_linter)
-- `setup_sub_dir`: Installation dans le path /check.
+- `setup_sub_dir`: Installation dans un path.
 - `setup_root`: Installation à la racine du domaine.
 - `setup_nourl`: Installation sans accès http. Ce test ne devrait être choisi que pour les applications ne disposant pas d'une interface web.
 - `setup_private`: Installation en privé.
@@ -117,15 +146,15 @@ Si un test est absent de la liste, il sera ignoré. Cela revient à le noter à 
 - `upgrade from_commit`: Upgrade du package à partir du commit spécifié vers la dernière version.
 - `backup_restore`: Backup et restauration.
 - `multi_instance`: Installation de l'application 2 fois de suite, pour vérifier sa capacité à être multi-instance.
-- `incorrect_path`: Provoque une erreur avec un path malformé, path/.
 - `port_already_use`: Provoque une erreur sur le port en l'ouvrant avant le script d'install.  
 	Le test` port_already_use` peut éventuellement prendre en argument un numéro de port. Si celui-ci n'est pas dans le manifest.  
 	Le numéro de port doit alors être noté entre parenthèse, il servira au test de port.  
 - `change_url`: Test le script change_url de 6 manières différentes, Root vers un path, path vers un autre path et path vers root. Et la même chose avec un autre domaine.
+- `actions`: Toutes les actions disponible dans actions.toml
+- `config_panel`: Toutes les configurations disponible dans config_panel.toml
 
 ### `;;; Levels`
-
-Les [niveaux](https://yunohost.org/#/packaging_apps_levels_fr) 1 à 7 sont déterminés automatiquement.  
+Les [niveaux](https://yunohost.org/#/packaging_apps_levels_fr) 1 à 8 sont déterminés automatiquement.  
 A l'exception du niveau 5, vous ne pouvez plus forcer une valeur pour un niveau.  
 Le niveau 5 est déterminé par les résultats de [package linter](https://github.com/YunoHost/package_linter).  
 La valeur par défaut pour ce niveau est `auto`, cependant, si nécessaire, vous pouvez forcer la valeur pour ce niveau en la fixant à `1`, pour un résultat positif, ou à `0`, pour un résultat négatif.  
@@ -164,11 +193,11 @@ Le script `package_check.sh` accepte 6 arguments en plus du package à tester.
 Package check utilise la virtualisation en conteneur pour assurer l'intégrité de l'environnement de test.  
 L'usage de LXC apporte une meilleure stabilité au processus de test, un test de suppression échoué n'entraine pas l'échec des tests suivant, et permet de garder un environnement de test sans résidus de test précédents. En revanche, l'usage de LXC augmente la durée des tests, en raison des manipulations du conteneur et de la réinstallation systématique des dépendances de l'application.
 
-Il faut prévoir également un espace suffisant sur l'hôte, au minimum 4Go pour le conteneur, son snapshot et sa copie de sauvegarde.
+Il faut prévoir également un espace suffisant sur l'hôte, au minimum 6Go pour le conteneur, ses snapshots et sa copie de sauvegarde.
 
 L'usage de LXC est facilité par 4 scripts, permettant de gérer la création, la mise à jour, la suppression et la réparation du conteneur.
 - `lxc_build.sh`: lxc_build installe LXC et ses dépendances, puis créer le conteneur debian.  
-	Il ajoute ensuite le support réseau, installe Yunohost et le configure. Et enfin configure un accès ssh.  
+	Il ajoute ensuite le support réseau, installe YunoHost et le configure. Et enfin configure un accès ssh.  
 	L'accès ssh par défaut est `ssh -t pchecker_lxc`
 - `lxc_upgrade.sh`: Effectue la mise à jour du conteneur à l'aide d'apt-get et recréer le snapshot.
 - `lxc_remove.sh`: Supprime le conteneur LXC, son snapshot et sa sauvegarde. Désinstalle LXC et déconfigure le réseau associé.
