@@ -1,5 +1,5 @@
-;; Nom du test
-# Commentaire ignoré
+;; Test name
+# Comment ignored
 	; pre-install
 		echo -n "Here your commands to execute in the container"
 		echo ", before each installation of the app."
@@ -8,10 +8,18 @@
 		path="/path"	(PATH)
 		admin="john"	(USER)
 		language="fr"
-#		is_public="Yes"	(PUBLIC|public=Yes|private=No)
 		is_public=1	(PUBLIC|public=1|private=0)
 		password="password"
 		port="666"	(PORT)
+	; Actions
+		action_argument=arg1|arg2
+		is_public=1|0
+	; Config_panel
+		main.categorie.config_example=arg1|arg2
+		main.overwrite_files.overwrite_phpfpm=1|0
+		main.php_fpm_config.footprint=low|medium|high|specific
+		main.php_fpm_config.free_footprint=20
+		main.php_fpm_config.usage=low|medium|high
 	; Checks
 		pkg_linter=1
 		setup_sub_dir=1
@@ -23,10 +31,10 @@
 		upgrade=1	from_commit=65c382d138596fcb32b4c97c39398815a1dcd4e8
 		backup_restore=1
 		multi_instance=1
-		# This test is no longer necessary since the version 2.7 (PR: https://github.com/YunoHost/yunohost/pull/304), you can still do it if your app could be installed with this version.
-		# incorrect_path=1
 		port_already_use=1	(66)
 		change_url=0
+		actions=0
+		config_panel=0
 ;;; Levels
 	# If the level 5 (Package linter) is forced to 1. Please add justifications here.
 	Level 5=auto
