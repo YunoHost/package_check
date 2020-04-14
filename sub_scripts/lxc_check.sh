@@ -198,70 +198,76 @@ RESTORE_CONTAINER () {
 
 LXC_NETWORK_CONFIG () {
 	lxc_network=0
-	if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^lxc.network.type = veth"
+	if [ $(lsb_release -sc) != buster ]
+	then
+		network_prefix=lxc.network
+	else
+		network_prefix=lxc.net.0
+	fi
+	if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^$network_prefix.type = veth"
 	then
 		lxc_network=1   # Si la ligne de la config réseau est absente, c'est une erreur.
 		check_repair=1
-		if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*lxc.network.type"
+		if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*$network_prefix.type"
 		then # Si la ligne est incorrecte, elle est corrigée.
-			sudo sed -i "s/.*lxc.network.type.*/lxc.network.type = veth/g" /var/lib/lxc/$LXC_NAME/config
+			sudo sed -i "s/.*$network_prefix.type.*/$network_prefix.type = veth/g" /var/lib/lxc/$LXC_NAME/config
 		else    # Sinon elle est ajoutée.
-			echo "lxc.network.type = veth" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
+			echo "$network_prefix.type = veth" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
 		fi
 	fi
-	if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^lxc.network.flags = up"
+	if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^$network_prefix.flags = up"
 	then
 		lxc_network=1
 		check_repair=1
-		if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*lxc.network.flags"
+		if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*$network_prefix.flags"
 		then
-			sudo sed -i "s/.*lxc.network.flags.*/lxc.network.flags = up/g" /var/lib/lxc/$LXC_NAME/config
+			sudo sed -i "s/.*$network_prefix.flags.*/$network_prefix.flags = up/g" /var/lib/lxc/$LXC_NAME/config
 		else
-			echo "lxc.network.flags = up" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
+			echo "$network_prefix.flags = up" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
 		fi
 	fi
-	if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^lxc.network.link = $LXC_BRIDGE"
+	if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^$network_prefix.link = $LXC_BRIDGE"
 	then
 		lxc_network=1
 		check_repair=1
-		if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*lxc.network.link"
+		if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*$network_prefix.link"
 		then
-			sudo sed -i "s/.*lxc.network.link.*/lxc.network.link = $LXC_BRIDGE" /var/lib/lxc/$LXC_NAME/config
+			sudo sed -i "s/.*$network_prefix.link.*/$network_prefix.link = $LXC_BRIDGE" /var/lib/lxc/$LXC_NAME/config
 		else
-			echo "lxc.network.link = $LXC_BRIDGE" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
+			echo "$network_prefix.link = $LXC_BRIDGE" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
 		fi
 	fi
-	if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^lxc.network.name = eth0"
+	if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^$network_prefix.name = eth0"
 	then
 		lxc_network=1
 		check_repair=1
-		if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*lxc.network.name"
+		if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*$network_prefix.name"
 		then
-			sudo sed -i "s/.*lxc.network.name.*/lxc.network.name = eth0/g" /var/lib/lxc/$LXC_NAME/config
+			sudo sed -i "s/.*$network_prefix.name.*/$network_prefix.name = eth0/g" /var/lib/lxc/$LXC_NAME/config
 		else
-			echo "lxc.network.name = eth0" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
+			echo "$network_prefix.name = eth0" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
 		fi
 	fi
-	if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^lxc.network.veth.pair = $LXC_NAME"
+	if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^$network_prefix.veth.pair = $LXC_NAME"
 	then
 		lxc_network=1
 		check_repair=1
-		if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*lxc.network.veth.pair"
+		if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*$network_prefix.veth.pair"
 		then
-			sudo sed -i "s/.*lxc.network.veth.pair.*/lxc.network.veth.pair = $LXC_NAME/g" /var/lib/lxc/$LXC_NAME/config
+			sudo sed -i "s/.*$network_prefix.veth.pair.*/$network_prefix.veth.pair = $LXC_NAME/g" /var/lib/lxc/$LXC_NAME/config
 		else
-			echo "lxc.network.veth.pair = $LXC_NAME" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
+			echo "$network_prefix.veth.pair = $LXC_NAME" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
 		fi
 	fi
-	if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^lxc.network.hwaddr = 00:FF:AA:00:00:01"
+	if ! sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q "^$network_prefix.hwaddr = 00:FF:AA:00:00:01"
 	then
 		lxc_network=1
 		check_repair=1
-		if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*lxc.network.hwaddr"
+		if sudo cat /var/lib/lxc/$LXC_NAME/config | grep -q ".*$network_prefix.hwaddr"
 		then
-			sudo sed -i "s/.*lxc.network.hwaddr.*/lxc.network.hwaddr = 00:FF:AA:00:00:01/g" /var/lib/lxc/$LXC_NAME/config
+			sudo sed -i "s/.*$network_prefix.hwaddr.*/$network_prefix.hwaddr = 00:FF:AA:00:00:01/g" /var/lib/lxc/$LXC_NAME/config
 		else
-			echo "lxc.network.hwaddr = 00:FF:AA:00:00:01" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
+			echo "$network_prefix.hwaddr = 00:FF:AA:00:00:01" | sudo tee -a /var/lib/lxc/$LXC_NAME/config
 		fi
 	fi
 	if [ $lxc_network -eq 1 ]
