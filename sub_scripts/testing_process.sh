@@ -1657,7 +1657,7 @@ ACTIONS_CONFIG_PANEL () {
                             continue
                         fi
                         # Get the name of the config. ask = "Config ?"
-                        local action_config_name="$(echo "${parts[$part]}" | grep "ask" | sed 's/^.* = \"\(.*\)\"/\1/')"
+                        local action_config_name="$(echo "${parts[$part]}" | grep "ask *= *" | sed 's/^.* = \"\(.*\)\"/\1/')"
 
                         # Get the config argument name "YNH_CONFIG_part1_part2.part3.partx"
                         local action_config_argument_name="$(echo "${parts[$part]}" | grep "^[[:blank:]]*\[.*\]$")"
@@ -1743,12 +1743,12 @@ ACTIONS_CONFIG_PANEL () {
                             then
                                 # Build the argument from a value from the check_process
                                 local action_config_actual_argument="$(echo "$actions_config_arguments_specifics" | cut -d'|' -f $j)"
-                                action_config_argument_built="--args $action_config_argument_name=$action_config_actual_argument"
+                                action_config_argument_built="--args $action_config_argument_name=\"$action_config_actual_argument\""
                             elif [ -n "$action_config_argument_default" ]
                             then
                                 # Build the argument from the default value
                                 local action_config_actual_argument="$action_config_argument_default"
-                                action_config_argument_built="--args $action_config_argument_name=$action_config_actual_argument"
+                                action_config_argument_built="--args $action_config_argument_name=\"$action_config_actual_argument\""
                             else
                                 ECHO_FORMAT "\n> No argument into the check_process to use or default argument for \"$action_config_name\"..." "lyellow" "bold" clog
                                 action_config_actual_argument=""
