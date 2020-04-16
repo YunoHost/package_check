@@ -255,7 +255,7 @@ sudo rm -r "$script_dir/upgrade"
 echo "$check_version" > "$version_file"
 rm "$script_dir/pcheck.lock"
 # Execute package check by replacement of this process
-exec "$script_dir/package_check.sh" "$arguments"
+exec "$script_dir/package_check.sh" "${arguments[@]}"
 EOF
 
 		# Get the last version of app_levels/en.json
