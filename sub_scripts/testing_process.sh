@@ -1354,7 +1354,7 @@ CHECK_CHANGE_URL () {
 	# Without modify the domain, root to path, path to path and path to root.
 	# And then, same with a domain change
 	local i=0
-	for i in `seq 1 6`
+	for i in `seq 1 7`
 	do
 		if [ $i -eq 1 ]; then
 			# Same domain, root to path
@@ -1387,8 +1387,18 @@ CHECK_CHANGE_URL () {
 			check_path=$test_path
 			local new_path=/
 			local new_domain=$main_domain
+		elif [ $i -eq 7 ]; then
+			# Other domain, root to root
+			check_path=/
+			local new_path=/
+			local new_domain=$main_domain
 		fi
 		replace_manifest_key "path" "$check_path"
+
+        # Ignore the test if it tries to move to the same address
+        if [ "$check_path" == "$new_path" ] && [ "$new_domain" == "$sub_domain" ]; then
+            continue
+        fi
 
 		# Check if root or subpath installation worked, or if force_install_ok is setted.
         # Try with a sub path install
@@ -1399,6 +1409,11 @@ CHECK_CHANGE_URL () {
                 # Jump this test
                 ECHO_FORMAT "Root install failed, impossible to perform this test...\n" "lyellow" clog
                 continue
+            elif [ "$new_path" != "/" ] && [ $sub_dir_install -eq 0 ]
+            then
+                # Jump this test
+                ECHO_FORMAT "Sub path install failed, impossible to perform this test...\n" "lyellow" clog
+                continue
             fi
         # And with a sub path install
         else
@@ -1406,6 +1421,11 @@ CHECK_CHANGE_URL () {
             then
                 # Jump this test
                 ECHO_FORMAT "Sub path install failed, impossible to perform this test...\n" "lyellow" clog
+                continue
+            elif [ "$new_path" = "/" ] && [ $root_install -eq 0 ]
+            then
+                # Jump this test
+                ECHO_FORMAT "Root install failed, impossible to perform this test...\n" "lyellow" clog
                 continue
             fi
         fi
