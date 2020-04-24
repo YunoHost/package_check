@@ -743,7 +743,7 @@ CHECK_UPGRADE () {
 			# Backup the modified arguments
 			update_manifest_args="$manifest_args_mod"
 			# Get the arguments of the manifest for this upgrade.
-			manifest_args_mod=$(grep "^manifest_arg=" "$partial_check_process" | cut -d'=' -f2-)
+			manifest_args_mod="$(grep "^manifest_arg=" "$partial_check_process" | cut -d'=' -f2-)"
 			if [ -z "$manifest_args_mod" ]; then
 				# If there's no specific arguments, use the previous one.
 				manifest_args_mod="$update_manifest_args"
@@ -771,6 +771,7 @@ CHECK_UPGRADE () {
 		if [ $yunohost_result -ne 0 ]
 		then
 			ECHO_FORMAT "\nInstallation failed...\n" "red" "bold"
+			ECHO_FORMAT "\nUpgrade test ignored...\n" "red" "bold"
 		else
 			ECHO_FORMAT "\nUpgrade...\n" "white" "bold" clog
 
@@ -796,21 +797,21 @@ CHECK_UPGRADE () {
 
 			# Try to access the app by its url
 			CHECK_URL
-		fi
 
-		# Check the result and print SUCCESS or FAIL
-		if check_test_result
-		then	# Success
-			# The global success for an upgrade can't be a success if another upgrade failed
-			if [ $RESULT_check_upgrade -ne -1 ]; then
-				RESULT_check_upgrade=1	# Upgrade succeed
-			fi
-		else	# Fail
-			RESULT_check_upgrade=-1	# Upgrade failed
-		fi
+            # Check the result and print SUCCESS or FAIL
+            if check_test_result
+            then	# Success
+                # The global success for an upgrade can't be a success if another upgrade failed
+                if [ $RESULT_check_upgrade -ne -1 ]; then
+                    RESULT_check_upgrade=1	# Upgrade succeed
+                fi
+            else	# Fail
+                RESULT_check_upgrade=-1	# Upgrade failed
+            fi
 
-		# Remove the application
-		REMOVE_APP
+            # Remove the application
+            REMOVE_APP
+		fi
 
 		# Uses the default snapshot
 		current_snapshot=snap0
