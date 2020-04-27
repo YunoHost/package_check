@@ -103,6 +103,8 @@ CHECK_TEMPLATE () {
     template_output="$(echo "$template_output" | sed '/:[[:blank:]]*ynh_/d')"
     # Remove find_mails, which is a part of ynh_send_readme_to_admin
     template_output="$(echo "$template_output" | sed '/find_mails/d')"
+    # And at_least_one, part of ynh_get_scalable_phpfpm
+    template_output="$(echo "$template_output" | sed '/at_least_one/d')"
     show_error "Do not use specific functions aside of ynh helpers." "Keep your code linear directly into the scripts to ease the reading of your scripts"
 
 
@@ -126,7 +128,7 @@ CHECK_TEMPLATE () {
         fi
         # To not pull more than once a hour
         if git_wait_for_pull "$official_helper_dir" 3600; then
-            git pull origin HEAD #> /dev/null 2>&1
+            git pull origin HEAD > /dev/null 2>&1
         fi )
 
         # And get experimentals helpers
@@ -141,7 +143,7 @@ CHECK_TEMPLATE () {
         cd Experimental_helpers
         # To not pull more than once a hour
         if git_wait_for_pull "$experimental_helper_dir" 3600; then
-            git pull origin HEAD #> /dev/null 2>&1
+            git pull origin HEAD > /dev/null 2>&1
         fi )
 
         # Check each helper found
