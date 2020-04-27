@@ -823,6 +823,11 @@ TEST_RESULTS () {
 		ECHO_FORMAT "Issue alias_traversal was detected ! Please see here https://github.com/YunoHost/example_ynh/pull/45 to fix that.\n" "red" "bold"
 	fi
 
+	if [ $RESULT_template -eq 1 ]
+	then
+		ECHO_FORMAT "This package does not fully respect the template.\nYou should consider upgrade your package to respect the template of the example app.\n" "red" "bold"
+	fi
+
 	# Then, print the levels
 	# Print the global level
 	verbose_level=$(grep applevel_$global_level\" "$script_dir/levels.json" | cut -d'"' -f4)
@@ -902,6 +907,7 @@ initialize_values() {
 	RESULT_check_port=0
 	RESULT_change_url=0
 	RESULT_action_config_panel=0
+	RESULT_template=0
 
 	# auto_remove parameter
 	if [ $interrupt -eq 1 ]; then

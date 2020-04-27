@@ -36,6 +36,185 @@ check_false_positive_error () {
 
 #=================================================
 
+git_wait_for_pull () {
+    local_git_repo="$1"
+    min_time_between_pull=$2
+    last_pull=$(cat "$local_git_repo/last_pull")
+    last_pull=${last_pull:-0}
+
+    if [ $(( $(date +%s) - $last_pull )) -ge $min_time_between_pull ]
+    then
+        date +%s > "$local_git_repo/last_pull"
+        return 0
+    else
+        return 1
+    fi
+}
+
+#=================================================
+
+# In complement of all checks done by Linter, check if the template is respected.
+CHECK_TEMPLATE () {
+
+    template_error=0
+    app_scripts_dir="$package_path/scripts"
+    # For some check, we don't want to look at the standard scripts.
+    app_scripts="backup|change_url|config|install|remove|restore|upgrade"
+
+    grep_command="grep --extended-regexp --dereference-recursive --line-number"
+    grep_ignore_scripts="grep --invert-match --extended-regexp $app_scripts"
+
+    show_error () {
+        messageL1="$1"
+        messageL2="$2"
+        messageL3="$3"
+        # Keep only the first line found as evidence
+        evidence="$(echo "$template_output" | head --lines=1)"
+        evidence="${evidence##$package_path/}"
+        if [ -n "$template_output" ]
+        then
+            if [ $template_error -eq 0 ]
+            then
+                all_test=$((all_test+1))
+                unit_test_title "Compare the syntax to the packaging template..."
+
+                ECHO_FORMAT "\nLooks like your package does not respect the template of the example app...\n" "red" "bold"
+                ECHO_FORMAT "Please follow the template https://github.com/YunoHost/example_ynh\n\n" "lyellow"
+            fi
+            template_error=1
+
+            ECHO_FORMAT "\n$messageL1\n" "red" "bold"
+            if [ -n "$messageL2" ]; then
+                ECHO_FORMAT "$messageL2\n" "red" "bold"
+            fi
+            if [ -n "$messageL3" ]; then
+                ECHO_FORMAT "$messageL3\n" "red" "bold"
+            fi
+            ECHO_FORMAT "Here the culprit:\n" "red" "bold"
+            ECHO_FORMAT "$evidence\n" "lyellow"
+        fi
+    }
+
+    ### Detect common functions that are not helpers
+    template_output="$($grep_command "^[[:blank:]]*[[:alnum:][:punct:]]+[[:blank:]]*\([[:blank:]]*\)" "$app_scripts_dir" | $grep_ignore_scripts)"
+    # Put aside ynh_ like helpers
+    helper_like="$(echo "$template_output" | sed -n '/:[[:blank:]]*ynh_/p')"
+    # Remove ynh_ like helpers
+    template_output="$(echo "$template_output" | sed '/:[[:blank:]]*ynh_/d')"
+    # Remove find_mails, which is a part of ynh_send_readme_to_admin
+    template_output="$(echo "$template_output" | sed '/find_mails/d')"
+    show_error "Do not use specific functions aside of ynh helpers." "Keep your code linear directly into the scripts to ease the reading of your scripts"
+
+
+    ### Detect functions that looks like YunoHost helpers
+    if [ -n "$helper_like" ]
+    then
+        # Download official helpers and YunoHost helpers
+        # Get officials helpers
+        official_helper_dir="$script_dir/helpers/Officials"
+        mkdir -p "$official_helper_dir"
+        ( cd "$official_helper_dir"
+        # If we don't already have the .git directory
+        if [ ! -d .git ]
+        then
+            # Set the git clone
+            git init > /dev/null 2>&1
+            git remote add origin -f https://github.com/YunoHost/yunohost > /dev/null 2>&1
+            git config core.sparseCheckout true
+            # Get only the helper directory
+            echo "/data/helpers.d" > .git/info/sparse-checkout
+        fi
+        # To not pull more than once a hour
+        if git_wait_for_pull "$official_helper_dir" 3600; then
+            git pull origin HEAD #> /dev/null 2>&1
+        fi )
+
+        # And get experimentals helpers
+        experimental_helper_dir="$script_dir/helpers/Experimental_helpers"
+        ( cd "$script_dir/helpers"
+        # If we don't already have the repository
+        if [ ! -d Experimental_helpers ]
+        then
+            # Clone the repository
+            git clone https://github.com/YunoHost-Apps/Experimental_helpers > /dev/null 2>&1
+        fi
+        cd Experimental_helpers
+        # To not pull more than once a hour
+        if git_wait_for_pull "$experimental_helper_dir" 3600; then
+            git pull origin HEAD #> /dev/null 2>&1
+        fi )
+
+        # Check each helper found
+        while read helper
+        do
+            # Keep only the name of the helper
+            helper_name=$(echo "$helper" | sed 's/.*:\([[:alnum:][:punct:]]*\).*/\1/' | sed 's/()//')
+
+            # Try to find the helper whether in officials or experimentals
+            if ! $grep_command --quiet "^$helper_name" "$script_dir/helpers"
+            then
+                template_output="$helper"
+                show_error "This helper does not look like an existing helper." "Do not use specific functions aside of ynh helpers." "Keep your code linear directly into the scripts to ease the reading of your scripts"
+                break
+            fi
+        done <<< "$(echo "$helper_like")"
+    fi
+
+
+    ### Detect usage of ynh_render_template
+    template_output="$($grep_command --word-regexp "ynh_render_template" "$app_scripts_dir")"
+    show_error "Do not use ynh_render_template in app scripts." "Use ynh_replace_string instead to keep clear all modifications made on files"
+
+
+    ### Detect presence of comment separators
+    for script in ${app_scripts//|/ }
+    do
+        if [ -e "$app_scripts_dir/$script" ]
+        then
+            template_output="$($grep_command --count "#=================" "$app_scripts_dir/$script")"
+            if [ $template_output -lt 12 ]
+            then
+                template_output="$app_scripts_dir/$script"
+                show_error "Looks like there isn't many comment separators in your script" "Consider adding more separators to clarify the steps in your script"
+            fi
+        fi
+    done
+
+
+    ### Detect presence of progression indicators
+    for script in ${app_scripts//|/ }
+    do
+        if [ -e "$app_scripts_dir/$script" ] && [ "$script" != "config" ]
+        then
+            template_output="$($grep_command --count "ynh_script_progression|ynh_print_info" "$app_scripts_dir/$script")"
+           if [ $template_output -lt 5 ] || ( [ "$script" = "change_url" ] && [ $template_output -lt 3 ] )
+           then
+               template_output="$app_scripts_dir/$script"
+               show_error "Looks like there isn't many comment progression indicators in your script" "Consider adding more indicators to help your users know the progression of the scripts"
+           fi
+        fi
+    done
+
+
+    ### Detect usage of ynh_restore
+    template_output="$($grep_command --word-regexp "ynh_restore" "$app_scripts_dir")"
+    show_error "Do not use ynh_restore in app scripts." "Use ynh_restore_file instead to keep clear all files that are restored and in which order."
+
+
+    ### Detect usage of set -u or set -e in remove script
+    template_output="$($grep_command --word-regexp "set -u|set -e" "$app_scripts_dir/remove")"
+    show_error "Do not use 'set -e' or 'set -u' in a remove script." "If an error happen during the script, the app will be half removed !"
+
+    if [ $template_error -eq 1 ]
+    then
+        echo ""
+        RESULT_template=1
+        check_failed
+    fi
+}
+
+#=================================================
+
 PRINT_YUNOHOST_VERSION () {
 	ECHO_FORMAT ">> YunoHost versions:\n" "white" "bold" clog
 	# Be sure that the container is running
@@ -2017,6 +2196,8 @@ TESTING_PROCESS () {
 	if [ $pkg_linter -eq 1 ]; then
 		PACKAGE_LINTER
 	fi
+
+	CHECK_TEMPLATE
 
 	# Try to install in a sub path
 	if [ $setup_sub_dir -eq 1 ]; then
