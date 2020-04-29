@@ -60,18 +60,24 @@ then
 else
 	# Store arguments in a array to keep each argument separated
 	arguments=("$@")
+	getopts_built_arg=()
 
 	# Read the array value per value
 	for i in `seq 0 $(( ${#arguments[@]} -1 ))`
 	do
+		if [[ "${arguments[$i]}" =~ "--branch=" ]]
+		then
+			getopts_built_arg+=(-b)
+			arguments[$i]=${arguments[$i]//--branch=/}
+		fi
 		# For each argument in the array, reduce to short argument for getopts
-		arguments[$i]=${arguments[$i]//--branch=/-b}
 		arguments[$i]=${arguments[$i]//--force-install-ok/-f}
 		arguments[$i]=${arguments[$i]//--interrupt/-i}
 		arguments[$i]=${arguments[$i]//--help/-h}
 		arguments[$i]=${arguments[$i]//--build-lxc/-l}
 		arguments[$i]=${arguments[$i]//--bash-mode/-y}
 		arguments[$i]=${arguments[$i]//--show-resources/-r}
+		getopts_built_arg+=(${arguments[$i]})
 	done
 
 	# Read and parse all the arguments
@@ -144,7 +150,7 @@ else
 	}
 
 	# Call parse_arg and pass the modified list of args as a array of arguments.
-	parse_arg "${arguments[@]}"
+	parse_arg "${getopts_built_arg[@]}"
 fi
 
 # Prevent a conflict between --interrupt and --bash-mode
