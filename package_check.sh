@@ -490,6 +490,21 @@ fi
 
 echo "Pick up the package which will be tested."
 
+# If the url is on a specific branch, extract the branch
+if echo "$app_arg" | grep --quiet --extended-regexp "https?:\/\/.*\/tree\/"
+then
+    gitbranch="-b ${app_arg##*/tree/}"
+    app_arg="${app_arg%%/tree/*}"
+fi
+
+ECHO_FORMAT "Test the package $app_arg" "blue" "bold"
+if [ -n "$gitbranch" ]
+then
+    ECHO_FORMAT " on the branch ${gitbranch##-b }.\n" "blue" "bold"
+else
+    ECHO_FORMAT ".\n" "blue" "bold"
+fi
+
 # Remove the previous package if it's still here.
 rm -rf "$script_dir"/*_check
 

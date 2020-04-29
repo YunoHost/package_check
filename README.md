@@ -184,6 +184,7 @@ The `package_check.sh` script accept 6 arguments in addition of the package to b
 - `--bash-mode`: The script will work without user intervention.  
 	auto_remove value is ignored
 - `--branch=branch-name`: Check a branch of the repository instead of master. Allow to check a pull request.
+	You can use an url with a branch, https://github.com/YunoHost-Apps/APP_ynh/tree/my_branch, to implicitly use this argument.
 - `--build-lxc`: Install LXC and create the Debian YunoHost container if necessary.
 - `--force-install-ok`: Force success of installations, even if they fail. Allow to perform following tests even if an installation fails.
 - `--interrupt`: Force auto_remove value, break before each remove.

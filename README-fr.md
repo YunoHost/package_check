@@ -184,6 +184,7 @@ Le script `package_check.sh` accepte 6 arguments en plus du package à tester.
 - `--bash-mode`: Rend le script autonome. Aucune intervention de l'utilisateur ne sera nécessaire.  
 	La valeur de auto_remove est ignorée.
 - `--branch=nom-de-branche`: Teste une branche du dépôt plutôt que de tester master. Permet de tester les pull request.
+	Vous pouvez utiliser une url avec une branche, https://github.com/YunoHost-Apps/APP_ynh/tree/my_branch, pour utiliser implicitement cet argument.
 - `--build-lxc`: Installe LXC et créer le conteneur debian Yunohost si nécessaire.
 - `--force-install-ok`: Force la réussite des installations, même si elles échouent. Permet d'effectuer les tests qui suivent même si l'installation a échouée.
 - `--interrupt`: Force l'option auto_remove à 0, le script marquera une pause avant chaque suppression d'application.
