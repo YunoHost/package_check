@@ -55,7 +55,7 @@ stop_timer () {
 	else
 		ECHO_FORMAT "Working time: " "blue"
 	fi
-	ECHO_FORMAT "${phours}${pminutes}${pseconds}.\n" "blue"
+	ECHO_FORMAT "${phours}${pminutes}${pseconds} ($(date '+%T')).\n" "blue"
 }
 
 #=================================================
