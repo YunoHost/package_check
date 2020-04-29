@@ -40,6 +40,8 @@ If this file is not present, package_check will be used in downgraded mode. It w
 ---
 ## Deploying package_check
 
+Package_check can only be installed on Debian Stretch or Debian Buster.
+
 ```
 git clone https://github.com/YunoHost/package_check
 package_check/sub_scripts/lxc_build.sh

@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# Check Debian Stretch or Buster
+host_codename=$(grep "VERSION_CODENAME" /etc/os-release | cut -d= -f2)
+if [ "$host_codename" != "stretch" ] && [ "$host_codename" != "buster" ]
+then
+    echo "Package_check can only be installed on Debian Stretch or Debian Buster..."
+    exit 1
+fi
+
 # Récupère le dossier du script
 if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
 
