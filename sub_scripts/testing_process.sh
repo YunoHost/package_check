@@ -105,6 +105,8 @@ CHECK_TEMPLATE () {
     template_output="$(echo "$template_output" | sed '/find_mails/d')"
     # And at_least_one, part of ynh_get_scalable_phpfpm
     template_output="$(echo "$template_output" | sed '/at_least_one/d')"
+    # Remove ynh_clean_setup, an official helper defined only in comment into official helpers
+    template_output="$(echo "$template_output" | sed '/at_least_one/d')"
     show_error "Do not use specific functions aside of ynh helpers." "Keep your code linear directly into the scripts to ease the reading of your scripts"
 
 
