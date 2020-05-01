@@ -101,14 +101,17 @@ CHECK_TEMPLATE () {
     helper_like="$(echo "$template_output" | sed -n '/:[[:blank:]]*ynh_/p')"
     # Remove ynh_ like helpers
     template_output="$(echo "$template_output" | sed '/:[[:blank:]]*ynh_/d')"
+
+    # Ignore known functions
     # Remove find_mails, which is a part of ynh_send_readme_to_admin
     template_output="$(echo "$template_output" | sed '/find_mails/d')"
     # And at_least_one, part of ynh_get_scalable_phpfpm
     template_output="$(echo "$template_output" | sed '/at_least_one/d')"
-    # Remove ynh_clean_setup, an official helper defined only in comment into official helpers
-    template_output="$(echo "$template_output" | sed '/at_least_one/d')"
     show_error "Do not use specific functions aside of ynh helpers." "Keep your code linear directly into the scripts to ease the reading of your scripts"
 
+    # Ignore known helpers
+    # Remove ynh_clean_setup, an official helper defined only in comment into official helpers
+    helper_like="$(echo "$helper_like" | sed '/ynh_clean_setup/d')"
 
     ### Detect functions that looks like YunoHost helpers
     if [ -n "$helper_like" ]
