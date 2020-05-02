@@ -514,6 +514,11 @@ package_path="$script_dir/$package_dir"
 # If the package is in a git repository
 if echo "$app_arg" | grep -Eq "https?:\/\/"
 then
+    # Force the branch master if no branch is specified.
+    if [ -z "$gitbranch" ]
+    then
+        gitbranch="-b master"
+    fi
 	# Clone the repository
 	git clone $app_arg $gitbranch "$package_path"
 
