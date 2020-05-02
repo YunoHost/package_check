@@ -77,7 +77,7 @@ else
 		arguments[$i]=${arguments[$i]//--build-lxc/-l}
 		arguments[$i]=${arguments[$i]//--bash-mode/-y}
 		arguments[$i]=${arguments[$i]//--show-resources/-r}
-		getopts_built_arg+=(${arguments[$i]})
+		getopts_built_arg+=("${arguments[$i]}")
 	done
 
 	# Read and parse all the arguments
