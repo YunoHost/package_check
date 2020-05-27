@@ -1200,7 +1200,7 @@ then
 		count_test $backup_restore
 		multi_instance=$(read_check_option multi_instance)
 		count_test $multi_instance
-		incorrect_path=$(read_check_option incorrect_path)
+		incorrect_path=0
 		count_test $incorrect_path
 		port_already_use=$(read_check_option port_already_use)
 		count_test $port_already_use
@@ -1286,7 +1286,7 @@ else
 	setup_public=1
 	backup_restore=1
 	multi_instance=1
-	incorrect_path=1
+	incorrect_path=0
 	port_already_use=0
 	change_url=0
 	all_test=$((all_test+9))
