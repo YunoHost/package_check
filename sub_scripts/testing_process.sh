@@ -194,7 +194,7 @@ CHECK_TEMPLATE () {
         if [ -e "$app_scripts_dir/$script" ] && [ "$script" != "config" ]
         then
             template_output="$($grep_command --count "ynh_script_progression|ynh_print_info" "$app_scripts_dir/$script")"
-           if [ $template_output -lt 5 ] || ( [ "$script" = "change_url" ] && [ $template_output -lt 3 ] || ( [ "$script" = "backup" ] && [ $template_output -lt 4 ] )
+           if [ $template_output -lt 5 ] || ( [ "$script" = "change_url" ] && [ $template_output -lt 3 ] ) || ( [ "$script" = "backup" ] && [ $template_output -lt 4 ] )
            then
                template_output="$app_scripts_dir/$script"
                show_error "Looks like there isn't many comment progression indicators in your script" "Consider adding more indicators to help your users know the progression of the scripts"
