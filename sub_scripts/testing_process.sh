@@ -2204,7 +2204,7 @@ TESTING_PROCESS () {
 		PACKAGE_LINTER
 	fi
 
-	CHECK_TEMPLATE
+	#CHECK_TEMPLATE
 
 	# Try to install in a sub path
 	if [ $setup_sub_dir -eq 1 ]; then
