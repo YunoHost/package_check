@@ -2115,6 +2115,9 @@ set_witness_files () {
 	if [ -d "${lxc_dir}/etc/php/7.0/fpm" ]; then
 		create_witness_file "/etc/php/7.0/fpm/pool.d/witnessfile.conf" file
 	fi
+    if [ -d "${lxc_dir}/etc/php/7.3/fpm" ]; then
+        create_witness_file "/etc/php/7.3/fpm/pool.d/witnessfile.conf" file
+    fi
 
 	# Config logrotate
 	create_witness_file "/etc/logrotate.d/witnessfile" file
@@ -2166,6 +2169,9 @@ check_witness_files () {
 	if [ -d "${lxc_dir}/etc/php/7.0/fpm" ]; then
 		check_file_exist "/etc/php/7.0/fpm/pool.d/witnessfile.conf" file
 	fi
+    if [ -d "${lxc_dir}/etc/php/7.3/fpm" ]; then
+        check_file_exist "/etc/php/7.3/fpm/pool.d/witnessfile.conf" file
+    fi
 
 	# Config logrotate
 	check_file_exist "/etc/logrotate.d/witnessfile"
