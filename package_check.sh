@@ -1023,7 +1023,8 @@ then
 # 		line=$(find_string "^Level $i=")
 		line=$(find_string "^Level 5=")
 		# And get the value
-		level[$i]=$(echo "$line" | cut -d'=' -f2)
+#		level[$i]=$(echo "$line" | cut -d'=' -f2)
+		level[5]=$(echo "$line" | cut -d'=' -f2)
 # 	done
 
 
