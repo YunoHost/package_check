@@ -514,7 +514,18 @@ then
     # Force the branch master if no branch is specified.
     if [ -z "$gitbranch" ]
     then
-        gitbranch="-b master"
+        if git ls-remote --quiet --exit-code $app_arg master
+        then
+            gitbranch="-b master"
+        else
+            if git ls-remote --quiet --exit-code $app_arg stable
+            then
+                gitbranch="-b stable"
+            else
+                ECHO_FORMAT "Unable to find a default branch to test (master or stable)" "red"
+                clean_exit 1
+            fi
+        fi
     fi
 	# Clone the repository
 	git clone $app_arg $gitbranch "$package_path"
