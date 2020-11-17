@@ -96,13 +96,7 @@ then	# Si le conteneur existe déjà
 fi
 
 echo -e "\e[1m> Création d'une machine debian $DISTRIB minimaliste.\e[0m" | tee -a "$LOG_BUILD_LXC"
-if [ "$(uname -m)" == "aarch64" ]
-then
-        arch_arg="--arch=arm64"
-else
-        arch_arg=""
-fi
-sudo lxc-create -n $LXC_NAME -t debian -- -r $DISTRIB $arch_arg >> "$LOG_BUILD_LXC" 2>&1
+sudo lxc-create -n $LXC_NAME -t download -- -d debian -r $DISTRIB -a $(dpkg --print-architecture) >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Autoriser l'ip forwarding, pour router vers la machine virtuelle.\e[0m" | tee -a "$LOG_BUILD_LXC"
 echo "net.ipv4.ip_forward=1" | sudo tee /etc/sysctl.d/lxc_pchecker.conf >> "$LOG_BUILD_LXC" 2>&1
