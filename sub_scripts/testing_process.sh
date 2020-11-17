@@ -962,7 +962,7 @@ CHECK_UPGRADE () {
 			ECHO_FORMAT "\nUpgrade...\n" "white" "bold" clog
 
 			# Upgrade the application in a LXC container
-			LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app upgrade $ynh_app_id -f \"$package_dir\""
+			LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app upgrade $ynh_app_id --file \"$package_dir\"" --force
 
 			# yunohost_result gets the return code of the upgrade
 			yunohost_result=$?
