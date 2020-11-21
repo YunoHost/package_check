@@ -693,8 +693,8 @@ TEST_RESULTS () {
 	if level_can_change 5
 	then
 		# Validated if Linter is ok. Or if Linter has been not tested but already validated before.
-		if 	[ $RESULT_linter -eq 1 ] || \
-			( [ $RESULT_linter -ne -1 ] && \
+		if 	[ $RESULT_linter -ge 1 ] || \
+			( [ $RESULT_linter -eq 0 ] && \
 			[ "${level[5]}" == "2" ] )
 		then level[5]=2
 		else level[5]=0
@@ -705,104 +705,71 @@ TEST_RESULTS () {
 		fi
 	fi
 
-	# Evaluate the sixth level
-	# -> The package can be backup and restore without error
-	if level_can_change 6
-	then
-		# Check the YEP 1.7 (https://github.com/YunoHost/doc/blob/master/packaging_apps_guidelines_fr.md#yep-17---ajouter-lapp-%C3%A0-lorganisation-yunohost-apps---valid%C3%A9--manuel--official-)
-		# Default value, YEP 1.7 not checked
-		YEP17=-1
-		YEP17_labriqueinternet=-1
-                YEP17_failed=0
-		if echo "$app_arg" | grep --extended-regexp --quiet "https?:\/\/"
-		then
-			# If the app have been picked from github, check if this app was under the YunoHost-Apps organisation
-			# YEP17 will be equal to 1 if the app was under the YunoHost-Apps organisation
-			YEP17=$(echo "$app_arg" | grep --ignore-case --count "github.com/YunoHost-Apps/")
-			# If the app have been picked from github, check if this app was under the labriqueinternet organisation
-			# YEP17_labriqueinternet will be equal to 1 if the app was under the labriqueinternet organisation
-			YEP17_labriqueinternet=$(echo "$app_arg" | grep --ignore-case --count "github.com/labriqueinternet/")
-			if [ $YEP17 -ne 1 ] && [ $YEP17_labriqueinternet -ne 1 ]; then
-				ECHO_FORMAT "This app doesn't respect the YEP 1.7 ! (https://yunohost.org/#/packaging_apps_guidelines_fr)\n" "red"
-                                YEP17_failed=1
-			fi
-		fi
+    # Evaluate the sixth level
+    # -> The package can be backup and restore without error
+    if level_can_change 6
+    then
+        # This is from the linter, tests if app is the Yunohost-apps organization
+        if [ $RESULT_linter_level_6 -eq 1 ]
+        then level[6]=2
+        else level[6]=0
+        fi
+    fi
 
-		# Validated if YEP 1.7 respected
-                if [ $YEP17_failed -eq 0 ]
-		then level[6]=2
-		else level[6]=0
-		fi
-	fi
+    # Evaluate the seventh level
+    # -> None errors in all tests performed
+    if level_can_change 7
+    then
+        level[7]=0
+        # Validated if none errors is happened.
+        if 	[ $RESULT_global_setup -ne -1 ] && \
+            [ $RESULT_global_remove -ne -1 ] && \
+            [ $RESULT_check_sub_dir -ne -1 ] && \
+            [ $RESULT_check_remove_sub_dir -ne -1 ] && \
+            [ $RESULT_check_remove_root -ne -1 ] && \
+            [ $RESULT_check_upgrade -ne -1 ] && \
+            [ $RESULT_check_private -ne -1 ] && \
+            [ $RESULT_check_public -ne -1 ] && \
+            [ $RESULT_check_multi_instance -ne -1 ] && \
+            [ $RESULT_check_path -ne -1 ] && \
+            [ $RESULT_check_port -ne -1 ] && \
+            [ $RESULT_check_backup -ne -1 ] && \
+            [ $RESULT_check_restore -ne -1 ] && \
+            [ $RESULT_change_url -ne -1 ] && \
+            [ $RESULT_action_config_panel -ne -1 ] && \
+            [ $RESULT_linter_level_7 -ge 1 ]
+        then
+            level[7]=2
+        fi
+    fi
 
-	# Evaluate the seventh level
-	# -> None errors in all tests performed
-	if level_can_change 7
-	then
-		# Validated if none errors is happened.
-		if 	[ $RESULT_global_setup -ne -1 ] && \
-			[ $RESULT_global_remove -ne -1 ] && \
-			[ $RESULT_check_sub_dir -ne -1 ] && \
-			[ $RESULT_check_remove_sub_dir -ne -1 ] && \
-			[ $RESULT_check_remove_root -ne -1 ] && \
-			[ $RESULT_check_upgrade -ne -1 ] && \
-			[ $RESULT_check_private -ne -1 ] && \
-			[ $RESULT_check_public -ne -1 ] && \
-			[ $RESULT_check_multi_instance -ne -1 ] && \
-			[ $RESULT_check_path -ne -1 ] && \
-			[ $RESULT_check_port -ne -1 ] && \
-			[ $RESULT_check_backup -ne -1 ] && \
-			[ $RESULT_check_restore -ne -1 ] && \
-			[ $RESULT_change_url -ne -1 ] && \
-			[ $RESULT_action_config_panel -ne -1 ]
-		then level[7]=2
-		else level[7]=0
-		fi
-	fi
+    # Evaluate the eighth level
+    # This happens in the linter
+    # When writing this, defined as app being maintained + long term quality (=
+    # certain amount of time level 5+ in the last year)
+    level[8]=0
+    if [ $RESULT_linter_level_8 -ge 1 ]
+    then
+        level[8]=2
+    fi
 
-	# Evaluate the eighth level
-	# -> High quality package.
-	# The level 8 can be validated only by the official list of app.
-	level[8]=0
-	# Define the level 8 only if we're working on a repository. Otherwise, we can't assert that this is the correct app.
-	if echo "$app_arg" | grep --extended-regexp --quiet "https?:\/\/"
-	then
-		# Get the last version of the app list
-		wget -nv https://raw.githubusercontent.com/YunoHost/apps/master/apps.json  -O "$script_dir/list.json"
+    # Evaluate the ninth level
+    # -> High quality package.
+    # The level 9 can be validated only by the official list of app.
+    level[9]=0
+    # Define the level 8 only if we're working on a repository. Otherwise, we can't assert that this is the correct app.
+    if echo "$app_arg" | grep --extended-regexp --quiet "https?:\/\/"
+    then
+        # Get the name of the app from the repository name.
+        app_name="$(basename --multiple --suffix=_ynh "$app_arg")"
 
-		# Get the name of the app from the repository name.
-		app_name="$(basename --multiple --suffix=_ynh "$app_arg")"
-		# Extract the app part from the json file. From the name line to the next "}" line.
-		json_app_part=$(sed -n "/\"$app_name\"/,/}/p" "$script_dir/list.json")
-		if [ -z "$json_app_part" ]
-		then
-			echo "$app_name for the repository $app_arg can't be found in the app list."
-		else
-			# Get high_quality tag for this app.
-			high_quality=$(echo "$json_app_part" | grep high_quality | awk '{print $2}')
-			if [ "${high_quality//,/}" == "true" ]
-			then
-				# This app is tag as a High Quality app.
-				level[8]=2
-			fi
-			# Get maintained tag for this app.
-			maintained=$(echo "$json_app_part" | grep maintained | awk '{print $2}')
-			# If maintained isn't empty or at true. This app can't be tag as a High Quality app.
-			# An app tagged as 'request_help' can still be High Quality, but not an app tagged as 'request_adoption'
-			if [ "${maintained//,/}" != "true" ] && [ "${maintained//[,\"]/}" != "request_help" ] && [ -n "$maintained" ]
-			then
-				if [ ${level[8]} -ge 1 ]
-				then
-					echo "As this app isn't maintained, it can't reach the level 8."
-				fi
-				level[8]=0
-			fi
-		fi
-	fi
-
-	# Evaluate the ninth level
-	# -> Not available yet...
-	level[9]=0
+        # Get the last version of the app list
+        list_url="https://raw.githubusercontent.com/YunoHost/apps/master/apps.json"
+        if curl $list_url | jq ".$app_name.high_quality" | grep -q "true"
+        then
+            level[9]=2
+        fi
+    fi
 
 	# Evaluate the tenth level
 	# -> Not available yet...
@@ -846,7 +813,7 @@ TEST_RESULTS () {
 	fi
 
 	# If the package linter returned a critical error, the app is flagged as broken / level 0
-	if [ $RESULT_linter -eq -2 ]
+	if [ $RESULT_linter -le -2 ]
 	then
 		ECHO_FORMAT "The package linter reported a critical failure ! App is considered broken !\n" "red" "bold"
 		global_level=0
@@ -925,6 +892,9 @@ initialize_values() {
 	RESULT_witness=0
 	RESULT_alias_traversal=0
 	RESULT_linter=0
+    RESULT_linter_level_6=0
+    RESULT_linter_level_7=0
+    RESULT_linter_level_8=0
 	RESULT_global_setup=0
 	RESULT_global_remove=0
 	RESULT_check_sub_dir=0

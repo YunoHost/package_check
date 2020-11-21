@@ -5,7 +5,7 @@
 4  Backup and restore support
 5  Clean
 6  Open to contributions from the community
-7  Successfully pass functional tests
-8  High quality app
-9  Respect higher guidelines
+7  Successfully pass all functional tests and linter tests
+8  Maintained and long-term good quality
+9  High quality app
 10 Package assessed as perfect
