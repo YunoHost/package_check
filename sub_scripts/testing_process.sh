@@ -342,9 +342,9 @@ CHECK_URL () {
 					fi
 
 					# Print the first 20 lines of the page
-					ECHO_FORMAT "Extract of the page:\n" "white"
+					ECHO_FORMAT "Extract of the page:\n" "white" >> "$test_result"
 					echo -en "\e[37m"	# Write in 'light grey'
-					lynx -dump -force_html "$script_dir/url_output" | head --lines 20 | tee --append "$test_result"
+					lynx -dump -force_html "$script_dir/url_output" | head --lines 20 >> "$test_result"
 					echo -e "\e[0m"
 
 					if [ $show_resources -eq 1 ]
