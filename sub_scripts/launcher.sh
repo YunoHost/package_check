@@ -295,23 +295,6 @@ $(cat "$script_dir/sub_scripts/Build_lxc.log")"
 	# Count the number of lines of the current yunohost log file.
 	COPY_LOG 1
 
-    # Wait for apt to be available before the test.
-    apt_lock=0
-    for try in `seq 1 17`
-    do
-            # Check if /var/lib/dpkg/lock is used by another process
-            if sudo lxc-attach -n $lxc_name -- lsof /var/lib/dpkg/lock > /dev/null
-            then
-                echo "apt is already in use..."
-                apt_lock=1
-                # Sleep an exponential time at each round
-                sleep $(( try * try ))
-            fi
-    done
-    if [ $apt_lock -eq 1 ]; then
-        echo "apt has released its lock."
-    fi
-
 	# Copy the package into the container.
 	rsync -rq --delete "$package_path" "$lxc_name": >> "$test_result" 2>&1
 
