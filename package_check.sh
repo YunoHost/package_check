@@ -578,17 +578,16 @@ TEST_RESULTS () {
 	# Print the result for each test
 	echo -e "\n\n"
 	print_result "Package linter" $RESULT_linter
-	print_result "Installation" $RESULT_global_setup
-	print_result "Deleting" $RESULT_global_remove
-	print_result "Installation in a sub path" $RESULT_check_sub_dir
-	print_result "Deleting from a sub path" $RESULT_check_remove_sub_dir
-	print_result "Installation on the root" $RESULT_check_root
-	print_result "Deleting from root" $RESULT_check_remove_root
+	print_result "Install" $RESULT_global_setup
+	print_result "Remove" $RESULT_global_remove
+    print_result "Install (subpath)" $RESULT_check_sub_dir
+    print_result "Remove  (subpath)" $RESULT_check_remove_sub_dir
+    print_result "Install (root)" $RESULT_check_root
+    print_result "Remove  (root)" $RESULT_check_remove_root
 	print_result "Upgrade" $RESULT_check_upgrade
-	print_result "Installation in private mode" $RESULT_check_private
-	print_result "Installation in public mode" $RESULT_check_public
-	print_result "Multi-instance installations" $RESULT_check_multi_instance
-	print_result "Malformed path" $RESULT_check_path
+    print_result "Install (private mode)" $RESULT_check_private
+    print_result "Install (public mode)" $RESULT_check_public
+    print_result "Install (multi-instance)" $RESULT_check_multi_instance
 	print_result "Port already used" $RESULT_check_port
 	print_result "Backup" $RESULT_check_backup
 	print_result "Restore" $RESULT_check_restore

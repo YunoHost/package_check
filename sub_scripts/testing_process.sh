@@ -167,7 +167,7 @@ REMOVE_APP () {
 	# Make a break if auto_remove is set
 	break_before_continue
 
-	ECHO_FORMAT "\nDeleting...\n" "white" "bold" clog
+	ECHO_FORMAT "\nRemoving the app...\n" "white" "bold" clog
 
 	# Remove the application from the LXC container
 	LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --debug app remove \"$ynh_app_id\""
@@ -177,9 +177,9 @@ REMOVE_APP () {
 
 	# Print the result of the remove command
 	if [ "$yunohost_remove" -eq 0 ]; then
-		ECHO_FORMAT "Deleting successful. ($yunohost_remove)\n" "white" clog
+		ECHO_FORMAT "Remove successful. ($yunohost_remove)\n" "white" clog
 	else
-		ECHO_FORMAT "Deleting failed. ($yunohost_remove)\n" "white" clog
+		ECHO_FORMAT "Remove failed. ($yunohost_remove)\n" "white" clog
 	fi
 
 	# Check all the witness files, to verify if them still here
@@ -620,7 +620,7 @@ CHECK_SETUP () {
 			# Check if a snapshot already exist for a root install
 			if [ -z "$root_snapshot" ]
 			then
-				ECHO_FORMAT "Create a snapshot for root installation.\n" "white" clog
+				ECHO_FORMAT "Create a snapshot for root installation.\n" "white" clog >> $complete_log
 				create_temp_backup 2
 				root_snapshot=snap2
 			fi
@@ -629,7 +629,7 @@ CHECK_SETUP () {
 			if [ -z "$subpath_snapshot" ]
 			then
 				# Then create a snapshot
-				ECHO_FORMAT "Create a snapshot for sub path installation.\n" "white" clog
+				ECHO_FORMAT "Create a snapshot for sub path installation.\n" "white" clog >> $complete_log
 				create_temp_backup 1
 				subpath_snapshot=snap1
 			fi

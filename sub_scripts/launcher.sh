@@ -105,7 +105,7 @@ create_temp_backup () {
 	# Set this snapshot as the current snapshot
 	current_snapshot=snap$snap_number
 
-	stop_timer 1 >&2
+	stop_timer 1 >> $complete_log
 
 	# Restart the container, after the snapshot
 	LXC_START "true" >&2
@@ -188,7 +188,7 @@ LXC_START () {
 		local j=0
 		for j in `seq 1 5`
 		do
-			echo -n .
+			echo -n . >> "$test_result"
 			# Try to connect with ssh to check if the container is ready to work.
 			if ssh $arg_ssh -o ConnectTimeout=10 $lxc_name "exit 0" > /dev/null 2>&1; then
 				# Break the for loop if the container is ready.
