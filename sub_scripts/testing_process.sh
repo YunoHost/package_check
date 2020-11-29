@@ -122,14 +122,14 @@ STANDARD_SETUP_APP () {
                 # Check if a snapshot already exist for a root install
                 if [ -z "$root_snapshot" ]
                 then
-                    ECHO_FORMAT "\nCreate a snapshot for root installation.\n" "white" clog
+                    ECHO_FORMAT "\nCreate a snapshot for root installation.\n" "white" clog >> $complete_log
                     create_temp_backup 2
                     root_snapshot=snap2
                 fi
             fi
 		else
 			# Or uses an existing snapshot
-			ECHO_FORMAT "Uses an existing snapshot for root installation.\n" "white" clog
+			ECHO_FORMAT "Uses an existing snapshot for root installation.\n" "white" clog >> $complete_log
 			use_temp_snapshot $root_snapshot
 		fi
 
@@ -148,14 +148,14 @@ STANDARD_SETUP_APP () {
                 # Check if a snapshot already exist for a subpath (or no_url) install
                 if [ -z "$subpath_snapshot" ]
                 then
-                    ECHO_FORMAT "\nCreate a snapshot for sub path installation.\n" "white" clog
+                    ECHO_FORMAT "\nCreate a snapshot for sub path installation.\n" "white" clog >> $complete_log
                     create_temp_backup 1
                     root_snapshot=snap1
                 fi
             fi
 		else
 			# Or uses an existing snapshot
-			ECHO_FORMAT "Uses an existing snapshot for sub path installation.\n" "white" clog
+			ECHO_FORMAT "Uses an existing snapshot for sub path installation.\n" "white" clog >> $complete_log
 			use_temp_snapshot $subpath_snapshot
 		fi
 	fi
@@ -444,7 +444,9 @@ unit_test_title () {
 	# Print a title for the test
 	# $1 = Name of the test
 
-	ECHO_FORMAT "\n\n>> $1 [Test $cur_test/$all_test]\n" "white" "bold" clog
+	ECHO_FORMAT "\n\n##########################################\n" "white" "bold" clog
+	ECHO_FORMAT "# >> $1 [Test $cur_test/$all_test]\n" "white" "bold" clog
+	ECHO_FORMAT "##########################################\n" "white" "bold" clog
 
 	# Increment the value of the current test
 	cur_test=$((cur_test+1))
@@ -1894,7 +1896,7 @@ TEST_LAUNCHER () {
 
 set_witness_files () {
 	# Create files to check if the remove script does not remove them accidentally
-	echo "Create witness files..." | tee --append "$test_result"
+	echo "Create witness files..." >> "$test_result"
 
 	lxc_dir="/var/lib/lxc/$lxc_name/rootfs"
 

@@ -123,7 +123,7 @@ use_temp_snapshot () {
 	# Restore this snapshot.
 	sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$snapshot_path/$current_snapshot/rootfs/" "/var/lib/lxc/$lxc_name/rootfs/" > /dev/null 2>> "$test_result"
 
-	stop_timer 1
+	stop_timer 1 >> "$complete_log"
 
 	# Retrieve the app id in the log. To manage the app after
 	ynh_app_id=$(sudo tac "$yunohost_log" | grep --only-matching --max-count=1 "YNH_APP_INSTANCE_NAME=[^ ]*" | cut --delimiter='=' --fields=2)
@@ -176,11 +176,11 @@ LXC_START () {
 		# Start the container and log the booting process in $script_dir/lxc_boot.log
 		# Try to start only if the container is not already started
 		if ! is_lxc_running; then
-			echo -n "Start the LXC container" | tee --append "$test_result"
+			echo -n "Start the LXC container" >> "$test_result"
 			sudo lxc-start --name=$lxc_name --daemon --logfile "$script_dir/lxc_boot.log" | tee --append "$test_result" 2>&1
 			local avoid_witness=0
 		else
-			echo -n "A LXC container is already running" | tee --append "$test_result"
+			echo -n "A LXC container is already running" >> "$test_result"
 			local avoid_witness=1
 		fi
 
@@ -272,7 +272,7 @@ $(cat "$script_dir/sub_scripts/Build_lxc.log")"
 				local lxc_check_result="An error has happened with the host. Please check the configuration."
 				ECHO_FORMAT "$lxc_check_result\n" "red" "bold"
 				send_email
-				stop_timer 1
+				stop_timer 1 >> "$complete_log"
 				return 1
 			elif [ $lxc_check -eq 2 ]; then
 				local lxc_check_result="The container is broken, it will be rebuilt."
@@ -289,7 +289,7 @@ $(cat "$script_dir/sub_scripts/Build_lxc.log")"
 			fi
 		fi
 	done
-	stop_timer 1
+	stop_timer 1 >> "$complete_log"
 	start_timer
 
 	# Count the number of lines of the current yunohost log file.
@@ -323,7 +323,7 @@ $(cat "$script_dir/sub_scripts/Build_lxc.log")"
 	# Retrieve the log of the previous command and copy its content in the temporary log
 	sudo cat "/var/lib/lxc/$lxc_name/rootfs/home/pchecker/temp_yunohost-cli.log" >> "$temp_log"
 
-	stop_timer 1
+	stop_timer 1 >> "$complete_log"
 	# Return the exit code of the ssh command
 	return $returncode
 }
@@ -356,7 +356,7 @@ LXC_STOP () {
 	# Restore the snapshot.
 	echo "Restore the previous snapshot." | tee --append "$test_result"
 	sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$snapshot_path/$current_snapshot/rootfs/" "/var/lib/lxc/$lxc_name/rootfs/" > /dev/null 2>> "$test_result"
-	stop_timer 1
+	stop_timer 1 >> "$complete_log"
 }
 
 LXC_TURNOFF () {
