@@ -302,6 +302,7 @@ then
 
 		# Clone in another directory
 		git clone --quiet https://github.com/YunoHost/package_linter "$script_dir/package_linter_tmp"
+		pip3 install pyparsing six
 
 		# And replace
 		cp -a "$script_dir/package_linter_tmp/." "$script_dir/package_linter/."
@@ -310,6 +311,7 @@ then
 else
 	echo -e "\e[97mInstall Package linter.\n\e[0m"
 	git clone --quiet $git_repository "$script_dir/package_linter"
+	pip3 install pyparsing six
 fi
 
 # Update the version file

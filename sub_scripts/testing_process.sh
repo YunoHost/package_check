@@ -2003,12 +2003,12 @@ PACKAGE_LINTER () {
 	unit_test_title "Package linter..."
 
 	# Execute package linter and linter_result gets the return code of the package linter
-	"$script_dir/package_linter/package_linter.py" "$package_path" > "$temp_result"
-	"$script_dir/package_linter/package_linter.py" "$package_path" --json > "$temp_result_json"
+	"$script_dir/package_linter/package_linter.py" "$package_path" > "$script_dir/temp_linter_result.log"
+	"$script_dir/package_linter/package_linter.py" "$package_path" --json > "$script_dir/temp_linter_result.json"
 
 	# Print the results of package linter and copy these result in the complete log
-	cat "$temp_result" | tee --append "$complete_log"
-	cat "$temp_result_json" >> "$complete_log"
+	cat "$script_dir/temp_linter_result.log" | tee --append "$complete_log"
+	cat "$script_dir/temp_linter_result.json" >> "$complete_log"
 
 	RESULT_linter_level_6=0
 	RESULT_linter_level_7=0
@@ -2017,33 +2017,34 @@ PACKAGE_LINTER () {
 	# Check we qualify for level 6, 7, 8
     # Linter will have a warning called "app_in_github_org" if app ain't in the
     # yunohost-apps org...
-	if ! cat "$temp_result_json" | jq ".warning" | grep -q "app_in_github_org"
+	if ! cat "$script_dir/temp_linter_result.json" | jq ".warning" | grep -q "app_in_github_org"
 	then
 		RESULT_linter_level_6=1
     fi
-	if cat "$temp_result_json" | jq ".success" | grep -q "qualify_for_level_7"
+	if cat "$script_dir/temp_linter_result.json" | jq ".success" | grep -q "qualify_for_level_7"
 	then
 		RESULT_linter_level_7=1
     fi
-	if cat "$temp_result_json" | jq ".success" | grep -q "qualify_for_level_8"
+	if cat "$script_dir/temp_linter_result.json" | jq ".success" | grep -q "qualify_for_level_8"
 	then
 		RESULT_linter_level_8=1
     fi
 
     # If there are any critical errors, we'll force level 0
-    if [[ -z "$(cat "$temp_result_json" | jq ".critical" | grep -v "\[\]")" ]]
+    if [[ -n "$(cat "$script_dir/temp_linter_result.json" | jq ".critical" | grep -v '\[\]')" ]]
     then
         check_failed
         RESULT_linter=-2
         # If there are any regular errors, we'll cap to 4
-    elif [[ -z "$(cat "$temp_result_json" | jq ".error" | grep -v "\[\]")" ]]
+    elif [[ -n "$(cat "$script_dir/temp_linter_result.json" | jq ".error" | grep -v '\[\]')" ]]
     then	# FAil
         check_failed
         RESULT_linter=-1
         # Otherwise, test pass (we'll display a warning depending on if there are
         # any remaning warnings or not)
     else
-        if [[ -z "$(cat "$temp_result_json" | jq ".warning" | grep -v "\[\]")" ]]
+        if [[ -n "$(cat "$script_dir/temp_linter_result.json" | jq ".warning" | grep -v '\[\]')" ]]
+	then
             check_warning
             RESULT_linter=1
         else
