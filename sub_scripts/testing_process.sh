@@ -818,7 +818,7 @@ CHECK_UPGRADE () {
 		# Uses the default snapshot
 		current_snapshot=snap0
 		# Stop and restore the LXC container
-		LXC_STOP
+		LXC_STOP >> $complete_log
 	done 4< "$script_dir/upgrade_list"
 }
 
@@ -942,7 +942,7 @@ CHECK_PUBLIC_PRIVATE () {
 		break_before_continue
 
 		# Stop and restore the LXC container
-		LXC_STOP
+		LXC_STOP >> $complete_log
 	done
 }
 
@@ -1285,7 +1285,7 @@ CHECK_BACKUP_RESTORE () {
 				sudo mv -f ./archives /var/lib/lxcsnaps/$lxc_name/$current_snapshot/rootfs/home/yunohost.backup/
 
 				# Stop and restore the LXC container
-				LXC_STOP
+				LXC_STOP >> $complete_log
 
 				ECHO_FORMAT "\nRestore on a clean YunoHost system...\n" "white" "bold" clog
 			fi
@@ -1328,7 +1328,7 @@ CHECK_BACKUP_RESTORE () {
 			break_before_continue
 
 			# Stop and restore the LXC container
-			LXC_STOP
+			LXC_STOP >> $complete_log
 		done
 	done
 }
@@ -1488,7 +1488,7 @@ CHECK_CHANGE_URL () {
 		# Uses the default snapshot
 		current_snapshot=snap0
 		# Stop and restore the LXC container
-		LXC_STOP
+		LXC_STOP >> $complete_log
 	done
 }
 
@@ -1806,7 +1806,7 @@ ACTIONS_CONFIG_PANEL () {
     # Uses the default snapshot
     current_snapshot=snap0
     # Stop and restore the LXC container
-    LXC_STOP
+    LXC_STOP >> $complete_log
 }
 
 PACKAGE_LINTER () {
@@ -1875,7 +1875,7 @@ TEST_LAUNCHER () {
         current_snapshot=snap0
 
         # Stop and restore the LXC container
-        LXC_STOP
+        LXC_STOP >> $complete_log
 
         # Restore the started time for the timer
         starttime=$global_start_timer

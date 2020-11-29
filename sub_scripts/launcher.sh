@@ -317,7 +317,7 @@ LXC_STOP () {
 	start_timer
 	# Stop the LXC container
 	if is_lxc_running; then
-		echo "Stop the LXC container" | tee --append "$test_result"
+		echo "Stop the LXC container" >> "$test_result"
 		sudo lxc-stop --name=$lxc_name | tee --append "$test_result" 2>&1
 	fi
 
@@ -337,7 +337,7 @@ LXC_STOP () {
 	fi
 
 	# Restore the snapshot.
-	echo "Restore the previous snapshot." | tee --append "$test_result"
+	echo "Restore the previous snapshot." >> "$test_result"
 	sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$snapshot_path/$current_snapshot/rootfs/" "/var/lib/lxc/$lxc_name/rootfs/" > /dev/null 2>> "$test_result"
 	stop_timer 1 >> "$complete_log"
 }
