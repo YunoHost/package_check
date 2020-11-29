@@ -264,10 +264,10 @@ USER_TEST=$(cat "$(dirname "$script_dir")/package_check.sh" | grep test_user= | 
 SOUS_DOMAIN="sous.$DOMAIN"
 # echo "Le mot de passe Yunohost est \'$YUNO_PWD\'"
 echo -e "\e[1m> Ajout du sous domaine de test\e[0m" | tee -a "$LOG_BUILD_LXC"
-ssh $ARG_SSH $LXC_NAME "sudo yunohost domain add \"$SOUS_DOMAIN\" --admin-password=\"$YUNO_PWD\""
+ssh $ARG_SSH $LXC_NAME "sudo yunohost domain add \"$SOUS_DOMAIN\""
 USER_TEST_CLEAN=${USER_TEST//"_"/""}
 echo -e "\e[1m> Ajout de l'utilisateur de test\e[0m" | tee -a "$LOG_BUILD_LXC"
-ssh $ARG_SSH $LXC_NAME "sudo yunohost user create --firstname \"$USER_TEST_CLEAN\" --mail \"$USER_TEST_CLEAN@$DOMAIN\" --lastname \"$USER_TEST_CLEAN\" --password \"$YUNO_PWD\" \"$USER_TEST\" --admin-password=\"$YUNO_PWD\""
+ssh $ARG_SSH $LXC_NAME "sudo yunohost user create --firstname \"$USER_TEST_CLEAN\" --mail \"$USER_TEST_CLEAN@$DOMAIN\" --lastname \"$USER_TEST_CLEAN\" --password \"$YUNO_PWD\" \"$USER_TEST\""
 
 echo -e -e "\e[1m\n> Vérification de l'état de Yunohost\e[0m" | tee -a "$LOG_BUILD_LXC"
 ssh $ARG_SSH $LXC_NAME "sudo yunohost -v" | tee -a "$LOG_BUILD_LXC" 2>&1
