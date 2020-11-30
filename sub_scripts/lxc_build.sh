@@ -83,7 +83,7 @@ sudo apt-get update >> "$LOG_BUILD_LXC" 2>&1
 sudo apt-get install -y lxc lxctl >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Install git, curl and lynx\e[0m" | tee -a "$LOG_BUILD_LXC"
-sudo apt-get install -y git curl lynx jq python3-pip >> "$LOG_BUILD_LXC" 2>&1
+sudo apt-get install -y git curl lynx jq python3-pip boxes >> "$LOG_BUILD_LXC" 2>&1
 # For those who have disabled APT::Install-Recommends we need to manually install the following packages.
 sudo apt-get install -y debootstrap rsync bridge-utils >> "$LOG_BUILD_LXC" 2>&1
 
