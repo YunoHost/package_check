@@ -106,24 +106,24 @@ STANDARD_SETUP_APP () {
             # Make an installation
             SETUP_APP
 
-        # Create a snapshot for this installation, to be able to reuse it instead of a new installation.
-        # But only if this installation has worked fine
-        if [ $yunohost_result -eq 0 ]; then
-            # Check if a snapshot already exist for a root install
-            if [ -z "$root_snapshot" ]
-            then
-                debug "Creating a snapshot for root installation."
-                create_temp_backup 2
-                root_snapshot=snap2
+            # Create a snapshot for this installation, to be able to reuse it instead of a new installation.
+            # But only if this installation has worked fine
+            if [ $yunohost_result -eq 0 ]; then
+                # Check if a snapshot already exist for a root install
+                if [ -z "$root_snapshot" ]
+                then
+                    debug "Creating a snapshot for root installation."
+                    create_temp_backup 2
+                    root_snapshot=snap2
+                fi
             fi
-        fi
         else
             # Or uses an existing snapshot
             debug "Reusing an existing snapshot for root installation."
             use_temp_snapshot $root_snapshot
         fi
 
-    # In case of sub path install, use another snapshot
+        # In case of sub path install, use another snapshot
     else
         # Check if a snapshot already exist for this install
         if [ -z "$subpath_snapshot" ]
@@ -140,7 +140,7 @@ STANDARD_SETUP_APP () {
                     debug "Creating a snapshot for sub path installation."
                     create_temp_backup 1
                     root_snapshot=snap1
-            fi
+                fi
             fi
         else
             # Or uses an existing snapshot
@@ -223,7 +223,8 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
     yuno_portal=0
 
     # Try to access to the url in 2 times, with a final / and without
-    i=1; while [ $i -ne 3 ]
+    i=1;
+    while [ $i -ne 3 ]
     do
 
         # First time, try without final /
@@ -236,7 +237,7 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
                 local curl_check_path="${check_path:0:${#check_path}-1}"
             else
                 curl_check_path=$check_path
-        fi
+            fi
 
             # The next loop will try the second test
             i=2
@@ -251,7 +252,7 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
                 curl_check_path="$check_path/"
             else
                 curl_check_path=$check_path
-        fi
+            fi
 
             # The next loop will break the while loop
             i=3
@@ -429,7 +430,7 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
 start_test () {
 
-   title "$1 [Test $cur_test/$all_test]"
+    title "$1 [Test $cur_test/$all_test]"
 
     # Increment the value of the current test
     cur_test=$((cur_test+1))
@@ -737,7 +738,7 @@ CHECK_UPGRADE () {
             sudo mv "${package_path}_back" "$package_path"
             # And restore the arguments for the manifest
             manifest_args_mod="$update_manifest_args"
-            fi
+        fi
 
         # Check if the install had work
         if [ $yunohost_result -ne 0 ]
@@ -840,7 +841,7 @@ CHECK_PUBLIC_PRIVATE () {
                 continue
             fi
 
-        # Second, try with a sub path install
+            # Second, try with a sub path install
         elif [ $i -eq 1 ]
         then
             # Check if sub path installation worked, or if force_install_ok is setted.
@@ -1057,7 +1058,7 @@ CHECK_COMMON_ERROR () {
             local check_path=/
         fi
         replace_manifest_key "path" "$check_path"
-        fi
+    fi
 
     # Open the specified port to force the script to find another
     if [ "$install_type" = "port_already_use" ]
@@ -1069,11 +1070,11 @@ CHECK_COMMON_ERROR () {
             # Retrieve the port number
             local check_port="${port_arg:1}"
 
-        # Else, the port number is in the manifest. So the port number is set at a fixed value.
-    else
-        local check_port=6660
-        # Replace port manifest key for the test
-        replace_manifest_key "port" "$check_port"
+            # Else, the port number is in the manifest. So the port number is set at a fixed value.
+        else
+            local check_port=6660
+            # Replace port manifest key for the test
+            replace_manifest_key "port" "$check_port"
         fi
 
         # Build a service with netcat for use this port before the app.
@@ -1098,7 +1099,7 @@ CHECK_COMMON_ERROR () {
         local check_result_setup=1
     else	# Fail
         local check_result_setup=-1
-        fi
+    fi
 
     # Fill the correct variable depend on the type of test
     if [ "$install_type" = "incorrect_path" ]
@@ -1149,7 +1150,7 @@ CHECK_BACKUP_RESTORE () {
                 continue
             fi
 
-        # Second, try with a sub path install
+            # Second, try with a sub path install
         elif [ $i -eq 1 ]
         then
             # Check if sub path installation worked, or if force_install_ok is setted.
@@ -1224,11 +1225,11 @@ CHECK_BACKUP_RESTORE () {
 
                 small_title "Restore after removing the application..."
 
-            # Second, restore the whole container to remove completely the application
-        elif [ $j -eq 1 ]
-        then
-            # Uses the default snapshot
-            current_snapshot=snap0
+                # Second, restore the whole container to remove completely the application
+            elif [ $j -eq 1 ]
+            then
+                # Uses the default snapshot
+                current_snapshot=snap0
 
                 # Remove the previous residual backups
                 sudo rm -rf /var/lib/lxcsnaps/$lxc_name/$current_snapshot/rootfs/home/yunohost.backup/archives
@@ -1363,7 +1364,7 @@ CHECK_CHANGE_URL () {
                 warning "Sub path install failed, therefore this test cannot be performed..."
                 continue
             fi
-        # And with a sub path install
+            # And with a sub path install
         else
             if [ $sub_dir_install -eq 0 ]
             then
@@ -1541,7 +1542,7 @@ ACTIONS_CONFIG_PANEL () {
             fi
         else	# Fail
             RESULT_action_config_panel=-1	# Actions failed
-            fi
+        fi
 
         # Make a break if auto_remove is set
         break_before_continue
@@ -1784,8 +1785,8 @@ PACKAGE_LINTER () {
     then
         report_test_failed
         RESULT_linter=-1
-    # Otherwise, test pass (we'll display a warning depending on if there are
-    # any remaning warnings or not)
+        # Otherwise, test pass (we'll display a warning depending on if there are
+        # any remaning warnings or not)
     else
         if [[ -n "$(cat "$script_dir/temp_linter_result.json" | jq ".warning" | grep -v '\[\]')" ]]
         then
@@ -1914,7 +1915,7 @@ check_witness_files () {
         then
             error "The file $1 is missing ! Something gone wrong !"
             RESULT_witness=1
-    fi
+        fi
     }
 
     # Nginx conf
