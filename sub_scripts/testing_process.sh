@@ -280,7 +280,7 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
         debug "$test_url_details"
 
         # Analyze the http code
-        if [ "${http_code:0:1}" = "0" ] || [ "${http_code:0:1}" = "4" ] || [ "${http_code:0:1}" = "5" ]
+        if [ "${http_code:0:1}" = "0" ] || [ "${http_code:0:1}" = "4" ] || [ "${http_code:0:1}" = "5" ] || [ "${http_code:0:1}" = "6" ]
         then
             # If the http code is a 0xx 4xx or 5xx, it's an error code.
             curl_error=1
@@ -400,7 +400,7 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
         fi
     done
 
-    if [[ curl_error -ne 0 ]]
+    if [[ $curl_error -ne 0 ]]
     then
         warning "$test_url_details"
         warning "Page title: $page_title"
