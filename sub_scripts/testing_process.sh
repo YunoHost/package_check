@@ -665,6 +665,10 @@ check_success () {
 	ECHO_FORMAT "--- SUCCESS ---\n" "lgreen" "bold"
 }
 
+check_warning () {
+	ECHO_FORMAT "--- WARNING ---\n" "lyellow" "bold"
+}
+
 check_failed () {
 	ECHO_FORMAT "--- FAIL ---\n" "red" "bold"
 }
@@ -1999,29 +2003,55 @@ PACKAGE_LINTER () {
 	unit_test_title "Package linter..."
 
 	# Execute package linter and linter_result gets the return code of the package linter
-	"$script_dir/package_linter/package_linter.py" "$package_path" > "$temp_result"
-
-	# linter_result gets the return code of the package linter
-	local linter_result=$?
+	"$script_dir/package_linter/package_linter.py" "$package_path" > "$script_dir/temp_linter_result.log"
+	"$script_dir/package_linter/package_linter.py" "$package_path" --json > "$script_dir/temp_linter_result.json"
 
 	# Print the results of package linter and copy these result in the complete log
-	cat "$temp_result" | tee --append "$complete_log"
+	cat "$script_dir/temp_linter_result.log" | tee --append "$complete_log"
+	cat "$script_dir/temp_linter_result.json" >> "$complete_log"
 
-	# Check the result and print SUCCESS or FAIL
-	if [ $linter_result -eq 0 ]
-	then	# Success
-		check_success
-		RESULT_linter=1
-	else	# Fail
-		check_failed
-		RESULT_linter=-1
+	RESULT_linter_level_6=0
+	RESULT_linter_level_7=0
+	RESULT_linter_level_8=0
 
-        # If return code is 2, this is critical failure, app should be considered as broken (level 0)
-        if [ $linter_result -eq 2 ]
-        then
-            RESULT_linter=-2
+	# Check we qualify for level 6, 7, 8
+    # Linter will have a warning called "app_in_github_org" if app ain't in the
+    # yunohost-apps org...
+	if ! cat "$script_dir/temp_linter_result.json" | jq ".warning" | grep -q "app_in_github_org"
+	then
+		RESULT_linter_level_6=1
+    fi
+	if cat "$script_dir/temp_linter_result.json" | jq ".success" | grep -q "qualify_for_level_7"
+	then
+		RESULT_linter_level_7=1
+    fi
+	if cat "$script_dir/temp_linter_result.json" | jq ".success" | grep -q "qualify_for_level_8"
+	then
+		RESULT_linter_level_8=1
+    fi
+
+    # If there are any critical errors, we'll force level 0
+    if [[ -n "$(cat "$script_dir/temp_linter_result.json" | jq ".critical" | grep -v '\[\]')" ]]
+    then
+        check_failed
+        RESULT_linter=-2
+        # If there are any regular errors, we'll cap to 4
+    elif [[ -n "$(cat "$script_dir/temp_linter_result.json" | jq ".error" | grep -v '\[\]')" ]]
+    then	# FAil
+        check_failed
+        RESULT_linter=-1
+        # Otherwise, test pass (we'll display a warning depending on if there are
+        # any remaning warnings or not)
+    else
+        if [[ -n "$(cat "$script_dir/temp_linter_result.json" | jq ".warning" | grep -v '\[\]')" ]]
+	then
+            check_warning
+            RESULT_linter=1
+        else
+            check_success
+            RESULT_linter=2
         fi
-	fi
+    fi
 }
 
 TEST_LAUNCHER () {
