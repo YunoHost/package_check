@@ -394,8 +394,7 @@ then
     authorised_user="$(cat "$setup_user_file")"
     if [ "$(whoami)" != "$authorised_user" ]
     then
-        echo -e "\e[91mThis script need to be executed by the user $setup_user_file !\nThe current user is $(whoami).\e[0m"
-        clean_exit 1
+        critical "This script need to be executed by the user $setup_user_file !\nThe current user is $(whoami)."
     fi
 else
     echo -e "\e[93mUnable to define the user who authorised to use package check. Please fill the file $setup_user_file\e[0m"
@@ -436,9 +435,7 @@ then
             # If lxc's not installed and build_lxc set. Asks to build the container.
             build_lxc=2
         else
-            critical "LXC is not installed or the container $lxc_name doesn't exist."
-            critical "Use the script 'lxc_build.sh' to fix them."
-            clean_exit 1
+            critical "LXC is not installed or the container $lxc_name doesn't exist.\nUse the script 'lxc_build.sh' to fix them."
         fi
     fi
 elif [ $build_lxc -eq 1 ]
@@ -515,7 +512,6 @@ then
                 gitbranch="-b stable"
             else
                 critical "Unable to find a default branch to test (master or stable)"
-                clean_exit 1
             fi
         fi
     fi
@@ -531,7 +527,6 @@ fi
 # Check if the package directory is really here.
 if [ ! -d "$package_path" ]; then
     critical "Unable to find the directory $package_path for the package..."
-    clean_exit 1
 fi
 
 

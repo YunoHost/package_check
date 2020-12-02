@@ -57,6 +57,7 @@ function error()
 function critical()
 {
     echo "${BOLD}${RED}Critical: ${1}${NORMAL}" | tee -a "$complete_log" 2>&1
+    clean_exit 1
 }
 
 function report_test_success () {
