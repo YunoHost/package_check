@@ -1755,6 +1755,7 @@ PACKAGE_LINTER () {
     cat "$script_dir/temp_linter_result.log" | tee --append "$complete_log"
     cat "$script_dir/temp_linter_result.json" >> "$complete_log"
 
+	RESULT_linter_broken=0
     RESULT_linter_level_6=0
     RESULT_linter_level_7=0
     RESULT_linter_level_8=0
@@ -1779,7 +1780,8 @@ PACKAGE_LINTER () {
     if [[ -n "$(cat "$script_dir/temp_linter_result.json" | jq ".critical" | grep -v '\[\]')" ]]
     then
         report_test_failed
-        RESULT_linter=-2
+        RESULT_linter_broken=1
+        RESULT_linter=-1
         # If there are any regular errors, we'll cap to 4
     elif [[ -n "$(cat "$script_dir/temp_linter_result.json" | jq ".error" | grep -v '\[\]')" ]]
     then
@@ -1791,11 +1793,10 @@ PACKAGE_LINTER () {
         if [[ -n "$(cat "$script_dir/temp_linter_result.json" | jq ".warning" | grep -v '\[\]')" ]]
         then
             report_test_warning
-            RESULT_linter=1
         else
             report_test_success
-            RESULT_linter=2
         fi
+        RESULT_linter=1
     fi
 }
 
