@@ -864,7 +864,7 @@ initialize_values() {
     fi
 
     # Number of tests to proceed
-    all_test=0
+    total_number_of_test=0
 
     # Default path
     test_path=/
@@ -969,7 +969,7 @@ then
         initialize_values
 
         # Break after the first tests serie
-        if [ $all_test -ne 0 ] && [ $bash_mode -ne 1 ]; then
+        if [ $total_number_of_test -ne 0 ] && [ $bash_mode -ne 1 ]; then
             read -p "Press a key to start the next tests serie..." < /dev/tty
         fi
 
@@ -1102,7 +1102,7 @@ then
 
         count_test () {
             # Increase the number of test, if this test is set at 1.
-            test "$1" -eq 1 && all_test=$((all_test+1))
+            test "$1" -eq 1 && total_number_of_test=$((total_number_of_test+1))
         }
 
         # Get standard options
@@ -1208,7 +1208,7 @@ else
     multi_instance=1
     port_already_use=0
     change_url=0
-    all_test=$((all_test+9))
+    total_number_of_test=$((total_number_of_test+9))
 
 
     # Read each arguments and store them
@@ -1251,7 +1251,7 @@ else
     count_test () {
         # Decrease the number of test, if this test is not already removed.
         if [ $1 -eq 1 ]; then
-            all_test=$((all_test-1))
+            total_number_of_test=$((total_number_of_test-1))
             return 1
         fi
     }
@@ -1276,7 +1276,7 @@ else
         error "The manifest key for public was not found."
         setup_private=0
         setup_public=0
-        all_test=$((all_test-2))
+        total_number_of_test=$((total_number_of_test-2))
     fi
     # Remove the multi-instance test if this parameter is set at false in the manifest.
     if grep multi_instance "$package_path/manifest.json" | grep -q false

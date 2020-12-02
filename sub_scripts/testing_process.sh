@@ -179,7 +179,7 @@ REMOVE_APP () {
 VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
     # Not checking this if this ain't relevant for the current test / app
-    if [ $use_curl -ne 1 ]
+    if [ $enable_validate_that_app_can_be_accessed == "true" ]
     then
         curl_error=0
         yuno_portal=0
@@ -430,10 +430,10 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
 start_test () {
 
-    title "$1 [Test $cur_test/$all_test]"
+    title "$1 [Test $current_test_number/$total_number_of_test]"
 
     # Increment the value of the current test
-    cur_test=$((cur_test+1))
+    current_test_number=$((current_test_number+1))
 }
 
 replace_manifest_key () {
@@ -534,8 +534,6 @@ CHECK_SETUP () {
         start_test "Installation on the root"
     else
         start_test "Installation without url access"
-        # Disable the curl test
-        use_curl=0
     fi
 
     # Copy original arguments
@@ -1785,7 +1783,7 @@ TEST_LAUNCHER () {
             if [ $false_positive_error_loop -lt $max_false_positive_error_loop ]
             then
                 warning "The test will restart."
-                cur_test=$((cur_test-1))
+                current_test_number=$((current_test_number-1))
             fi
         fi
 
@@ -1937,10 +1935,13 @@ TESTING_PROCESS () {
     PRINT_YUNOHOST_VERSION
 
     # Init the value for the current test
-    cur_test=1
+    current_test_number=1
 
-    # By default, all tests will try to access the app with curl
-    use_curl=1
+    # We will chech that the app can be accessed
+    # (except if it's a no-url app)
+    [ $setup_nourl      -eq 0 ] \
+        && enable_validate_that_app_can_be_accessed="true" \
+        ||enable_validate_that_app_can_be_accessed="false"
 
     # Check the package with package linter
     [ $pkg_linter       -eq 1 ] && PACKAGE_LINTER
@@ -1970,14 +1971,14 @@ TESTING_PROCESS () {
     [ $port_already_use -eq 1 ] && TEST_LAUNCHER CHECK_COMMON_ERROR port_already_use
 
     # Try to backup then restore the app
-    [ $backup_restore   -eq 1 ] &&  TEST_LAUNCHER CHECK_BACKUP_RESTORE
+    [ $backup_restore   -eq 1 ] && TEST_LAUNCHER CHECK_BACKUP_RESTORE
 
     # Try the change_url script
-    [ $change_url       -eq 1 ] &&  TEST_LAUNCHER CHECK_CHANGE_URL
+    [ $change_url       -eq 1 ] && TEST_LAUNCHER CHECK_CHANGE_URL
 
     # Try the actions
     [ $actions          -eq 1 ] && TEST_LAUNCHER ACTIONS_CONFIG_PANEL actions
 
     # Try the config-panel
-    [ $config_panel     -eq 1 ] &&  TEST_LAUNCHER ACTIONS_CONFIG_PANEL config_panel
+    [ $config_panel     -eq 1 ] && TEST_LAUNCHER ACTIONS_CONFIG_PANEL config_panel
 }
