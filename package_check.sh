@@ -698,7 +698,7 @@ TEST_RESULTS () {
         [ "${level[8]}" == "2" ] ))
     }
 
-    pass_level8() {
+    pass_level_8() {
         # This happens in the linter
         # When writing this, defined as app being maintained + long term quality (=
         # certain amount of time level 5+ in the last year)
