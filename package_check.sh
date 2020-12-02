@@ -621,139 +621,107 @@ TEST_RESULTS () {
 	test -n "${level[9]}" || level[9]=0
 	test -n "${level[10]}" || level[10]=0
 
-	# Check if the level can be changed
-	level_can_change () {
-		# If the level is set at auto, it's waiting for a change
-		# And if it's set at 2, its value can be modified by a new result
-		if [ "${level[$1]}" == "auto" ] || [ "${level[$1]}" -eq 2 ]
-		then
-			return 0
-		fi
-		return 1
-	}
+    pass_level_1() {
+        # -> The package can be install and remove.
+        [ $RESULT_global_setup -eq 1 ] && \
+        [ $RESULT_global_remove -eq 1 ]
+    }
 
-	# Evaluate the first level
-	# -> The package can be install and remove.
-	if level_can_change 1
-	then
-		# Validated if at least one install and remove work fine
-		if	[ $RESULT_global_setup -eq 1 ] && \
-			[ $RESULT_global_remove -eq 1 ]
-		then level[1]=2
-		else level[1]=0
-		fi
-	fi
+    pass_level_2() {
+        # -> The package can be install and remove in all tested configurations.
+        # Validated if none install failed
+        [ $RESULT_check_sub_dir -ne -1 ] && \
+        [ $RESULT_check_remove_sub_dir -ne -1 ] && \
+        [ $RESULT_check_root -ne -1 ] && \
+        [ $RESULT_check_remove_root -ne -1 ] && \
+        [ $RESULT_check_private -ne -1 ] && \
+        [ $RESULT_check_public -ne -1 ] && \
+        [ $RESULT_check_multi_instance -ne -1 ]
+    }
 
-	# Evaluate the second level
-	# -> The package can be install and remove in all tested configurations.
-	if level_can_change 2
-	then
-		# Validated if none install failed
-		if 	[ $RESULT_check_sub_dir -ne -1 ] && \
-			[ $RESULT_check_remove_sub_dir -ne -1 ] && \
-			[ $RESULT_check_root -ne -1 ] && \
-			[ $RESULT_check_remove_root -ne -1 ] && \
-			[ $RESULT_check_private -ne -1 ] && \
-			[ $RESULT_check_public -ne -1 ] && \
-			[ $RESULT_check_multi_instance -ne -1 ]
-		then level[2]=2
-		else level[2]=0
-		fi
-	fi
+    pass_level_3() {
+        # -> The package can be upgraded from the same version.
+        # Validated if the upgrade is ok. Or if the upgrade has been not tested but already validated before.
+        [ $RESULT_check_upgrade -eq 1 ] || \
+        ( [ $RESULT_check_upgrade -ne -1 ] && \
+        [ "${level[3]}" == "2" ] )
+    }
 
-	# Evaluate the third level
-	# -> The package can be upgraded from the same version.
-	if level_can_change 3
-	then
-		# Validated if the upgrade is ok. Or if the upgrade has been not tested but already validated before.
-		if 	[ $RESULT_check_upgrade -eq 1 ] || \
-			( [ $RESULT_check_upgrade -ne -1 ] && \
-			[ "${level[3]}" == "2" ] )
-		then level[3]=2
-		else level[3]=0
-		fi
-	fi
+    pass_level_4() {
+        # -> The package can be backup and restore without error
+        # Validated if backup and restore are ok. Or if backup and restore have been not tested but already validated before.
+        ( [ $RESULT_check_backup -eq 1 ] && \
+        [ $RESULT_check_restore -eq 1 ] ) || \
+        ( [ $RESULT_check_backup -ne -1 ] && \
+        [ $RESULT_check_restore -ne -1 ] && \
+        [ "${level[4]}" == "2" ] )
+    }
 
-	# Evaluate the fourth level
-	# -> The package can be backup and restore without error
-	if level_can_change 4
-	then
-		# Validated if backup and restore are ok. Or if backup and restore have been not tested but already validated before.
-		if 	( [ $RESULT_check_backup -eq 1 ] && \
-			[ $RESULT_check_restore -eq 1 ] ) || \
-			( [ $RESULT_check_backup -ne -1 ] && \
-			[ $RESULT_check_restore -ne -1 ] && \
-			[ "${level[4]}" == "2" ] )
-		then level[4]=2
-		else level[4]=0
-		fi
-	fi
+    pass_level_5() {
+        # -> The package have no error with package linter
+        # -> The package does not have any alias_traversal error
+        # Validated if Linter is ok. Or if Linter has been not tested but already validated before.
+        [ $RESULT_alias_traversal -ne 1 ] && \
+        ([ $RESULT_linter -ge 1 ] || \
+        ( [ $RESULT_linter -eq 0 ] && \
+        [ "${level[5]}" == "2" ] ) )
+    }
 
-	# Evaluate the fifth level
-	# -> The package have no error with package linter
-	# -> The package does not have any alias_traversal error
-	if level_can_change 5
-	then
-		# Validated if Linter is ok. Or if Linter has been not tested but already validated before.
-		if 	[ $RESULT_linter -ge 1 ] || \
-			( [ $RESULT_linter -eq 0 ] && \
-			[ "${level[5]}" == "2" ] )
-		then level[5]=2
-		else level[5]=0
-		fi
-		if [ $RESULT_alias_traversal -eq 1 ]
-		then
-			level[5]=0
-		fi
-	fi
-
-    # Evaluate the sixth level
-    # -> The package can be backup and restore without error
-    if level_can_change 6
-    then
+    pass_level_6() {
+        # -> The package can be backup and restore without error
         # This is from the linter, tests if app is the Yunohost-apps organization
-        if [ $RESULT_linter_level_6 -eq 1 ]
-        then level[6]=2
-        else level[6]=0
-        fi
-    fi
+        [ $RESULT_linter_level_6 -eq 1 ] || \
+        ([ $RESULT_linter_level_6 -eq 0 ] && \
+        [ "${level[6]}" == "2" ] )
+    }
 
-    # Evaluate the seventh level
-    # -> None errors in all tests performed
-    if level_can_change 7
-    then
-        level[7]=0
+    pass_level_7() {
+        # -> None errors in all tests performed
         # Validated if none errors is happened.
-        if 	[ $RESULT_global_setup -ne -1 ] && \
-            [ $RESULT_global_remove -ne -1 ] && \
-            [ $RESULT_check_sub_dir -ne -1 ] && \
-            [ $RESULT_check_remove_sub_dir -ne -1 ] && \
-            [ $RESULT_check_remove_root -ne -1 ] && \
-            [ $RESULT_check_upgrade -ne -1 ] && \
-            [ $RESULT_check_private -ne -1 ] && \
-            [ $RESULT_check_public -ne -1 ] && \
-            [ $RESULT_check_multi_instance -ne -1 ] && \
-            [ $RESULT_check_path -ne -1 ] && \
-            [ $RESULT_check_port -ne -1 ] && \
-            [ $RESULT_check_backup -ne -1 ] && \
-            [ $RESULT_check_restore -ne -1 ] && \
-            [ $RESULT_change_url -ne -1 ] && \
-            [ $RESULT_action_config_panel -ne -1 ] && \
-            [ $RESULT_linter_level_7 -ge 1 ]
-        then
-            level[7]=2
-        fi
-    fi
+        [ $RESULT_global_setup -ne -1 ] && \
+        [ $RESULT_global_remove -ne -1 ] && \
+        [ $RESULT_check_sub_dir -ne -1 ] && \
+        [ $RESULT_check_remove_sub_dir -ne -1 ] && \
+        [ $RESULT_check_remove_root -ne -1 ] && \
+        [ $RESULT_check_upgrade -ne -1 ] && \
+        [ $RESULT_check_private -ne -1 ] && \
+        [ $RESULT_check_public -ne -1 ] && \
+        [ $RESULT_check_multi_instance -ne -1 ] && \
+        [ $RESULT_check_path -ne -1 ] && \
+        [ $RESULT_check_port -ne -1 ] && \
+        [ $RESULT_check_backup -ne -1 ] && \
+        [ $RESULT_check_restore -ne -1 ] && \
+        [ $RESULT_change_url -ne -1 ] && \
+        [ $RESULT_action_config_panel -ne -1 ] && \
+        ([ $RESULT_linter_level_7 -ge 1 ] ||
+        ([ $RESULT_linter_level_7 -eq 0 ] && \
+        [ "${level[8]}" == "2" ] ))
+    }
 
-    # Evaluate the eighth level
-    # This happens in the linter
-    # When writing this, defined as app being maintained + long term quality (=
-    # certain amount of time level 5+ in the last year)
-    level[8]=0
-    if [ $RESULT_linter_level_8 -ge 1 ]
-    then
-        level[8]=2
-    fi
+    pass_level8() {
+        # This happens in the linter
+        # When writing this, defined as app being maintained + long term quality (=
+        # certain amount of time level 5+ in the last year)
+        [ $RESULT_linter_level_8 -ge 1 ] || \
+        ([ $RESULT_linter_level_8 -eq 0 ] && \
+        [ "${level[8]}" == "2" ] )
+    }
+
+    # Check if the level can be changed
+    level_can_change () {
+        # If the level is set at auto, it's waiting for a change
+        # And if it's set at 2, its value can be modified by a new result
+        [ "${level[$1]}" == "auto" ] || [ "${level[$1]}" -eq 2 ]
+    }
+
+    if level_can_change 1; then pass_level_1 && level[1]=2 || level[1]=0; fi
+    if level_can_change 2; then pass_level_2 && level[2]=2 || level[2]=0; fi
+    if level_can_change 3; then pass_level_3 && level[3]=2 || level[3]=0; fi
+    if level_can_change 4; then pass_level_4 && level[4]=2 || level[4]=0; fi
+    if level_can_change 5; then pass_level_5 && level[5]=2 || level[5]=0; fi
+    if level_can_change 6; then pass_level_6 && level[6]=2 || level[6]=0; fi
+    if level_can_change 7; then pass_level_7 && level[7]=2 || level[7]=0; fi
+    if level_can_change 8; then pass_level_8 && level[8]=2 || level[8]=0; fi
 
     # Evaluate the ninth level
     # -> High quality package.
