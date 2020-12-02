@@ -783,7 +783,7 @@ TEST_RESULTS () {
 	fi
 
 	# If the package linter returned a critical error, the app is flagged as broken / level 0
-	if [ $RESULT_linter -le -2 ]
+	if [ $RESULT_linter_broken -eq 1 ]
 	then
 		ECHO_FORMAT "The package linter reported a critical failure ! App is considered broken !\n" "red" "bold"
 		global_level=0
@@ -865,6 +865,7 @@ initialize_values() {
     RESULT_linter_level_6=0
     RESULT_linter_level_7=0
     RESULT_linter_level_8=0
+    RESULT_linter_broken=0
 	RESULT_global_setup=0
 	RESULT_global_remove=0
 	RESULT_check_sub_dir=0

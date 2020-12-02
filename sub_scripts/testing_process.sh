@@ -666,7 +666,7 @@ check_success () {
 }
 
 check_warning () {
-	ECHO_FORMAT "--- WARNING ---\n" "lyellow" "bold"
+       ECHO_FORMAT "--- WARNING ---\n" "lyellow" "bold"
 }
 
 check_failed () {
@@ -2010,6 +2010,7 @@ PACKAGE_LINTER () {
 	cat "$script_dir/temp_linter_result.log" | tee --append "$complete_log"
 	cat "$script_dir/temp_linter_result.json" >> "$complete_log"
 
+	RESULT_linter_broken=0
 	RESULT_linter_level_6=0
 	RESULT_linter_level_7=0
 	RESULT_linter_level_8=0
@@ -2034,10 +2035,11 @@ PACKAGE_LINTER () {
     if [[ -n "$(cat "$script_dir/temp_linter_result.json" | jq ".critical" | grep -v '\[\]')" ]]
     then
         check_failed
-        RESULT_linter=-2
+        RESULT_linter_broken=1
+        RESULT_linter=-1
         # If there are any regular errors, we'll cap to 4
     elif [[ -n "$(cat "$script_dir/temp_linter_result.json" | jq ".error" | grep -v '\[\]')" ]]
-    then	# FAil
+    then
         check_failed
         RESULT_linter=-1
         # Otherwise, test pass (we'll display a warning depending on if there are
@@ -2049,7 +2051,7 @@ PACKAGE_LINTER () {
             RESULT_linter=1
         else
             check_success
-            RESULT_linter=2
+            RESULT_linter=1
         fi
     fi
 }
