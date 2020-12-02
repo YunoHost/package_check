@@ -767,7 +767,7 @@ TEST_RESULTS () {
 
         # Get the last version of the app list
         list_url="https://raw.githubusercontent.com/YunoHost/apps/master/apps.json"
-        if curl $list_url | jq ".$app_name.high_quality" | grep -q "true"
+        if curl --silent $list_url | jq ".[\"$app_name\"].high_quality" | grep -q "true"
         then
             level[9]=2
         fi
