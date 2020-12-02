@@ -617,7 +617,7 @@ TEST_RESULTS () {
 	test -n "${level[5]}" || level[5]=auto
 	test -n "${level[6]}" || level[6]=auto
 	test -n "${level[7]}" || level[7]=auto
-	test -n "${level[8]}" || level[8]=0
+	test -n "${level[8]}" || level[8]=auto
 	test -n "${level[9]}" || level[9]=0
 	test -n "${level[10]}" || level[10]=0
 
@@ -727,7 +727,7 @@ TEST_RESULTS () {
     # -> High quality package.
     # The level 9 can be validated only by the official list of app.
     level[9]=0
-    # Define the level 8 only if we're working on a repository. Otherwise, we can't assert that this is the correct app.
+    # Define the level 9 only if we're working on a repository. Otherwise, we can't assert that this is the correct app.
     if echo "$app_arg" | grep --extended-regexp --quiet "https?:\/\/"
     then
         # Get the name of the app from the repository name.
