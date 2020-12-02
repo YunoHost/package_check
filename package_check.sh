@@ -23,6 +23,7 @@ clean_exit () {
     rm -f "$script_dir/url_output"
     rm -f "$script_dir/curl_print"
     rm -f "$script_dir/manifest_extract"
+    rm -rf "$script_dir/tmp_context_for_tests"
 
     # Remove the application which been tested
     if [ -n "$package_path" ]; then
@@ -883,20 +884,15 @@ then
     # Remove all spaces at the beginning of the lines
     sed --in-place 's/^[ \t]*//g' "$check_process"
 
-    # Check if a string can be find in the current line
-    check_line () {
-        return $(echo "$line" | grep -q "$1")
-    }
-
     # Search a string in the partial check_process
     find_string () {
-        echo $(grep -m1 "$1" "$partial_check_process")
+        echo $(grep -m1 "$1" "$check_process_section")
     }
 
     # Extract a section found between $1 and $2 from the file $3
     extract_section () {
         # Erase the partial check_process
-        > "$partial_check_process"
+        > "$check_process_section"
         local source_file="$3"
         local extract=0
         local line=""
@@ -906,16 +902,16 @@ then
             if [ $extract -eq 1 ]
             then
                 # Check if the line is the second line to found
-                if check_line "$2"; then
+                if echo $line | grep -q "$2"; then
                     # Break the loop to finish the extract process
                     break;
                 fi
                 # Copy the line in the partial check_process
-                echo "$line" >> "$partial_check_process"
+                echo "$line" >> "$check_process_section"
             fi
 
             # Search for the first line
-            if check_line "$1"; then
+            if echo $line | grep -q "$1"; then
                 # Activate the extract process
                 extract=1
             fi
@@ -928,7 +924,7 @@ then
 
 
     # Extract the level section
-    partial_check_process=$partial1
+    check_process_section=$partial1
     extract_section "^;;; Levels" ";; " "$check_process"
 
     # Get the value associated to each level
@@ -945,7 +941,7 @@ then
 
 
     # Extract the Options section
-    partial_check_process=$partial1
+    check_process_section=$partial1
     extract_section "^;;; Options" ";; " "$check_process"
 
     # Try to find a optionnal email address to notify the maintainer
@@ -963,39 +959,30 @@ then
         # Initialize the values for this serie of tests
         initialize_values
 
+        rm -rf $script_dir/tmp_context_for_tests/
+        mkdir -p $script_dir/tmp_context_for_tests/
+
         # Break after the first tests serie
         if [ $total_number_of_test -ne 0 ] && [ $bash_mode -ne 1 ]; then
             read -p "Press a key to start the next tests serie..." < /dev/tty
         fi
 
         # Use the second file to extract the whole section of a tests serie
-        partial_check_process=$partial2
+        check_process_section=$partial2
 
         # Extract the section of the current tests serie
         extract_section "^$tests_serie" "^;;" "$check_process"
-        partial_check_process=$partial1
+        check_process_section=$partial1
 
         # Check if there a pre-install instruction for this serie
         extract_section "^; pre-install" "^;" "$partial2"
-        pre_install="$(cat "$partial_check_process")"
+        cat "$check_process_section" > ./tmp_context_for_tests/preinstall.sh.template
 
         # Parse all infos about arguments of manifest
         # Extract the manifest arguments section from the second partial file
         extract_section "^; Manifest" "^; " "$partial2"
 
-        # Initialize the arguments list
-        manifest_arguments=""
-
-        # Read each arguments and store them
-        while read line
-        do
-            # Extract each argument by removing spaces or tabulations before a parenthesis
-            add_arg="$(echo $line | sed 's/[ *|\t*](.*//')"
-            # Remove all double quotes
-            add_arg="${add_arg//\"/}"
-            # Then add this argument and follow it by &
-            manifest_arguments="${manifest_arguments}${add_arg}&"
-        done < "$partial_check_process"
+        manifest_arguments=$(cat $check_process_section | awk '{print $1}' | tr -d '"' | tr '\n' '&')
 
         # Try to find all specific arguments needed for the tests
         keep_name_arg_only () {
@@ -1056,7 +1043,7 @@ then
             add_arg="${line//\"/}"
             # Then add this argument and follow it by :
             actions_arguments="${actions_arguments}${add_arg}:"
-        done < "$partial_check_process"
+        done < "$check_process_section"
 
         # Parse all infos about arguments of config-panel.toml
         # Extract the config_panel arguments section from the second partial file
@@ -1072,7 +1059,7 @@ then
             add_arg="${line//\"/}"
             # Then add this argument and follow it by :
             config_panel_arguments="${config_panel_arguments}${add_arg}:"
-        done < "$partial_check_process"
+        done < "$check_process_section"
 
         # Parse all tests to perform
         # Extract the checks options section from the second partial file
@@ -1080,9 +1067,7 @@ then
 
         read_check_option () {
             # Find the line for the given check option
-            local line=$(find_string "^$1=")
-            # Get only the value
-            local value=$(echo "$line" | cut -d '=' -f2)
+            local value=$(find_string "^$1=" | awk -F= '{print $2}')
             # And return this value
             if [ "${value:0:1}" = "1" ]
             then
@@ -1139,9 +1124,9 @@ then
         fi
 
         # Clean the upgrade list
-        > "$script_dir/upgrade_list"
+        touch "$script_dir/tmp_context_for_tests/upgrade_list"
         # Get multiples lines for upgrade option.
-        while $(grep --quiet "^upgrade=" "$partial_check_process")
+        while $(grep --quiet "^upgrade=" "$check_process_section")
         do
             # Get the value for the first upgrade test.
             temp_upgrade=$(read_check_option upgrade)
@@ -1158,14 +1143,14 @@ then
                 line="${line##*from_commit=}"
                 # Add the upgrade to the list only if the test is set to 1
                 if [ $temp_upgrade -eq 1 ]; then
-                    echo "$line" >> "$script_dir/upgrade_list"
+                    echo "$line" >> "$script_dir/tmp_context_for_tests/upgrade_list"
                 fi
             elif [ $temp_upgrade -eq 1 ]; then
                 # Or simply 'current' for a standard upgrade.
-                echo "current" >> "$script_dir/upgrade_list"
+                echo "current" >> "$script_dir/tmp_context_for_tests/upgrade_list"
             fi
             # Remove this line from the check_process
-            sed --in-place "\|${line}$|d" "$partial_check_process"
+            sed --in-place "\|${line}$|d" "$check_process_section"
         done
 
         # Launch all tests successively
@@ -1188,7 +1173,7 @@ else
 
     manifest_extract="$script_dir/manifest_extract"
 
-    # Extract the informations from the manifest with the Bram's sly snake script.
+    # Extract the informations from the manifest with the Brams sly snake script.
     python "$script_dir/sub_scripts/manifest_parsing.py" "$package_path/manifest.json" > "$manifest_extract"
 
     # Default tests

@@ -3,13 +3,6 @@
 echo -e "Loads functions from testing_process.sh"
 
 #=================================================
-# Globals variables
-#=================================================
-
-# A complete list of backup hooks is available at /usr/share/yunohost/hooks/backup/
-backup_hooks="conf_ssowat data_home conf_ynh_firewall conf_cron"
-
-#=================================================
 
 break_before_continue () {
     # Make a break if auto_remove is set
@@ -58,23 +51,25 @@ SETUP_APP () {
     current_snapshot=snap0
 
     # Exec the pre-install instruction, if there one
-    if [ -n "$pre_install" ]
+    preinstall_script_template="$script_dir/tmp_context_for_tests/preinstall.sh.template"
+    if [ -e "$preinstall_script_template" ]
     then
         small_title "Pre installation request"
         # Start the lxc container
         LXC_START "true"
         # Copy all the instructions into a script
-        echo "$pre_install" > "$script_dir/preinstall.sh"
-        chmod +x "$script_dir/preinstall.sh"
-        # Replace variables
-        sed -i "s/\$USER/$test_user/" "$script_dir/preinstall.sh"
-        sed -i "s/\$DOMAIN/$main_domain/" "$script_dir/preinstall.sh"
-        sed -i "s/\$SUBDOMAIN/$sub_domain/" "$script_dir/preinstall.sh"
-        sed -i "s/\$PASSWORD/$yuno_pwd/" "$script_dir/preinstall.sh"
+        preinstall_script="$script_dir/tmp_context_for_tests/preinstall.sh"
+        cp "$preinstall_script_template" "$preinstall_script"
+        chmod +x "$preinstall_script"
+        # Hydrate the template with variables
+        sed -i "s/\$USER/$test_user/" "$preinstall_script"
+        sed -i "s/\$DOMAIN/$main_domain/" "$preinstall_script"  
+        sed -i "s/\$SUBDOMAIN/$sub_domain/" "$preinstall_script"
+        sed -i "s/\$PASSWORD/$yuno_pwd/" "$preinstall_script"   
         # Copy the pre-install script into the container.
-        scp -rq "$script_dir/preinstall.sh" "$lxc_name":
+        scp -rq "$preinstall_script" "$lxc_name":
         # Then execute the script to execute the pre-install commands.
-        LXC_START "./preinstall.sh >&2" | tee -a "$complete_log"
+        LXC_START "./preinstall.sh >&2"
     fi
 
     # Install the application in a LXC container
@@ -658,7 +653,7 @@ CHECK_UPGRADE () {
             # Get the specific section for this upgrade from the check_process
             extract_section "^; commit=$commit" "^;" "$check_process"
             # Get the name for this upgrade.
-            upgrade_name=$(grep "^name=" "$partial_check_process" | cut -d'=' -f2)
+            upgrade_name=$(grep "^name=" "$check_process_section" | cut -d'=' -f2)
             # Or use the commit if there's no name.
             if [ -z "$upgrade_name" ]; then
                 start_test "Upgrade from the commit $commit"
@@ -698,7 +693,7 @@ CHECK_UPGRADE () {
             # Backup the modified arguments
             update_manifest_args="$manifest_args_mod"
             # Get the arguments of the manifest for this upgrade.
-            manifest_args_mod="$(grep "^manifest_arg=" "$partial_check_process" | cut -d'=' -f2-)"
+            manifest_args_mod="$(grep "^manifest_arg=" "$check_process_section" | cut -d'=' -f2-)"
             if [ -z "$manifest_args_mod" ]; then
                 # If there's no specific arguments, use the previous one.
                 manifest_args_mod="$update_manifest_args"
@@ -764,7 +759,7 @@ CHECK_UPGRADE () {
         current_snapshot=snap0
         # Stop and restore the LXC container
         LXC_STOP >> $complete_log
-    done 4< "$script_dir/upgrade_list"
+    done 4< "$script_dir/tmp_context_for_tests/upgrade_list"
 }
 
 CHECK_PUBLIC_PRIVATE () {
@@ -1143,6 +1138,9 @@ CHECK_BACKUP_RESTORE () {
             error "Installation failed..."
         else
             small_title "Backup of the application..."
+
+            # A complete list of backup hooks is available at /usr/share/yunohost/hooks/backup/
+            backup_hooks="conf_ssowat data_home conf_ynh_firewall conf_cron"
 
             # Made a backup of the application
             run_yunohost "backup create -n Backup_test --apps $ynh_app_id --system $backup_hooks"
