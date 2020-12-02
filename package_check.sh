@@ -840,7 +840,7 @@ initialize_values() {
     RESULT_linter_level_6=0
     RESULT_linter_level_7=0
     RESULT_linter_level_8=0
-	RESULT_linter_broken=0
+    RESULT_linter_broken=0
     RESULT_global_setup=0
     RESULT_global_remove=0
     RESULT_check_sub_dir=0

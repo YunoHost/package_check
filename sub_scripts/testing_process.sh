@@ -1755,7 +1755,7 @@ PACKAGE_LINTER () {
     cat "$script_dir/temp_linter_result.log" | tee --append "$complete_log"
     cat "$script_dir/temp_linter_result.json" >> "$complete_log"
 
-	RESULT_linter_broken=0
+    RESULT_linter_broken=0
     RESULT_linter_level_6=0
     RESULT_linter_level_7=0
     RESULT_linter_level_8=0
