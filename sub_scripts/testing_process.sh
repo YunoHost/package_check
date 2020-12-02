@@ -436,17 +436,6 @@ start_test () {
     cur_test=$((cur_test+1))
 }
 
-check_manifest_key () {
-    # Check if a manifest key is set
-    # $1 = manifest key
-
-    if [ -z "${1}_arg" ]  # FIXME : How can this ever be true ? wtf ?
-    then
-        error "Unable to find a manifest key for '${1,,}' in the check_process file. therefore this test cannot be performed"
-        return 1
-    fi
-}
-
 replace_manifest_key () {
     # Replace a generic manifest key by another
     # $1 = Manifest key
@@ -547,12 +536,6 @@ CHECK_SETUP () {
         start_test "Installation without url access"
         # Disable the curl test
         use_curl=0
-    fi
-
-    # Check if the needed manifest key are set or abort the test
-    if [ "$install_type" != "no_url" ]; then
-        check_manifest_key "domain" || return
-        check_manifest_key "path" || return
     fi
 
     # Copy original arguments
@@ -797,10 +780,6 @@ CHECK_PUBLIC_PRIVATE () {
         start_test "Installation in public mode"
     fi
 
-    # Check if the needed manifest key are set or abort the test
-    check_manifest_key "public" || return
-    check_manifest_key "public_public" || return
-    check_manifest_key "public_private" || return
 
     # Check if an install have previously work
     is_install_failed || return
@@ -1021,14 +1000,8 @@ CHECK_COMMON_ERROR () {
     # $1 = install type
 
     local install_type=$1
-    if [ "$install_type" = "incorrect_path" ]; then
-        start_test "Malformed path"
-        # Check if the needed manifest key are set or abort the test
-        check_manifest_key "path" || return
-    else [ "$install_type" = "port_already_use" ]
+    if [ "$install_type" = "port_already_use" ]
         start_test "Port already used"
-        # Check if the needed manifest key are set or abort the test
-        check_manifest_key "port" || return
     fi
 
     # Check if an install have previously work
@@ -1044,13 +1017,7 @@ CHECK_COMMON_ERROR () {
     replace_manifest_key "public" "$public_public_arg"
 
     # Replace path manifest key for the test
-    if [ "$install_type" = "incorrect_path" ]; then
-        # Change the path from /path to path/
-        local wrong_path=${test_path#/}/
-        # Use this wrong path only for the arguments that will give to yunohost for installation.
-        replace_manifest_key "path" "$wrong_path"
-        local check_path=$test_path
-    else [ "$install_type" = "port_already_use" ]
+    if [ "$install_type" = "port_already_use" ]
         # Use a path according to previous succeeded installs
         if [ $sub_dir_install -eq 1 ]; then
             local check_path=$test_path
@@ -1102,10 +1069,7 @@ CHECK_COMMON_ERROR () {
     fi
 
     # Fill the correct variable depend on the type of test
-    if [ "$install_type" = "incorrect_path" ]
-    then
-        RESULT_check_path=$check_result_setup
-    elif [ "$install_type" = "port_already_use" ]; then
+    if [ "$install_type" = "port_already_use" ]; then
         RESULT_check_port=$check_result_setup
     fi
 
@@ -1283,9 +1247,6 @@ CHECK_CHANGE_URL () {
     # Try the change_url script
 
     start_test "Change URL"
-
-    # Check if the needed manifest key are set or abort the test
-    check_manifest_key "domain" || return
 
     # Check if an install have previously work
     is_install_failed || return
@@ -1492,9 +1453,6 @@ ACTIONS_CONFIG_PANEL () {
             return 1
         fi
     fi
-
-    # Check if the needed manifest key are set or abort the test
-    check_manifest_key "domain" || return
 
     # Check if an install have previously work
     is_install_failed || return
@@ -2007,9 +1965,6 @@ TESTING_PROCESS () {
 
     # Try multi-instance installations
     [ $multi_instance   -eq 1 ] && TEST_LAUNCHER CHECK_MULTI_INSTANCE
-
-    # Try to install with an malformed path
-    [ $incorrect_path   -eq 1 ] && TEST_LAUNCHER CHECK_COMMON_ERROR incorrect_path
 
     # Try to install with a port already used
     [ $port_already_use -eq 1 ] && TEST_LAUNCHER CHECK_COMMON_ERROR port_already_use

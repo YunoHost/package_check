@@ -669,7 +669,6 @@ TEST_RESULTS () {
         [ $RESULT_check_private -ne -1 ] && \
         [ $RESULT_check_public -ne -1 ] && \
         [ $RESULT_check_multi_instance -ne -1 ] && \
-        [ $RESULT_check_path -ne -1 ] && \
         [ $RESULT_check_port -ne -1 ] && \
         [ $RESULT_check_backup -ne -1 ] && \
         [ $RESULT_check_restore -ne -1 ] && \
@@ -853,7 +852,6 @@ initialize_values() {
     RESULT_check_private=0
     RESULT_check_public=0
     RESULT_check_multi_instance=0
-    RESULT_check_path=0
     RESULT_check_port=0
     RESULT_change_url=0
     RESULT_action_config_panel=0
@@ -1124,8 +1122,6 @@ then
         count_test $backup_restore
         multi_instance=$(read_check_option multi_instance)
         count_test $multi_instance
-        incorrect_path=0
-        count_test $incorrect_path
         port_already_use=$(read_check_option port_already_use)
         count_test $port_already_use
         change_url=$(read_check_option change_url)
@@ -1210,7 +1206,6 @@ else
     setup_public=1
     backup_restore=1
     multi_instance=1
-    incorrect_path=0
     port_already_use=0
     change_url=0
     all_test=$((all_test+9))
@@ -1268,7 +1263,6 @@ else
         setup_sub_dir=0
         count_test "$setup_root" || setup_root=0
         count_test "$multi_instance" || multi_instance=0
-        count_test "$incorrect_path" || incorrect_path=0
         setup_nourl=1
     fi
     if [ -z "$path_arg" ]
@@ -1276,7 +1270,6 @@ else
         error "The manifest key for path was not found."
         count_test "$setup_root" || setup_root=0
         count_test "$multi_instance" || multi_instance=0
-        count_test "$incorrect_path" || incorrect_path=0
     fi
     if [ -z "$public_arg" ]
     then
