@@ -922,24 +922,6 @@ then
     partial1="${check_process}_part1"
     partial2="${check_process}_part2"
 
-
-    # Extract the level section
-    check_process_section=$partial1
-    extract_section "^;;; Levels" ";; " "$check_process"
-
-    # Get the value associated to each level
-    # Get only the value for the level 5 from the check_process
-    # 	for i in `seq 1 10`
-    # 	do
-    # Find the line for this level
-    # 		line=$(find_string "^Level $i=")
-    line=$(find_string "^Level 5=")
-    # And get the value
-    #		level[$i]=$(echo "$line" | cut -d'=' -f2)
-    level[5]=$(echo "$line" | cut -d'=' -f2)
-    # 	done
-
-
     # Extract the Options section
     check_process_section=$partial1
     extract_section "^;;; Options" ";; " "$check_process"
