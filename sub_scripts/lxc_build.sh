@@ -253,6 +253,9 @@ ssh $ARG_SSH $LXC_NAME "systemctl -q disable apt-daily.timer" | tee -a "$LOG_BUI
 ssh $ARG_SSH $LXC_NAME "systemctl -q disable apt-daily-upgrade.timer" | tee -a "$LOG_BUILD_LXC" 2>&1
 ssh $ARG_SSH $LXC_NAME "systemctl -q disable apt-daily.service" | tee -a "$LOG_BUILD_LXC" 2>&1
 ssh $ARG_SSH $LXC_NAME "systemctl -q disable apt-daily-upgrade.service" | tee -a "$LOG_BUILD_LXC" 2>&1
+ssh $ARG_SSH $LXC_NAME "rm -f /etc/cron.daily/apt-compat" | tee -a "$LOG_BUILD_LXC" 2>&1
+ssh $ARG_SSH $LXC_NAME "cp /bin/true /usr/lib/apt/apt.systemd.daily" | tee -a "$LOG_BUILD_LXC" 2>&1
+
 echo -e "\e[1m> Post install Yunohost\e[0m" | tee -a "$LOG_BUILD_LXC"
 ssh $ARG_SSH $LXC_NAME "sudo yunohost tools postinstall --domain $DOMAIN --password $YUNO_PWD --force-password" | tee -a "$LOG_BUILD_LXC" 2>&1
 
