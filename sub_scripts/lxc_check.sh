@@ -1,41 +1,18 @@
 #!/bin/bash
-
 # Test différents aspect du conteneur pour chercher d'éventuelles erreurs.
 # Et tente de réparer si possible...
 
-# Récupère le dossier du script
-if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
+cd $(dirname $(realpath $0) | sed 's@/sub_scripts$@@g')
+source "./sub_scripts/common.sh"
 
 no_lock=0
 if [ "$1" == "--no-lock" ]; then
 	no_lock=1
 fi
 
-ARG_SSH="-t"
-# Récupère les informations depuis le fichier de conf (Ou le complète le cas échéant)
-pcheck_config="$script_dir/../config"
-# Tente de lire les informations depuis le fichier de config si il existe
-if [ -e "$pcheck_config" ]
-then
-	PLAGE_IP=$(cat "$pcheck_config" | grep PLAGE_IP= | cut -d '=' -f2)
-	DOMAIN=$(cat "$pcheck_config" | grep DOMAIN= | cut -d '=' -f2)
-	YUNO_PWD=$(cat "$pcheck_config" | grep YUNO_PWD= | cut -d '=' -f2)
-	LXC_NAME=$(cat "$pcheck_config" | grep LXC_NAME= | cut -d '=' -f2)
-	LXC_BRIDGE=$(cat "$pcheck_config" | grep LXC_BRIDGE= | cut -d '=' -f2)
-	main_iface=$(cat "$pcheck_config" | grep iface= | cut -d '=' -f2)
-fi
-
 # Exit with the correct exit code
 remove_lock () {
-	if [ $no_lock -eq 1 ]
-	then
-		sudo rm -f "$script_dir/../pcheck.lock"
-	fi
-}
-
-exit_failure () {
-	remove_lock
-	exit 1
+	rm -f "$lock_file"
 }
 
 exit_rebuild () {
@@ -53,51 +30,6 @@ exit_sane () {
 	exit 0
 }
 
-# Use the default value and set it in the config file
-replace_default_value () {
-	CONFIG_KEY=$1
-	local value=$(grep "|| $CONFIG_KEY=" "$build_script" | cut -d '=' -f2)
-	if grep -q $CONFIG_KEY= "$pcheck_config"
-	then
-		sed -i "s/$CONFIG_KEY=.*/$CONFIG_KEY=$value/" "$pcheck_config"
-	else
-		echo -e "$CONFIG_KEY=$value\n" >> "$pcheck_config"
-	fi
-	echo $value
-}
-
-# Utilise des valeurs par défaut si les variables sont vides, et génère le fichier de config
-if [ -z "$PLAGE_IP" ]; then
-	PLAGE_IP=$(replace_default_value PLAGE_IP)
-fi
-if [ -z "$DOMAIN" ]; then
-	DOMAIN=$(replace_default_value DOMAIN)
-fi
-if [ -z "$YUNO_PWD" ]; then
-	YUNO_PWD=$(replace_default_value YUNO_PWD)
-fi
-if [ -z "$LXC_NAME" ]; then
-	LXC_NAME=$(replace_default_value LXC_NAME)
-fi
-if [ -z "$LXC_BRIDGE" ]; then
-	LXC_BRIDGE=$(replace_default_value LXC_BRIDGE)
-fi
-if [ -z "$main_iface" ]; then
-	# Tente de définir l'interface réseau principale
-	main_iface=$(sudo ip route | grep default | awk '{print $5;}')	# Prend l'interface réseau défini par default
-	if [ -z $main_iface ]; then
-		echo -e "\e[91mImpossible de déterminer le nom de l'interface réseau de l'hôte.\e[0m"
-		exit_failure
-	fi
-	# Store the main iface in the config file
-	if grep -q iface= "$pcheck_config"
-	then
-		sed -i "s/iface=.*/iface=$main_iface/"
-	else
-		echo -e "# Main host iface\niface=$main_iface\n" >> "$pcheck_config"
-	fi
-fi
-
 STOP_CONTAINER () {
 	echo "Arrêt du conteneur $LXC_NAME"
 	sudo lxc-stop -n $LXC_NAME
@@ -107,16 +39,16 @@ START_NETWORK () {
 	echo "Initialisation du réseau pour le conteneur."
 	sudo ifup $LXC_BRIDGE --interfaces=/etc/network/interfaces.d/$LXC_BRIDGE
 	# Activation des règles iptables
-	sudo iptables -A FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT
-	sudo iptables -A FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT
-	sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE
+	sudo iptables -A FORWARD -i $LXC_BRIDGE -o $MAIN_NETWORK_INTERFACE -j ACCEPT
+	sudo iptables -A FORWARD -i $MAIN_NETWORK_INTERFACE -o $LXC_BRIDGE -j ACCEPT
+	sudo iptables -t nat -A POSTROUTING -s $LXC_NETWORK.0/24 -j MASQUERADE
 }
 
 STOP_NETWORK () {
 	echo "Arrêt du réseau pour le conteneur."
-	sudo iptables -D FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT > /dev/null 2>&1
-	sudo iptables -D FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT > /dev/null 2>&1
-	sudo iptables -t nat -D POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE > /dev/null 2>&1
+	sudo iptables -D FORWARD -i $LXC_BRIDGE -o $MAIN_NETWORK_INTERFACE -j ACCEPT > /dev/null 2>&1
+	sudo iptables -D FORWARD -i $MAIN_NETWORK_INTERFACE -o $LXC_BRIDGE -j ACCEPT > /dev/null 2>&1
+	sudo iptables -t nat -D POSTROUTING -s $LXC_NETWORK.0/24 -j MASQUERADE > /dev/null 2>&1
 	sudo ifdown --force $LXC_BRIDGE > /dev/null 2>&1
 }
 
@@ -278,9 +210,7 @@ LXC_NETWORK_CONFIG () {
 	fi
 }
 
-if [ $no_lock -eq 0 ]; then
-	touch "$script_dir/../pcheck.lock" # Met en place le lock de Package check
-fi
+[ $no_lock -eq 0 ] && touch "$lock_file"
 
 STOP_CONTAINER
 STOP_NETWORK
@@ -292,7 +222,7 @@ CREATE_BRIDGE () {
 	echo | sudo tee /etc/network/interfaces.d/$LXC_BRIDGE <<EOF
 auto $LXC_BRIDGE
 iface $LXC_BRIDGE inet static
-        address $PLAGE_IP.1/24
+        address $LXC_NETWORK.1/24
         bridge_ports none
         bridge_fd 0
         bridge_maxwait 0
@@ -318,7 +248,7 @@ do
 	then
 		echo -e "\e[92mLe bridge démarre correctement.\e[0m"
 		# Vérifie que le bridge obtient une adresse IP
-		if LC_ALL=C sudo ip address | grep -A 10 $LXC_BRIDGE | grep "inet " | grep -q -F "$PLAGE_IP.1"
+		if LC_ALL=C sudo ip address | grep -A 10 $LXC_BRIDGE | grep "inet " | grep -q -F "$LXC_NETWORK.1"
 		then
 			echo -e "\e[92mLe bridge obtient correctement son adresse IP.\e[0m"
 		else
@@ -353,16 +283,15 @@ do
 done
 
 # Test l'application des règles iptables
-sudo iptables -A FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT
-sudo iptables -A FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT
-sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE
+sudo iptables -A FORWARD -i $LXC_BRIDGE -o $MAIN_NETWORK_INTERFACE -j ACCEPT
+sudo iptables -A FORWARD -i $MAIN_NETWORK_INTERFACE -o $LXC_BRIDGE -j ACCEPT
+sudo iptables -t nat -A POSTROUTING -s $LXC_NETWORK.0/24 -j MASQUERADE
 
-if sudo iptables -C FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT && sudo iptables -C FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT && sudo iptables -t nat -C POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE
+if sudo iptables -C FORWARD -i $LXC_BRIDGE -o $MAIN_NETWORK_INTERFACE -j ACCEPT && sudo iptables -C FORWARD -i $MAIN_NETWORK_INTERFACE -o $LXC_BRIDGE -j ACCEPT && sudo iptables -t nat -C POSTROUTING -s $LXC_NETWORK.0/24 -j MASQUERADE
 then
 	echo -e "\e[92mLes règles iptables sont appliquées correctement.\e[0m"
 else
-	echo -e "\e[91mLes règles iptables ne sont pas appliquées correctement, vérifier la configuration du système...\e[0m"
-	exit_failure
+	critical "Les règles iptables ne sont pas appliquées correctement, vérifier la configuration du système..."
 fi
 
 # Arrête le réseau du conteneur
@@ -388,8 +317,7 @@ ping -q -c 2 yunohost.org > /dev/null 2>&1
 if [ "$?" -ne 0 ]; then	# En cas d'échec de connexion, tente de pinger un autre domaine pour être sûr
 	ping -q -c 2 framasoft.org > /dev/null 2>&1
 	if [ "$?" -ne 0 ]; then	# En cas de nouvel échec de connexion. On considère que la connexion est down...
-		echo -e "\e[91mL'hôte semble ne pas avoir accès à internet. La connexion internet est indispensable.\e[0m"
-		exit_failure
+		critical "L'hôte semble ne pas avoir accès à internet. La connexion internet est indispensable."
 	fi
 fi
 echo -e "\e[92mL'hôte dispose d'un accès à internet.\e[0m"
@@ -397,14 +325,11 @@ echo -e "\e[92mL'hôte dispose d'un accès à internet.\e[0m"
 ### Test le réseau du conteneur
 echo -e "\e[1m\n> Test de l'accès internet depuis le conteneur:\e[0m"
 CHECK_LXC_NET () {
-	sudo lxc-attach -n $LXC_NAME -- ping -q -c 2 yunohost.org > /dev/null 2>&1
-	if [ "$?" -ne 0 ]; then	# En cas d'échec de connexion, tente de pinger un autre domaine pour être sûr
-		sudo lxc-attach -n $LXC_NAME -- ping -q -c 2 framasoft.org > /dev/null 2>&1
-		if [ "$?" -ne 0 ]; then	# En cas de nouvel échec de connexion. On considère que la connexion est down...
-			return 1
-		fi
-	fi
-	return 0
+    RUN_INSIDE_LXC ping -q -c 2 yunohost.org > /dev/null 2>&1 \
+    || RUN_INSIDE_LXC ping -q -c 2 framasoft.org > /dev/null 2>&1 \
+    || return 1
+	
+    return 0
 }
 
 lxc_net=1
@@ -473,7 +398,7 @@ do
 			else
 				echo -e "\e[92mLe fichier network/interfaces du conteneur est présent.\nMais il va être réécrit par précaution.\e[0m"
 			fi
-			echo -e "auto lo\niface lo inet loopback\nauto eth0\niface eth0 inet static\n\taddress $PLAGE_IP.2/24\n\tgateway $PLAGE_IP.1" | sudo tee /var/lib/lxc/$LXC_NAME/rootfs/etc/network/interfaces
+			echo -e "auto lo\niface lo inet loopback\nauto eth0\niface eth0 inet static\n\taddress $LXC_NETWORK.2/24\n\tgateway $LXC_NETWORK.1" | sudo tee /var/lib/lxc/$LXC_NAME/rootfs/etc/network/interfaces
 		fi
 	else
 		echo -e "\e[92mLe conteneur dispose d'un accès à internet.\e[0m"
@@ -483,21 +408,17 @@ done
 
 ### Test l'accès ssh sur le conteneur
 echo -e "\e[1m\n> Test de l'accès ssh:\e[0m"
-# Check user
-if [ "$(whoami)" != "$(cat "$script_dir/setup_user")" ] && test -e "$script_dir/setup_user"; then
-	echo -e "\e[91mPour tester l'accès ssh, le script doit être exécuté avec l'utilisateur $(cat "$script_dir/setup_user") !\nL'utilisateur actuel est $(whoami).\e[0m"
-	exit_failure
-fi
+assert_we_are_the_setup_user
 
 sudo lxc-ls -f
 sleep 3
-ssh $ARG_SSH $LXC_NAME "exit 0"	# Test une connexion ssh
+ssh -t $LXC_NAME "exit 0"	# Test une connexion ssh
 if [ "$?" -eq 0 ]; then
 	echo -e "\e[92mLa connexion ssh est fonctionnelle.\e[0m"
 else
 	echo -e "\e[91mÉchec de la connexion ssh. Reconfiguration de l'accès ssh.\e[0m"
 	check_repair=1
-	ssh $ARG_SSH $LXC_NAME -v "exit 0"	# Répète la connexion ssh pour afficher l'erreur.
+	ssh -t $LXC_NAME -v "exit 0"	# Répète la connexion ssh pour afficher l'erreur.
 
 	echo "Suppression de la config ssh actuelle pour le conteneur."
 	rm -f $HOME/.ssh/$LXC_NAME $HOME/.ssh/$LXC_NAME.pub
@@ -505,23 +426,23 @@ else
 	BEGIN_LINE=$(cat $HOME/.ssh/config | grep -n "# ssh $LXC_NAME" | cut -d':' -f 1)
 	sed -i "$BEGIN_LINE,/^IdentityFile/d" $HOME/.ssh/config
 
-	ssh-keygen -f "$HOME/.ssh/known_hosts" -R $PLAGE_IP.2
+	ssh-keygen -f "$HOME/.ssh/known_hosts" -R $LXC_NETWORK.2
 
 	echo "Création de la clé ssh."
 	ssh-keygen -t dsa -f $HOME/.ssh/$LXC_NAME -P ''
 	sudo cp $HOME/.ssh/$LXC_NAME.pub /var/lib/lxc/$LXC_NAME/rootfs/home/pchecker/.ssh/authorized_keys
-	sudo lxc-attach -n $LXC_NAME -- chown pchecker: -R /home/pchecker/.ssh
+	RUN_INSIDE_LXC chown pchecker: -R /home/pchecker/.ssh
 	echo "Ajout de la config ssh."
 
 	echo | tee -a $HOME/.ssh/config <<EOF
 	# ssh $LXC_NAME
 	Host $LXC_NAME
-	Hostname $PLAGE_IP.2
+	Hostname $LXC_NETWORK.2
 	User pchecker
 	IdentityFile $HOME/.ssh/$LXC_NAME
 EOF
 	ssh-keyscan -H 10.1.4.2 >> ~/.ssh/known_hosts	# Récupère la clé publique pour l'ajouter au known_hosts
-	ssh $ARG_SSH $LXC_NAME -v "exit 0" > /dev/null	# Test à nouveau la connexion ssh
+	ssh -t $LXC_NAME -v "exit 0" > /dev/null	# Test à nouveau la connexion ssh
 	if [ "$?" -eq 0 ]; then
 		echo -e "\e[92mLa connexion ssh est retablie.\e[0m"
 	else
@@ -532,7 +453,7 @@ fi
 
 ### Vérifie que Yunohost est installé
 echo -e "\e[1m\n> Vérifie que Yunohost est installé dans le conteneur:\e[0m"
-sudo lxc-attach -n $LXC_NAME -- sudo yunohost -v
+RUN_INSIDE_LXC sudo yunohost -v
 if [ "$?" -ne 0 ]; then	# Si la commande échoue, il y a un problème avec Yunohost
 	echo -e "\e[91mYunohost semble mal installé. Il est nécessaire de détruire et de reconstruire le conteneur.\e[0m"
 	exit_rebuild

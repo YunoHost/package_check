@@ -1,16 +1,46 @@
 #!/bin/bash
 
-#=================================================
-# Grab the script directory
-#=================================================
+cd $(dirname $(realpath $0) | sed 's@/sub_scripts$@@g')
+source "./sub_scripts/common.sh"
+source "./sub_scripts/launcher.sh"
+source "./sub_scripts/testing_process.sh"
 
-if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
+complete_log="./Complete.log"
+test_series=""
+
+# Purge some log files
+> "$complete_log"
+> "./lxc_boot.log"
+
+TEST_CONTEXT="./.tmp_test_context"
+rm -rf $TEST_CONTEXT
+mkdir -p $TEST_CONTEXT
 
 #=================================================
 # Starting and checking
 #=================================================
 # Generic functions
 #=================================================
+
+print_help() {
+    cat << EOF
+
+Usage:
+package_check.sh [OPTION]... PACKAGE_TO_CHECK
+    -b, --branch=BRANCH
+        Specify a branch to check.
+    -f, --force-install-ok
+        Force remaining tests even if installation tests failed or were not selected for execution.
+    -i, --interactive
+        Wait for the user to continue before each remove.
+    -h, --help
+        Display this help
+    -l, --build-lxc
+        Install LXC and build the container if necessary.
+EOF
+exit 0
+}
+
 
 clean_exit () {
     # Exit and remove all temp files
@@ -20,10 +50,9 @@ clean_exit () {
     LXC_TURNOFF
 
     # Remove temporary files
-    rm -f "$script_dir/url_output"
-    rm -f "$script_dir/curl_print"
-    rm -f "$script_dir/manifest_extract"
-    rm -rf "$script_dir/tmp_context_for_tests"
+    rm -f "./url_output"
+    rm -f "./curl_print"
+    rm -rf "$TEST_CONTEXT"
 
     # Remove the application which been tested
     if [ -n "$package_path" ]; then
@@ -37,164 +66,104 @@ clean_exit () {
 }
 
 #=================================================
-# Check and read CLI arguments
+# Pase CLI arguments
 #=================================================
 
-echo ""
+# If no arguments provided
+# Print the help and exit
+[ "$#" -eq 0 ] && print_help
 
-# Init arguments value
 gitbranch=""
 force_install_ok=0
-interrupt=0
-notice=0
+interactive=0
 build_lxc=0
-bash_mode=0
-show_resources=0
+arguments=("$@")
+getopts_built_arg=()
 
-# If no arguments provided
-if [ "$#" -eq 0 ]
-then
-    # Print the help and exit
-    notice=1
-else
-    # Store arguments in a array to keep each argument separated
-    arguments=("$@")
-    getopts_built_arg=()
+# Read the array value per value
+for i in `seq 0 $(( ${#arguments[@]} -1 ))`
+do
+    if [[ "${arguments[$i]}" =~ "--branch=" ]]
+    then
+        getopts_built_arg+=(-b)
+        arguments[$i]=${arguments[$i]//--branch=/}
+    fi
+    # For each argument in the array, reduce to short argument for getopts
+    arguments[$i]=${arguments[$i]//--force-install-ok/-f}
+    arguments[$i]=${arguments[$i]//--interactive/-i}
+    arguments[$i]=${arguments[$i]//--help/-h}
+    arguments[$i]=${arguments[$i]//--build-lxc/-l}
+    getopts_built_arg+=("${arguments[$i]}")
+done
 
-    # Read the array value per value
-    for i in `seq 0 $(( ${#arguments[@]} -1 ))`
+# Read and parse all the arguments
+# Use a function here, to use standart arguments $@ and be able to use shift.
+parse_arg () {
+    while [ $# -ne 0 ]
     do
-        if [[ "${arguments[$i]}" =~ "--branch=" ]]
+        # If the paramater begins by -, treat it with getopts
+        if [ "${1:0:1}" == "-" ]
         then
-            getopts_built_arg+=(-b)
-            arguments[$i]=${arguments[$i]//--branch=/}
+            # Initialize the index of getopts
+            OPTIND=1
+            # Parse with getopts only if the argument begin by -
+            getopts ":b:fihlyr" parameter || true
+            case $parameter in
+                b)
+                    # --branch=branch-name
+                    gitbranch="-b $OPTARG"
+                    shift_value=2
+                    ;;
+                f)
+                    # --force-install-ok
+                    force_install_ok=1
+                    shift_value=1
+                    ;;
+                i)
+                    # --interactive
+                    interactive=1
+                    shift_value=1
+                    ;;
+                h)
+                    # --help
+                    print_help
+                    ;;
+                l)
+                    # --build-lxc
+                    build_lxc=1
+                    shift_value=1
+                    ;;
+                \?)
+                    echo "Invalid argument: -${OPTARG:-}"
+                    print_help
+                    ;;
+                :)
+                    echo "-$OPTARG parameter requires an argument."
+                    print_help
+                    ;;
+            esac
+            # Otherwise, it's not an option, it's an operand
+        else
+            path_to_package_to_test="$1"
+            shift_value=1
         fi
-        # For each argument in the array, reduce to short argument for getopts
-        arguments[$i]=${arguments[$i]//--force-install-ok/-f}
-        arguments[$i]=${arguments[$i]//--interrupt/-i}
-        arguments[$i]=${arguments[$i]//--help/-h}
-        arguments[$i]=${arguments[$i]//--build-lxc/-l}
-        arguments[$i]=${arguments[$i]//--bash-mode/-y}
-        arguments[$i]=${arguments[$i]//--show-resources/-r}
-        getopts_built_arg+=("${arguments[$i]}")
+        # Shift the parameter and its argument
+        shift $shift_value
     done
+}
 
-    # Read and parse all the arguments
-    # Use a function here, to use standart arguments $@ and be able to use shift.
-    parse_arg () {
-        while [ $# -ne 0 ]
-        do
-            # If the paramater begins by -, treat it with getopts
-            if [ "${1:0:1}" == "-" ]
-            then
-                # Initialize the index of getopts
-                OPTIND=1
-                # Parse with getopts only if the argument begin by -
-                getopts ":b:fihlyr" parameter || true
-                case $parameter in
-                    b)
-                        # --branch=branch-name
-                        gitbranch="-b $OPTARG"
-                        shift_value=2
-                        ;;
-                    f)
-                        # --force-install-ok
-                        force_install_ok=1
-                        shift_value=1
-                        ;;
-                    i)
-                        # --interrupt
-                        interrupt=1
-                        shift_value=1
-                        ;;
-                    h)
-                        # --help
-                        notice=1
-                        shift_value=1
-                        ;;
-                    l)
-                        # --build-lxc
-                        build_lxc=1
-                        shift_value=1
-                        ;;
-                    y)
-                        # --bash-mode
-                        bash_mode=1
-                        shift_value=1
-                        ;;
-                    r)
-                        # --show-resources
-                        show_resources=1
-                        shift_value=1
-                        ;;
-                    \?)
-                        echo "Invalid argument: -${OPTARG:-}"
-                        notice=1
-                        shift_value=1
-                        ;;
-                    :)
-                        echo "-$OPTARG parameter requires an argument."
-                        notice=1
-                        shift_value=1
-                        ;;
-                esac
-                # Otherwise, it's not an option, it's an operand
-            else
-                app_arg="$1"
-                shift_value=1
-            fi
-            # Shift the parameter and its argument
-            shift $shift_value
-        done
-    }
-
-    # Call parse_arg and pass the modified list of args as a array of arguments.
-    parse_arg "${getopts_built_arg[@]}"
-fi
-
-# Prevent a conflict between --interrupt and --bash-mode
-if [ $interrupt -eq 1 ] && [ $bash_mode -eq 1 ]
-then
-    echo "You can't use --interrupt and --bash-mode together !"
-    notice=1
-fi
-
-# Print help
-if [ $notice -eq 1 ]
-then
-    cat << EOF
-
-Usage:
-package_check.sh [OPTION]... PACKAGE_TO_CHECK
-    -b, --branch=BRANCH
-        Specify a branch to check.
-    -f, --force-install-ok
-        Force remaining tests even if installation tests failed or were not selected for execution.
-    -i, --interrupt
-        Force auto_remove value, break before each remove.
-    -h, --help
-        Display this notice.
-    -l, --build-lxc
-        Install LXC and build the container if necessary.
-    -y, --bash-mode
-Do not ask for continue check. Ignore auto_remove.
-    -r, --show-resources
-        Show the unavailable resources when accessing the url.
-EOF
-exit 0
-fi
+# Call parse_arg and pass the modified list of args as a array of arguments.
+parse_arg "${getopts_built_arg[@]}"
 
 #=================================================
 # Check if the lock file exist
 #=================================================
 
-lock_file="$script_dir/pcheck.lock"
-
 if test -e "$lock_file"
 then
     # If the lock file exist
     echo "The lock file $lock_file is present. Package check would not continue."
-    if [ $bash_mode -ne 1 ]; then
+    if [ $interactive -eq 1 ]; then
         echo -n "Do you want to continue anyway? (y/n) :"
         read answer
     fi
@@ -211,244 +180,28 @@ fi
 echo "start:$(date +%s):$$" > "$lock_file"
 
 #=================================================
-# Check the internet connectivity
+# Various logistic checks and upgrades...
 #=================================================
 
-# Try to ping yunohost.org
-ping -q -c 2 yunohost.org > /dev/null 2>&1
-if [ "$?" -ne 0 ]; then
-    # If fail, try to ping another domain
-    ping -q -c 2 framasoft.org > /dev/null 2>&1
-    if [ "$?" -ne 0 ]; then
-        # If ping failed twice, it's seems the internet connection is down.
-        echo "\e[91mUnable to connect to internet.\e[0m"
-
-        # Remove the lock file
-        rm -f "$lock_file"
-        # And exit
-        exit 1
-    fi
-fi
-
-#=================================================
-# Upgrade Package check
-#=================================================
-
-git_repository=https://github.com/YunoHost/package_check
-version_file="$script_dir/pcheck_version"
-
-check_version="$(git ls-remote $git_repository | cut -f 1 | head -n1)"
-
-# If the version file exist, check for an upgrade
-if [ -e "$version_file" ]
-then
-    # Check if the last commit on the repository match with the current version
-    if [ "$check_version" != "$(cat "$version_file")" ]
-    then
-        # If the versions don't matches. Do an upgrade
-        echo -e "\e[97m\e[1mUpgrade Package check...\n\e[0m"
-
-        # Build the upgrade script
-        cat > "$script_dir/upgrade_script.sh" << EOF
-
-#!/bin/bash
-# Clone in another directory
-git clone --quiet $git_repository "$script_dir/upgrade"
-cp -a "$script_dir/upgrade/." "$script_dir/."
-sudo rm -r "$script_dir/upgrade"
-# Update the version file
-echo "$check_version" > "$version_file"
-rm "$script_dir/pcheck.lock"
-# Execute package check by replacement of this process
-exec "$script_dir/package_check.sh" "${arguments[@]}"
-EOF
-
-# Give the execution right
-chmod +x "$script_dir/upgrade_script.sh"
-
-# Temporary upgrade fix
-# Check if lynx is already installed.
-if [ ! -e "$(which lynx)" ]
-then
-    sudo apt-get install -y lynx
-fi
-
-# Start the upgrade script by replacement of this process
-exec "$script_dir/upgrade_script.sh"
-    fi
-fi
-
-# Update the version file
-echo "$check_version" > "$version_file"
-
-#=================================================
-# Upgrade Package linter
-#=================================================
-
-git_repository=https://github.com/YunoHost/package_linter
-version_file="$script_dir/plinter_version"
-
-check_version="$(git ls-remote $git_repository | cut -f 1 | head -n1)"
-
-# If the version file exist, check for an upgrade
-if [ -e "$version_file" ]
-then
-    # Check if the last commit on the repository match with the current version
-    if [ "$check_version" != "$(cat "$version_file")" ]
-    then
-        # If the versions don't matches. Do an upgrade
-        echo -e "\e[97m\e[1mUpgrade Package linter...\n\e[0m"
-
-        # Clone in another directory
-        git clone --quiet https://github.com/YunoHost/package_linter "$script_dir/package_linter_tmp"
-        pip3 install pyparsing six
-
-        # And replace
-        cp -a "$script_dir/package_linter_tmp/." "$script_dir/package_linter/."
-        sudo rm -r "$script_dir/package_linter_tmp"
-    fi
-else
-    echo -e "\e[97mInstall Package linter.\n\e[0m"
-    git clone --quiet $git_repository "$script_dir/package_linter"
-    pip3 install pyparsing six
-fi
-
-# Update the version file
-echo "$check_version" > "$version_file"
-
-#=================================================
-# Get variables from the config file
-#=================================================
-
-pcheck_config="$script_dir/config"
-build_script="$script_dir/sub_scripts/lxc_build.sh"
-
-if [ -e "$pcheck_config" ]
-then
-    # Read the config file if it exists
-    ip_range=$(grep PLAGE_IP= "$pcheck_config" | cut -d '=' -f2)
-    main_domain=$(grep DOMAIN= "$pcheck_config" | cut -d '=' -f2)
-    yuno_pwd=$(grep YUNO_PWD= "$pcheck_config" | cut -d '=' -f2)
-    lxc_name=$(grep LXC_NAME= "$pcheck_config" | cut -d '=' -f2)
-    lxc_bridge=$(grep LXC_BRIDGE= "$pcheck_config" | cut -d '=' -f2)
-    main_iface=$(grep iface= "$pcheck_config" | cut -d '=' -f2)
-fi
-
-# Use the default value and set it in the config file
-replace_default_value () {
-    CONFIG_KEY=$1
-    local value=$(grep "|| $CONFIG_KEY=" "$build_script" | cut -d '=' -f2)
-    if grep -q $CONFIG_KEY= "$pcheck_config"
-    then
-        sed -i "s/$CONFIG_KEY=.*/$CONFIG_KEY=$value/" "$pcheck_config"
-    else
-        echo -e "$CONFIG_KEY=$value\n" >> "$pcheck_config"
-    fi
-    echo $value
-}
-# Use default value from the build script if needed
-if [ -z "$ip_range" ]; then
-    ip_range=$(replace_default_value PLAGE_IP)
-fi
-if [ -z "$main_domain" ]; then
-    main_domain=$(replace_default_value DOMAIN)
-fi
-if [ -z "$yuno_pwd" ]; then
-    yuno_pwd=$(replace_default_value YUNO_PWD)
-fi
-if [ -z "$lxc_name" ]; then
-    lxc_name=$(replace_default_value LXC_NAME)
-fi
-if [ -z "$lxc_bridge" ]; then
-    lxc_bridge=$(replace_default_value LXC_BRIDGE)
-fi
-
-if [ -z "$main_iface" ]; then
-    # Try to determine the main iface
-    main_iface=$(sudo ip route | grep default | awk '{print $5;}')
-    if [ -z $main_iface ]
-    then
-        echo -e "\e[91mUnable to find the name of the main iface.\e[0m"
-
-        # Remove the lock file
-        rm -f "$lock_file"
-        # And exit
-        exit 1
-    fi
-    # Store the main iface in the config file
-    if grep -q iface= "$pcheck_config"
-    then
-        sed -i "s/iface=.*/iface=$main_iface/"
-    else
-        echo -e "# Main host iface\niface=$main_iface\n" >> "$pcheck_config"
-    fi
-fi
-
-#=================================================
-# Check the user who try to execute this script
-#=================================================
-
-setup_user_file="$script_dir/sub_scripts/setup_user"
-if [ -e "$setup_user_file" ]
-then
-    # Compare the current user and the user stored in $setup_user_file
-    authorised_user="$(cat "$setup_user_file")"
-    if [ "$(whoami)" != "$authorised_user" ]
-    then
-        critical "This script need to be executed by the user $setup_user_file !\nThe current user is $(whoami)."
-    fi
-else
-    echo -e "\e[93mUnable to define the user who authorised to use package check. Please fill the file $setup_user_file\e[0m"
-fi
-
-#=================================================
-# Define globals variables
-#=================================================
-
-# Complete result log. Complete log of YunoHost
-complete_log="$script_dir/Complete.log"
-# Real YunoHost log
-yunohost_log="/var/lib/lxc/$lxc_name/rootfs/var/log/yunohost/yunohost-cli.log"
-
-sub_domain="sous.$main_domain"
-test_user=package_checker
-
-#=================================================
-# Load all functions
-#=================================================
-
-source "$script_dir/sub_scripts/common.sh"
-source "$script_dir/sub_scripts/launcher.sh"
-source "$script_dir/sub_scripts/testing_process.sh"
-
-#=================================================
-# Check LXC
-#=================================================
+assert_we_are_the_setup_user
+assert_we_are_connected_to_the_internets
+self_upgrade
+fetch_or_upgrade_package_linter
 
 # Check if lxc is already installed
 if dpkg-query -W -f '${Status}' "lxc" 2>/dev/null | grep -q "ok installed"
 then
     # If lxc is installed, check if the container is already built.
-    if ! sudo lxc-ls | grep -q "$lxc_name"
+    if ! sudo lxc-ls | grep -q "$LXC_NAME"
     then
-        if [ $build_lxc -eq 1 ]
-        then
-            # If lxc's not installed and build_lxc set. Asks to build the container.
-            build_lxc=2
-        else
-            critical "LXC is not installed or the container $lxc_name doesn't exist.\nUse the script 'lxc_build.sh' to fix them."
-        fi
+        # If lxc's not installed and build_lxc set. Asks to build the container.
+        [ $build_lxc -eq 1 ] || log_critical "LXC is not installed or the container $LXC_NAME doesn't exist.\nYou should build it with 'lxc_build.sh'."
+        ./sub_scripts/lxc_build.sh
     fi
 elif [ $build_lxc -eq 1 ]
 then
     # If lxc's not installed and build_lxc set. Asks to build the container.
-    build_lxc=2
-fi
-
-if [ $build_lxc -eq 2 ]
-then
-    # Install LXC and build the container before continue.
-    "$script_dir/sub_scripts/lxc_build.sh"
+    ./sub_scripts/lxc_build.sh
 fi
 
 # Stop and restore the LXC container. In case of previous incomplete execution.
@@ -457,87 +210,70 @@ LXC_STOP
 LXC_TURNOFF
 
 #=================================================
-# Determine if it's a CI environment
-#=================================================
-
-# By default, it's a standalone execution.
-type_exec_env=0
-if [ -e "$script_dir/../config" ]
-then
-    # CI environment
-    type_exec_env=1
-fi
-if [ -e "$script_dir/../auto_build/auto.conf" ]
-then
-    # Official CI environment
-    type_exec_env=2
-fi
-
-#=================================================
 # Pick up the package
 #=================================================
 
-echo "Pick up the package which will be tested."
+function FETCH_PACKAGE_TO_TEST() {
 
-# If the url is on a specific branch, extract the branch
-if echo "$app_arg" | grep --quiet --extended-regexp "https?:\/\/.*\/tree\/"
-then
-    gitbranch="-b ${app_arg##*/tree/}"
-    app_arg="${app_arg%%/tree/*}"
-fi
+    local path_to_package_to_test="$1"
 
-if [ -n "$gitbranch" ]
-then
-    branch_msg=" on the branch ${gitbranch##-b }"
-fi
-info "Test the package $app_arg $branch_msg"
-
-# Remove the previous package if it's still here.
-rm -rf "$script_dir"/*_check
-
-package_dir="$(basename "$app_arg")_check"
-package_path="$script_dir/$package_dir"
-
-# If the package is in a git repository
-if echo "$app_arg" | grep -Eq "https?:\/\/"
-then
-    # Force the branch master if no branch is specified.
-    if [ -z "$gitbranch" ]
+    # If the url is on a specific branch, extract the branch
+    if echo "$path_to_package_to_test" | grep -Eq "https?:\/\/.*\/tree\/"
     then
-        if git ls-remote --quiet --exit-code $app_arg master
+        gitbranch="-b ${path_to_package_to_test##*/tree/}"
+        path_to_package_to_test="${path_to_package_to_test%%/tree/*}"
+    fi
+
+    log_info "Testing the package $path_to_package_to_test"
+    [ -n "$gitbranch" ] && log_info " on the branch ${gitbranch##-b }"
+
+    package_path="$TEST_CONTEXT/app_folder"
+
+    # If the package is in a git repository
+    if echo "$path_to_package_to_test" | grep -Eq "https?:\/\/"
+    then
+        # Force the branch master if no branch is specified.
+        if [ -z "$gitbranch" ]
         then
-            gitbranch="-b master"
-        else
-            if git ls-remote --quiet --exit-code $app_arg stable
+            if git ls-remote --quiet --exit-code $path_to_package_to_test master
             then
-                gitbranch="-b stable"
+                gitbranch="-b master"
             else
-                critical "Unable to find a default branch to test (master or stable)"
+                if git ls-remote --quiet --exit-code $path_to_package_to_test stable
+                then
+                    gitbranch="-b stable"
+                else
+                    log_critical "Unable to find a default branch to test (master or stable)"
+                fi
             fi
         fi
+        # Clone the repository
+        git clone --quiet $path_to_package_to_test $gitbranch "$package_path"
+
+        # If it's a local directory
+    else
+        # Do a copy in the directory of Package check
+        cp -a "$path_to_package_to_test" "$package_path"
     fi
-    # Clone the repository
-    git clone $app_arg $gitbranch "$package_path"
 
-    # If it's a local directory
-else
-    # Do a copy in the directory of Package check
-    cp -a "$app_arg" "$package_path"
-fi
+    # Check if the package directory is really here.
+    if [ ! -d "$package_path" ]; then
+        log_critical "Unable to find the directory $package_path for the package..."
+    fi
+}
 
-# Check if the package directory is really here.
-if [ ! -d "$package_path" ]; then
-    critical "Unable to find the directory $package_path for the package..."
-fi
-
-
+FETCH_PACKAGE_TO_TEST $path_to_package_to_test
+readonly app_id="$(cat $package_path/manifest.json | jq .id | tr -d '"')"
 
 
 #=================================================
 # Determine and print the results
 #=================================================
 
-TEST_RESULTS () {
+COMPUTE_RESULTS_SUMMARY () {
+
+    local test_serie_id=$1
+    source $TEST_CONTEXT/$test_serie_id/results
 
     # Print the test result
     print_result () {
@@ -574,8 +310,6 @@ TEST_RESULTS () {
     print_result "Restore" $RESULT_check_restore
     print_result "Change URL" $RESULT_change_url
     print_result "Actions and config-panel" $RESULT_action_config_panel
-
-
 
     # Determine the level for this app
 
@@ -684,6 +418,11 @@ TEST_RESULTS () {
         [ "${level[8]}" == "2" ] )
     }
 
+    pass_level_9() {
+        list_url="https://raw.githubusercontent.com/YunoHost/apps/master/apps.json"
+        curl --silent $list_url | jq ".[\"$app_id\"].high_quality" | grep -q "true"
+    }
+
     # Check if the level can be changed
     level_can_change () {
         # If the level is set at auto, it's waiting for a change
@@ -699,27 +438,9 @@ TEST_RESULTS () {
     if level_can_change 6; then pass_level_6 && level[6]=2 || level[6]=0; fi
     if level_can_change 7; then pass_level_7 && level[7]=2 || level[7]=0; fi
     if level_can_change 8; then pass_level_8 && level[8]=2 || level[8]=0; fi
+    if level_can_change 9; then pass_level_9 && level[9]=2 || level[9]=0; fi
 
-    # Evaluate the ninth level
-    # -> High quality package.
-    # The level 9 can be validated only by the official list of app.
-    level[9]=0
-    # Define the level 9 only if we're working on a repository. Otherwise, we can't assert that this is the correct app.
-    if echo "$app_arg" | grep --extended-regexp --quiet "https?:\/\/"
-    then
-        # Get the name of the app from the repository name.
-        app_name="$(basename --multiple --suffix=_ynh "$app_arg")"
-
-        # Get the last version of the app list
-        list_url="https://raw.githubusercontent.com/YunoHost/apps/master/apps.json"
-        if curl --silent $list_url | jq ".[\"$app_name\"].high_quality" | grep -q "true"
-        then
-            level[9]=2
-        fi
-    fi
-
-    # Evaluate the tenth level
-    # -> Not available yet...
+    # Level 10 has no definition yet
     level[10]=0
 
     # Initialize the global level
@@ -755,27 +476,27 @@ TEST_RESULTS () {
     # If some witness files was missing, it's a big error ! So, the level fall immediately at 0.
     if [ $RESULT_witness -eq 1 ]
     then
-        error "Some witness files has been deleted during those tests ! It's a very bad thing !"
+        log_error "Some witness files has been deleted during those tests ! It's a very bad thing !"
         global_level=0
     fi
 
     # If the package linter returned a critical error, the app is flagged as broken / level 0
     if [ $RESULT_linter_broken -eq 1 ]
     then
-        error "The package linter reported a critical failure ! App is considered broken !"
+        log_error "The package linter reported a critical failure ! App is considered broken !"
         global_level=0
     fi
 
     if [ $RESULT_alias_traversal -eq 1 ]
     then
-        error "Issue alias_traversal was detected ! Please see here https://github.com/YunoHost/example_ynh/pull/45 to fix that."
+        log_error "Issue alias_traversal was detected ! Please see here https://github.com/YunoHost/example_ynh/pull/45 to fix that."
     fi
 
     # Then, print the levels
     # Print the global level
-    verbose_level=$(grep "^$global_level " "$script_dir/levels.list" | cut -c4-)
+    verbose_level=$(grep "^$global_level " "./levels.list" | cut -c4-)
 
-    info "Level of this application: $global_level ($verbose_level)"
+    log_info "Level of this application: $global_level ($verbose_level)"
 
     # And print the value for each level
     for i in `seq 1 10`
@@ -793,81 +514,35 @@ TEST_RESULTS () {
 #=================================================
 # Parsing and performing tests
 #=================================================
-# Check if a check_process file exist
-#=================================================
 
-check_file=1
-check_process="$package_path/check_process"
-
-if [ ! -e "$check_process" ]
-then
-    error "Unable to find a check_process file."
-    warning "Package check will attempt to automatically guess what tests to run."
-    check_file=0
-fi
-
-#=================================================
-# Set the timer for all tests
-#=================================================
-
-# Start the timer for this test
-start_timer
-# And keep this value separately
-complete_start_timer=$starttime
-
-#=================================================
-# Initialize tests
-#=================================================
-
-# Purge some log files
-> "$complete_log"
-> "$script_dir/lxc_boot.log"
-
-# Initialize LXC network
-LXC_INIT
 
 # Default values for check_process and TESTING_PROCESS
-initialize_values() {
-    # Test results
-    RESULT_witness=0
-    RESULT_alias_traversal=0
-    RESULT_linter=0
-    RESULT_linter_level_6=0
-    RESULT_linter_level_7=0
-    RESULT_linter_level_8=0
-    RESULT_linter_broken=0
-    RESULT_global_setup=0
-    RESULT_global_remove=0
-    RESULT_check_sub_dir=0
-    RESULT_check_root=0
-    RESULT_check_remove_sub_dir=0
-    RESULT_check_remove_root=0
-    RESULT_check_upgrade=0
-    RESULT_check_backup=0
-    RESULT_check_restore=0
-    RESULT_check_private=0
-    RESULT_check_public=0
-    RESULT_check_multi_instance=0
-    RESULT_check_port=0
-    RESULT_change_url=0
-    RESULT_action_config_panel=0
-
-    # auto_remove parameter
-    if [ $interrupt -eq 1 ]; then
-        auto_remove=0
-    else
-        auto_remove=1
-    fi
-
-    # Number of tests to proceed
-    total_number_of_test=0
-
-    # Default path
-    test_path=/
-
-    # CHECK_URL default values
-    curl_error=0
-    yuno_portal=0
+init_results() {
+    local test_serie_id=$1
+    cat << EOF > $TEST_CONTEXT/$test_serie_id/results
+RESULT_witness=0
+RESULT_alias_traversal=0
+RESULT_linter=0
+RESULT_linter_level_6=0
+RESULT_linter_level_7=0
+RESULT_linter_level_8=0
+RESULT_linter_broken=0
+RESULT_global_setup=0
+RESULT_global_remove=0
+RESULT_check_sub_dir=0
+RESULT_check_root=0
+RESULT_check_remove_sub_dir=0
+RESULT_check_remove_root=0
+RESULT_check_upgrade=0
+RESULT_check_backup=0
+RESULT_check_restore=0
+RESULT_check_private=0
+RESULT_check_public=0
+RESULT_check_multi_instance=0
+RESULT_check_port=0
+RESULT_change_url=0
+RESULT_action_config_panel=0
+EOF
 }
 
 #=================================================
@@ -875,181 +550,77 @@ initialize_values() {
 #=================================================
 
 # Parse the check_process only if it's exist
-if [ $check_file -eq 1 ]
-then
-    info "Parsing check_process file"
+check_process="$package_path/check_process"
+
+# Extract a section found between $1 and $2 from the file $3
+extract_check_process_section () {
+    local source_file="${3:-$check_process}"
+    local extract=0
+    local line=""
+    while read line
+    do
+        # Extract the line
+        if [ $extract -eq 1 ]
+        then
+            # Check if the line is the second line to found
+            if echo $line | grep -q "$2"; then
+                # Break the loop to finish the extract process
+                break;
+            fi
+            # Copy the line in the partial check_process
+            echo "$line"
+        fi
+
+        # Search for the first line
+        if echo $line | grep -q "$1"; then
+            # Activate the extract process
+            extract=1
+        fi
+    done < "$source_file"
+}
+
+
+parse_check_process() {
+
+    log_info "Parsing check_process file"
 
     # Remove all commented lines in the check_process
     sed --in-place '/^#/d' "$check_process"
     # Remove all spaces at the beginning of the lines
     sed --in-place 's/^[ \t]*//g' "$check_process"
 
-    # Search a string in the partial check_process
-    find_string () {
-        echo $(grep -m1 "$1" "$check_process_section")
-    }
-
-    # Extract a section found between $1 and $2 from the file $3
-    extract_section () {
-        # Erase the partial check_process
-        > "$check_process_section"
-        local source_file="$3"
-        local extract=0
-        local line=""
-        while read line
-        do
-            # Extract the line
-            if [ $extract -eq 1 ]
-            then
-                # Check if the line is the second line to found
-                if echo $line | grep -q "$2"; then
-                    # Break the loop to finish the extract process
-                    break;
-                fi
-                # Copy the line in the partial check_process
-                echo "$line" >> "$check_process_section"
-            fi
-
-            # Search for the first line
-            if echo $line | grep -q "$1"; then
-                # Activate the extract process
-                extract=1
-            fi
-        done < "$source_file"
-    }
-
-    # Use 2 partial files, to keep one for a whole tests serie
-    partial1="${check_process}_part1"
-    partial2="${check_process}_part2"
-
     # Extract the Options section
-    check_process_section=$partial1
-    extract_section "^;;; Options" ";; " "$check_process"
-
-    # Try to find a optionnal email address to notify the maintainer
-    # In this case, this email will be used instead of the email from the manifest.
-    dest="$(echo $(find_string "^Email=") | cut -d '=' -f2)"
-
-    # Try to find a optionnal option for the grade of notification
-    notification_grade="$(echo $(find_string "^Notification=") | cut -d '=' -f2)"
-
+    extract_check_process_section "^;;; Options" ";; " > $TEST_CONTEXT/check_process.options
+    extract_check_process_section "^;;; Upgrade options" ";; " > $TEST_CONTEXT/check_process.upgrade_options
 
     # Parse each tests serie
     while read <&3 tests_serie
     do
+        local test_serie_id=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 16)
+        local test_serie_dir=$TEST_CONTEXT/$test_serie_id
+        local test_serie_rawconf=$test_serie_dir/raw_test_serie_config
 
-        # Initialize the values for this serie of tests
-        initialize_values
+        test_series+="$test_serie_id "
 
-        rm -rf $script_dir/tmp_context_for_tests/
-        mkdir -p $script_dir/tmp_context_for_tests/
-
-        # Break after the first tests serie
-        if [ $total_number_of_test -ne 0 ] && [ $bash_mode -ne 1 ]; then
-            read -p "Press a key to start the next tests serie..." < /dev/tty
-        fi
-
-        # Use the second file to extract the whole section of a tests serie
-        check_process_section=$partial2
+        mkdir -p $test_serie_dir
+        init_results $test_serie_id
 
         # Extract the section of the current tests serie
-        extract_section "^$tests_serie" "^;;" "$check_process"
-        check_process_section=$partial1
+        echo "$tests_serie" > $test_serie_dir/test_serie_name
+        extract_check_process_section "^$tests_serie"   "^;;" > $test_serie_rawconf
+        extract_check_process_section "^; pre-install"  "^; "   $test_serie_rawconf > $test_serie_dir/preinstall.sh.template
+        extract_check_process_section "^; Manifest"     "^; "   $test_serie_rawconf > $test_serie_dir/check_process.manifest_infos
+        extract_check_process_section "^; Actions"      "^; "   $test_serie_rawconf > $test_serie_dir/check_process.actions_infos
+        extract_check_process_section "^; Config_panel" "^; "   $test_serie_rawconf > $test_serie_dir/check_process.configpanel_infos
+        extract_check_process_section "^; Checks"       "^; "   $test_serie_rawconf > $test_serie_dir/check_process.tests_infos
 
-        # Check if there a pre-install instruction for this serie
-        extract_section "^; pre-install" "^;" "$partial2"
-        cat "$check_process_section" > ./tmp_context_for_tests/preinstall.sh.template
+        # This is the arg list to be later fed to "yunohost app install"
+        cat $test_serie_dir/check_process.manifest_infos \
+        | awk '{print $1}' | tr -d '"' | tr '\n' '&' > $test_serie_dir/install_args
 
-        # Parse all infos about arguments of manifest
-        # Extract the manifest arguments section from the second partial file
-        extract_section "^; Manifest" "^; " "$partial2"
-
-        manifest_arguments=$(cat $check_process_section | awk '{print $1}' | tr -d '"' | tr '\n' '&')
-
-        # Try to find all specific arguments needed for the tests
-        keep_name_arg_only () {
-            # Find the line for the given argument
-            local argument=$(find_string "($1")
-            # If a line exist for this argument
-            if [ -n "$argument" ]; then
-                # Keep only the name of the argument
-                echo "$(echo "$argument" | cut -d '=' -f1)"
-            fi
-        }
-        domain_arg=$(keep_name_arg_only "DOMAIN")
-        user_arg=$(keep_name_arg_only "USER")
-        port_arg=$(keep_name_arg_only "PORT")
-        path_arg=$(keep_name_arg_only "PATH")
-        # Get the path value
-        if [ -n "$path_arg" ]
-        then
-            line="$(find_string "(PATH")"
-            # Keep only the part after the =
-            line="$(echo "$line" | grep -o "path=.* " | cut -d "=" -f2)"
-            # And remove " et spaces to keep only the path.
-            line="${line//[\" ]/}"
-            # If this path is not empty or equal to /. It become the new default path value.
-            if [ ${#line} -gt 1 ]; then
-                test_path="$line"
-            fi
-        fi
-        public_arg=$(keep_name_arg_only "PUBLIC")
-        # Find the values for public and private
-        if [ -n "$public_arg" ]
-        then
-            line=$(find_string "(PUBLIC")
-            public_public_arg=$(echo "$line" | grep -o "|public=[[:alnum:]]*" | cut -d "=" -f2)
-            public_private_arg=$(echo "$line" | grep -o "|private=[[:alnum:]]*" | cut -d "=" -f2)
-        fi
-
-        if echo "$LIGNE" | grep -q "(PATH)"; then	# Path dans le manifest
-            MANIFEST_PATH=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au path
-            parse_path=$(echo "$LIGNE" | cut -d '"' -f2)	# Lit le path du check_process
-            if [ -n "$parse_path" ]; then	# Si le path nest pas null, utilise ce path au lieu de la valeur par défaut.
-                PATH_TEST=$(echo "$LIGNE" | cut -d '"' -f2)
-            fi
-            LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire lindicateur de clé de manifest à la fin de la ligne
-        fi
-
-        # Parse all infos about arguments of actions.toml
-        # Extract the actions arguments section from the second partial file
-        extract_section "^; Actions" "^; " "$partial2"
-
-        # Initialize the arguments list
-        actions_arguments=""
-
-        # Read each arguments and store them
-        while read line
-        do
-            # Remove all double quotes
-            add_arg="${line//\"/}"
-            # Then add this argument and follow it by :
-            actions_arguments="${actions_arguments}${add_arg}:"
-        done < "$check_process_section"
-
-        # Parse all infos about arguments of config-panel.toml
-        # Extract the config_panel arguments section from the second partial file
-        extract_section "^; Config_panel" "^; " "$partial2"
-
-        # Initialize the arguments list
-        config_panel_arguments=""
-
-        # Read each arguments and store them
-        while read line
-        do
-            # Remove all double quotes
-            add_arg="${line//\"/}"
-            # Then add this argument and follow it by :
-            config_panel_arguments="${config_panel_arguments}${add_arg}:"
-        done < "$check_process_section"
-
-        # Parse all tests to perform
-        # Extract the checks options section from the second partial file
-        extract_section "^; Checks" "^; " "$partial2"
-
-        read_check_option () {
+        is_test_enabled () {
             # Find the line for the given check option
-            local value=$(find_string "^$1=" | awk -F= '{print $2}')
+            local value=$(grep -m1 -o "^$1=." "$test_serie_dir/check_process.tests_infos" | awk -F= '{print $2}')
             # And return this value
             if [ "${value:0:1}" = "1" ]
             then
@@ -1062,83 +633,84 @@ then
             fi
         }
 
-        count_test () {
-            # Increase the number of test, if this test is set at 1.
-            test "$1" -eq 1 && total_number_of_test=$((total_number_of_test+1))
-        }
+        cat << EOF > $test_serie_dir/tests_to_perform
+pkg_linter=$(is_test_enabled pkg_linter)
+setup_sub_dir=$(is_test_enabled setup_sub_dir)
+setup_root=$(is_test_enabled setup_root)
+setup_nourl=$(is_test_enabled setup_nourl)
+setup_private=$(is_test_enabled setup_private)
+setup_public=$(is_test_enabled setup_public)
+upgrade=$(is_test_enabled upgrade)
+backup_restore=$(is_test_enabled backup_restore)
+multi_instance=$(is_test_enabled multi_instance)
+port_already_use=$(is_test_enabled port_already_use)
+change_url=$(is_test_enabled change_url)
+actions=$(is_test_enabled actions)
+config_panel=$(is_test_enabled config_panel)
+EOF
 
-        # Get standard options
-        pkg_linter=$(read_check_option pkg_linter)
-        count_test $pkg_linter
-        setup_sub_dir=$(read_check_option setup_sub_dir)
-        count_test $setup_sub_dir
-        setup_root=$(read_check_option setup_root)
-        count_test $setup_root
-        setup_nourl=$(read_check_option setup_nourl)
-        count_test $setup_nourl
-        setup_private=$(read_check_option setup_private)
-        count_test $setup_private
-        setup_public=$(read_check_option setup_public)
-        count_test $setup_public
-        backup_restore=$(read_check_option backup_restore)
-        count_test $backup_restore
-        multi_instance=$(read_check_option multi_instance)
-        count_test $multi_instance
-        port_already_use=$(read_check_option port_already_use)
-        count_test $port_already_use
-        change_url=$(read_check_option change_url)
-        count_test $change_url
-        actions=$(read_check_option actions)
-        count_test $actions
-        config_panel=$(read_check_option config_panel)
-        count_test $config_panel
+    done 3<<< "$(grep "^;; " "$check_process")"
 
-        # For port_already_use, check if there is also a port number
-        if [ $port_already_use -eq 1 ]
-        then
-            line=$(find_string "^port_already_use=")
-            # If there is port number
-            if echo "$line" | grep -q "([0-9]*)"
-            then
-                # Store the port number in port_arg and prefix it by # to means that not really a manifest arg
-                port_arg="#$(echo "$line" | cut -d '(' -f2 | cut -d ')' -f1)"
-            fi
+}
+
+guess_test_configuration() {
+
+    log_error "Not check_process file found."
+    log_warning "Package check will attempt to automatically guess what tests to run."
+
+    local test_serie_id=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 16)
+    local test_serie_dir=$TEST_CONTEXT/$test_serie_id
+    
+    mkdir -p $test_serie_dir
+    init_results $test_serie_id
+
+    test_series+="$test_serie_id "
+    
+
+    python "./sub_scripts/manifest_parsing.py" "$package_path/manifest.json" \
+    | cut -d ':' -f1,2 | tr ':' '=' | tr '\n' '&' > $test_serie_dir/install_args
+
+    cat << EOF > $test_serie_dir/tests_to_perform
+pkg_linter=1
+setup_sub_dir=1
+setup_root=1
+setup_nourl=0
+setup_private=$(grep -q "is_public=" $test_serie_dir/install_args && echo 1 || echo 0)
+setup_public=$(grep -q "is_public=" $test_serie_dir/install_args && echo 1 || echo 0)0
+upgrade=1
+backup_restore=1
+multi_instance=$(grep multi_instance "$package_path/manifest.json" | grep -q true && echo 1 || echo 0)
+port_already_use=0
+change_url=0
+EOF
+}
+
+#=================================================
+
+run_all_tests() {
+
+    # Start the timer for this test
+    start_timer
+    # And keep this value separately
+    complete_start_timer=$starttime
+
+
+    LXC_INIT
+
+    for test_serie_id in $test_series
+    do
+        test_serie_dir=$TEST_CONTEXT/$test_serie_id
+
+        # Break after the first tests serie
+        if [ $interactive -eq 1 ]; then
+            read -p "Press a key to start the next tests serie..." < /dev/tty
         fi
 
-        # Clean the upgrade list
-        touch "$script_dir/tmp_context_for_tests/upgrade_list"
-        # Get multiples lines for upgrade option.
-        while $(grep --quiet "^upgrade=" "$check_process_section")
-        do
-            # Get the value for the first upgrade test.
-            temp_upgrade=$(read_check_option upgrade)
-            count_test $temp_upgrade
-            # Set upgrade to 1, but never to 0.
-            if [ "$upgrade" != "1" ]; then
-                upgrade=$temp_upgrade
-            fi
-            # Get this line to find if there an option.
-            line=$(find_string "^upgrade=")
-            if echo "$line" | grep --quiet "from_commit="
-            then
-                # Add the commit to the upgrade list
-                line="${line##*from_commit=}"
-                # Add the upgrade to the list only if the test is set to 1
-                if [ $temp_upgrade -eq 1 ]; then
-                    echo "$line" >> "$script_dir/tmp_context_for_tests/upgrade_list"
-                fi
-            elif [ $temp_upgrade -eq 1 ]; then
-                # Or simply 'current' for a standard upgrade.
-                echo "current" >> "$script_dir/tmp_context_for_tests/upgrade_list"
-            fi
-            # Remove this line from the check_process
-            sed --in-place "\|${line}$|d" "$check_process_section"
-        done
-
         # Launch all tests successively
-        TESTING_PROCESS
+        RUN_TEST_SERIE $test_serie_dir
+
         # Print the final results of the tests
-        TEST_RESULTS
+        COMPUTE_RESULTS_SUMMARY $test_serie_id
 
         # Set snap0 as the current snapshot
         current_snapshot=snap0
@@ -1146,302 +718,23 @@ then
         unset root_snapshot
         unset subpath_snapshot
 
-    done 3<<< "$(grep "^;; " "$check_process")"
+    done
 
-    # No check_process file. Try to parse the manifest.
-else
-    # Initialize the values for this serie of tests
-    initialize_values
+    # Restore the started time for the timer
+    starttime=$complete_start_timer
+    # End the timer for the test
+    stop_timer 3
 
-    manifest_extract="$script_dir/manifest_extract"
+    echo "You can find the complete log of these tests in $(realpath $complete_log)"
 
-    # Extract the informations from the manifest with the Brams sly snake script.
-    python "$script_dir/sub_scripts/manifest_parsing.py" "$package_path/manifest.json" > "$manifest_extract"
+    source "./sub_scripts/notifications.sh"
 
-    # Default tests
-    pkg_linter=1
-    setup_sub_dir=1
-    setup_root=1
-    setup_nourl=0
-    upgrade=1
-    setup_private=1
-    setup_public=1
-    backup_restore=1
-    multi_instance=1
-    port_already_use=0
-    change_url=0
-    total_number_of_test=$((total_number_of_test+9))
-
-
-    # Read each arguments and store them
-    while read line
-    do
-        # Read each argument and pick up the first value. Then replace : by =
-        add_arg="$(echo $line | cut -d ':' -f1,2 | sed s/:/=/)"
-        # Then add this argument and follow it by &
-        manifest_arguments="${manifest_arguments}${add_arg}&"
-    done < "$manifest_extract"
-
-    # Search a string in the partial check_process
-    find_string () {
-        echo $(grep "$1" "$manifest_extract")
-    }
-
-    # Try to find all specific arguments needed for the tests
-    keep_name_arg_only () {
-        # Find the line for the given argument
-        local argument=$(find_string "$1")
-        # If a line exist for this argument
-        if [ -n "$argument" ]; then
-            # Keep only the name of the argument
-            echo "$(echo "$argument" | cut -d ':' -f1)"
-        fi
-    }
-    domain_arg=$(keep_name_arg_only ":ynh.local")
-    path_arg=$(keep_name_arg_only "path:")
-    user_arg=$(keep_name_arg_only "user:\|admin:")
-    public_arg=$(keep_name_arg_only "is_public:")
-    # Find the values for public and private
-    if [ -n "$public_arg" ]
-    then
-        line=$(find_string "is_public:")
-        # Assume the first value is public and the second is private.
-        public_public_arg=$(echo "$line" | cut -d ":" -f2)
-        public_private_arg=$(echo "$line" | cut -d ":" -f3)
-    fi
-
-    count_test () {
-        # Decrease the number of test, if this test is not already removed.
-        if [ $1 -eq 1 ]; then
-            total_number_of_test=$((total_number_of_test-1))
-            return 1
-        fi
-    }
-
-    # Disable some tests if the manifest key doesn't be found
-    if [ -z "$domain_arg" ]
-    then
-        error "The manifest key for domain was not found."
-        setup_sub_dir=0
-        count_test "$setup_root" || setup_root=0
-        count_test "$multi_instance" || multi_instance=0
-        setup_nourl=1
-    fi
-    if [ -z "$path_arg" ]
-    then
-        error "The manifest key for path was not found."
-        count_test "$setup_root" || setup_root=0
-        count_test "$multi_instance" || multi_instance=0
-    fi
-    if [ -z "$public_arg" ]
-    then
-        error "The manifest key for public was not found."
-        setup_private=0
-        setup_public=0
-        total_number_of_test=$((total_number_of_test-2))
-    fi
-    # Remove the multi-instance test if this parameter is set at false in the manifest.
-    if grep multi_instance "$package_path/manifest.json" | grep -q false
-    then
-        count_test "$multi_instance" || multi_instance=0
-    fi
-
-    # Launch all tests successively
-    TESTING_PROCESS
-    # Print the final results of the tests
-    TEST_RESULTS
-fi
-
-echo "You can find the complete log of these tests in $complete_log"
-
-#=================================================
-# Ending the timer
-#=================================================
-
-# Restore the started time for the timer
-starttime=$complete_start_timer
-# End the timer for the test
-stop_timer 3
-
-#=================================================
-# Notification grade
-#=================================================
-
-notif_grade () {
-    # Check the level of notification from the check_process.
-    # Echo 1 if the grade is reached
-
-    compare_grade ()
-    {
-        if echo "$notification_grade" | grep -q "$1"; then
-            echo 1
-        else
-            echo 0
-        fi
-    }
-
-    case "$1" in
-        all)
-            # If 'all' is needed, only a grade of notification at 'all' can match
-            compare_grade "^all$"
-            ;;
-        change)
-            # If 'change' is needed, notification at 'all' or 'change' can match
-            compare_grade "^all$\|^change$"
-            ;;
-        down)
-            # If 'down' is needed, notification at 'all', 'change' or 'down' match
-            compare_grade "^all$\|^change$\|^down$"
-            ;;
-        *)
-            echo 0
-            ;;
-    esac
 }
 
-#=================================================
-# Inform of the results by XMPP and/or by mail
-#=================================================
+[ -e "$check_process" ] \
+&& parse_check_process \
+|| guess_test_configuration
 
-send_mail=0
-
-# Keep only the name of the app
-app_name=${package_dir%_ynh_check}
-
-# If package check it's in the official CI environment
-# Check the level variation
-if [ $type_exec_env -eq 2 ]
-then
-
-    # Get the job name, stored in the work_list
-    job=$(head -n1 "$script_dir/../work_list" | cut -d ';' -f 3)
-
-    # Identify the type of test, stable (0), testing (1) or unstable (2)
-    # Default stable
-    test_type=0
-    message=""
-    if echo "$job" | grep -q "(testing)"
-    then
-        message="(TESTING) "
-        test_type=1
-    elif echo "$job" | grep -q "(unstable)"
-    then
-        message="(UNSTABLE) "
-        test_type=2
-    fi
-
-    # Build the log path (and replace all space by %20 in the job name)
-    if [ -n "$job" ]; then
-        if systemctl list-units | grep --quiet jenkins
-        then
-            job_log="/job/${job// /%20}/lastBuild/console"
-        elif systemctl list-units | grep --quiet yunorunner
-        then
-            # Get the directory of YunoRunner
-            ci_dir="$(grep WorkingDirectory= /etc/systemd/system/yunorunner.service | cut -d= -f2)"
-            # List the jobs from YunoRunner and grep the job (without Community or Official).
-            job_id="$(cd "$ci_dir"; ve3/bin/python ciclic list | grep ${job%% *} | head -n1)"
-            # Keep only the id of the job, by removing everything after -
-            job_id="${job_id%% -*}"
-            # And remove any space before the id.
-            job_id="${job_id##* }"
-            job_log="/job/$job_id"
-        fi
-    fi
-
-    # If it's a test on testing or unstable
-    if [ $test_type -gt 0 ]
-    then
-        # Remove unstable or testing of the job name to find its stable version in the level list
-        job="${job% (*)}"
-    fi
-
-    # Get the previous level, found in the file list_level_stable
-    previous_level=$(grep "^$job:" "$script_dir/../auto_build/list_level_stable" | cut -d: -f2)
-
-    # Print the variation of the level. If this level is different than 0
-    if [ $global_level -gt 0 ]
-    then
-        message="${message}Application $app_name"
-        # If non previous level was found
-        if [ -z "$previous_level" ]; then
-            message="$message just reach the level $global_level"
-            send_mail=$(notif_grade all)
-            # If the level stays the same
-        elif [ $global_level -eq $previous_level ]; then
-            message="$message stays at level $global_level"
-            # Need notification at 'all' to notify by email
-            send_mail=$(notif_grade all)
-            # If the level go up
-        elif [ $global_level -gt $previous_level ]; then
-            message="$message rise from level $previous_level to level $global_level"
-            # Need notification at 'change' to notify by email
-            send_mail=$(notif_grade change)
-            # If the level go down
-        elif [ $global_level -lt $previous_level ]; then
-            message="$message go down from level $previous_level to level $global_level"
-            # Need notification at 'down' to notify by email
-            send_mail=$(notif_grade down)
-        fi
-    fi
-fi
-
-# If the app completely failed and obtained 0
-if [ $global_level -eq 0 ]
-then
-    message="${message}Application $app_name has completely failed the continuous integration tests"
-
-    # Always send an email if the app failed
-    send_mail=1
-fi
-
-# The mail subject is the message to send, before any logs informations
-subject="[YunoHost] $message"
-
-# If the test was perform in the official CI environment
-# Add the log address
-# And inform with xmpp
-if [ $type_exec_env -eq 2 ]
-then
-
-    # Build the address of the server from auto.conf
-    ci_path=$(grep "DOMAIN=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)/$(grep "CI_PATH=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)
-
-    # Add the log adress to the message
-    message="$message on https://$ci_path$job_log"
-
-    # Send a xmpp notification on the chat room "apps"
-    # Only for a test with the stable version of YunoHost
-    if [ $test_type -eq 0 ]
-    then
-        "$script_dir/../auto_build/xmpp_bot/xmpp_post.sh" "$message" > /dev/null 2>&1
-    fi
-fi
-
-# Send a mail to main maintainer according to notification option in the check_process.
-# Only if package check is in a CI environment (Official or not)
-if [ $type_exec_env -ge 1 ] && [ $send_mail -eq 1 ]
-then
-
-    # Add a 'from' header for the official CI only.
-    # Apparently, this trick is not needed anymore !?
-    #	if [ $type_exec_env -eq 2 ]; then
-    #		from_yuno="-a \"From: yunohost@yunohost.org\""
-    #	fi
-
-    # Get the maintainer email from the manifest. If it doesn't found if the check_process
-    if [ -z "$dest" ]; then
-        dest=$(grep '\"email\": ' "$package_path/manifest.json" | cut -d '"' -f 4)
-    fi
-
-    # Send the message by mail, if a address has been find
-    if [ -n "$dest" ]; then
-        mail $from_yuno -s "$subject" "$dest" <<< "$message"
-    fi
-fi
-
-#=================================================
-# Clean and exit
-#=================================================
+run_all_tests
 
 clean_exit 0
