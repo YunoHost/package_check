@@ -66,7 +66,7 @@ function log_small_title()
 
 function log_debug()
 {
-    echo "$1"
+    echo "$1" >&3
 }
 
 function log_info()

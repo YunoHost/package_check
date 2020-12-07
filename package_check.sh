@@ -16,6 +16,9 @@ TEST_CONTEXT="./.tmp_test_context"
 rm -rf $TEST_CONTEXT
 mkdir -p $TEST_CONTEXT
 
+# Redirect fd 3 (=debug steam) to complete log
+exec 3>>$complete_log
+
 #=================================================
 # Starting and checking
 #=================================================

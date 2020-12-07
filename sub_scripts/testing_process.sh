@@ -30,7 +30,7 @@ RUN_YUNOHOST_CMD() {
     # --output-as none is to disable the json-like output for some commands like backup create
     LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --output-as none --debug $1" \
         | grep --line-buffered -v --extended-regexp '^[0-9]+\s+.{1,15}DEBUG' \
-        | grep -v 'processing action'
+        | grep --line-buffered -v 'processing action'
 
     returncode=${PIPESTATUS[0]}
     check_witness_files
