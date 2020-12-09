@@ -67,20 +67,22 @@ sudo lxc-start -n $LXC_NAME -d
 sleep 3
 sudo lxc-ls -f
 
+
+
+sudo lxc-attach -n $LXC_NAME -- systemctl -q stop apt-daily.timer 
+sudo lxc-attach -n $LXC_NAME -- systemctl -q stop apt-daily-upgrade.timer
+sudo lxc-attach -n $LXC_NAME -- systemctl -q stop apt-daily.service
+sudo lxc-attach -n $LXC_NAME -- systemctl -q stop apt-daily-upgrade.service
+sudo lxc-attach -n $LXC_NAME -- systemctl -q disable apt-daily.timer
+sudo lxc-attach -n $LXC_NAME -- systemctl -q disable apt-daily-upgrade.timer
+sudo lxc-attach -n $LXC_NAME -- systemctl -q disable apt-daily.service
+sudo lxc-attach -n $LXC_NAME -- systemctl -q disable apt-daily-upgrade.service
+sudo lxc-attach -n $LXC_NAME -- rm -f /etc/cron.daily/apt-compat
+sudo lxc-attach -n $LXC_NAME -- cp /bin/true /usr/lib/apt/apt.systemd.daily
+
+
 echo -e "\e[1m> Update\e[0m"
 update_apt=0
-sudo lxc-attach -n $LXC_NAME -- apt-get update
-# Wait for apt to be available before the upgrade.
-for try in `seq 1 17`
-do
-        # Check if /var/lib/dpkg/lock is used by another process
-        if sudo lxc-attach -n $LXC_NAME -- lsof /var/lib/dpkg/lock > /dev/null
-        then
-            echo "apt is already in use..."
-            # Sleep an exponential time at each round
-            sleep $(( try * try ))
-        fi
-done
 sudo lxc-attach -n $LXC_NAME -- apt-get dist-upgrade --dry-run | grep -q "^Inst "	# Vérifie si il y aura des mises à jour.
 
 if [ "$?" -eq 0 ]; then
@@ -96,6 +98,17 @@ if [ "$update_apt" -eq 1 ]
 then	# Print les numéros de version de Yunohost, si il y a eu un upgrade
 	(sudo lxc-attach -n $LXC_NAME -- yunohost -v) | sudo tee "$script_dir/ynh_version"
 fi
+
+sudo lxc-attach -n $LXC_NAME -- systemctl -q stop apt-daily.timer 
+sudo lxc-attach -n $LXC_NAME -- systemctl -q stop apt-daily-upgrade.timer
+sudo lxc-attach -n $LXC_NAME -- systemctl -q stop apt-daily.service
+sudo lxc-attach -n $LXC_NAME -- systemctl -q stop apt-daily-upgrade.service
+sudo lxc-attach -n $LXC_NAME -- systemctl -q disable apt-daily.timer
+sudo lxc-attach -n $LXC_NAME -- systemctl -q disable apt-daily-upgrade.timer
+sudo lxc-attach -n $LXC_NAME -- systemctl -q disable apt-daily.service
+sudo lxc-attach -n $LXC_NAME -- systemctl -q disable apt-daily-upgrade.service
+sudo lxc-attach -n $LXC_NAME -- rm -f /etc/cron.daily/apt-compat
+sudo lxc-attach -n $LXC_NAME -- cp /bin/true /usr/lib/apt/apt.systemd.daily
 
 # Disable password strength check
 ssh $ARG_SSH $LXC_NAME "sudo yunohost settings set security.password.admin.strength -v -1" | tee -a "$LOG_BUILD_LXC" 2>&1
