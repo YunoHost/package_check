@@ -244,17 +244,18 @@ fi
 ssh $ARG_SSH $LXC_NAME "git clone https://github.com/YunoHost/install_script $branch /tmp/install_script" >> "$LOG_BUILD_LXC" 2>&1
 echo -e "\e[1m> Installation de Yunohost...\e[0m" | tee -a "$LOG_BUILD_LXC"
 ssh $ARG_SSH $LXC_NAME "cd /tmp/install_script; sudo ./install_yunohost -a" | tee -a "$LOG_BUILD_LXC" 2>&1
+
 echo -e "\e[1m> Disable apt-daily to prevent it from messing with apt/dpkg lock\e[0m" | tee -a "$LOG_BUILD_LXC"
-ssh $ARG_SSH $LXC_NAME "systemctl -q stop apt-daily.timer" | tee -a "$LOG_BUILD_LXC" 2>&1
-ssh $ARG_SSH $LXC_NAME "systemctl -q stop apt-daily-upgrade.timer" | tee -a "$LOG_BUILD_LXC" 2>&1
-ssh $ARG_SSH $LXC_NAME "systemctl -q stop apt-daily.service" | tee -a "$LOG_BUILD_LXC" 2>&1
-ssh $ARG_SSH $LXC_NAME "systemctl -q stop apt-daily-upgrade.service" | tee -a "$LOG_BUILD_LXC" 2>&1
-ssh $ARG_SSH $LXC_NAME "systemctl -q disable apt-daily.timer" | tee -a "$LOG_BUILD_LXC" 2>&1
-ssh $ARG_SSH $LXC_NAME "systemctl -q disable apt-daily-upgrade.timer" | tee -a "$LOG_BUILD_LXC" 2>&1
-ssh $ARG_SSH $LXC_NAME "systemctl -q disable apt-daily.service" | tee -a "$LOG_BUILD_LXC" 2>&1
-ssh $ARG_SSH $LXC_NAME "systemctl -q disable apt-daily-upgrade.service" | tee -a "$LOG_BUILD_LXC" 2>&1
-ssh $ARG_SSH $LXC_NAME "rm -f /etc/cron.daily/apt-compat" | tee -a "$LOG_BUILD_LXC" 2>&1
-ssh $ARG_SSH $LXC_NAME "cp /bin/true /usr/lib/apt/apt.systemd.daily" | tee -a "$LOG_BUILD_LXC" 2>&1
+sudo lxc-attach -n $LXC_NAME -- systemctl -q stop apt-daily.timer 
+sudo lxc-attach -n $LXC_NAME -- systemctl -q stop apt-daily-upgrade.timer
+sudo lxc-attach -n $LXC_NAME -- systemctl -q stop apt-daily.service
+sudo lxc-attach -n $LXC_NAME -- systemctl -q stop apt-daily-upgrade.service
+sudo lxc-attach -n $LXC_NAME -- systemctl -q disable apt-daily.timer
+sudo lxc-attach -n $LXC_NAME -- systemctl -q disable apt-daily-upgrade.timer
+sudo lxc-attach -n $LXC_NAME -- systemctl -q disable apt-daily.service
+sudo lxc-attach -n $LXC_NAME -- systemctl -q disable apt-daily-upgrade.service
+sudo lxc-attach -n $LXC_NAME -- rm -f /etc/cron.daily/apt-compat
+sudo lxc-attach -n $LXC_NAME -- cp /bin/true /usr/lib/apt/apt.systemd.daily
 
 echo -e "\e[1m> Post install Yunohost\e[0m" | tee -a "$LOG_BUILD_LXC"
 ssh $ARG_SSH $LXC_NAME "sudo yunohost tools postinstall --domain $DOMAIN --password $YUNO_PWD --force-password" | tee -a "$LOG_BUILD_LXC" 2>&1
