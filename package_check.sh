@@ -591,7 +591,7 @@ parse_check_process() {
     mkdir -p $TEST_CONTEXT/upgrades.d
     for commit in $(cat $TEST_CONTEXT/check_process.upgrade_options | grep "^; commit=.*" | awk -F= '{print $2}')
     do
-    	cat $TEST_CONTEXT/check_process.upgrade_options | sed -n -e "/^;; $commit/,/^;;/ p" | grep -v "^;;" > $TEST_CONTEXT/upgrades
+        cat $TEST_CONTEXT/check_process.upgrade_options | sed -n -e "/^;; $commit/,/^;;/ p" | grep -v "^;;" > $TEST_CONTEXT/upgrades
     done
     rm $TEST_CONTEXT/check_process.upgrade_options
 
@@ -617,12 +617,12 @@ parse_check_process() {
         extract_check_process_section "^; Config_panel" "^; "   $test_serie_rawconf > $test_serie_dir/check_process.configpanel_infos
         extract_check_process_section "^; Checks"       "^; "   $test_serie_rawconf > $test_serie_dir/check_process.tests_infos
 
-	# This is the test of commits to test upgrade from
+        # This is the test of commits to test upgrade from
         for LINE in $(grep "^upgrade=1" "$test_serie_dir/check_process.tests_infos")
         do
-             commit=$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')
-             [ -n "$commit" ] || commit="current"
-	     echo $commit >> $test_serie_dir/upgrades_to_test
+            commit=$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')
+            [ -n "$commit" ] || commit="current"
+            echo $commit >> $test_serie_dir/upgrades_to_test
         done
 
         is_test_enabled () {
@@ -667,15 +667,15 @@ guess_test_configuration() {
 
     local test_serie_id=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 16)
     local test_serie_dir=$TEST_CONTEXT/$test_serie_id
-    
+
     mkdir -p $test_serie_dir
     init_results $test_serie_id
 
     test_series+="$test_serie_id "
-    
+
 
     python "./sub_scripts/manifest_parsing.py" "$package_path/manifest.json" \
-    | cut -d ':' -f1,2 | tr ':' '=' | tr '\n' '&' > $test_serie_dir/install_args
+        | cut -d ':' -f1,2 | tr ':' '=' | tr '\n' '&' > $test_serie_dir/install_args
 
     cat << EOF > $test_serie_dir/tests_to_perform
 pkg_linter=1
@@ -734,8 +734,8 @@ run_all_tests() {
 }
 
 [ -e "$check_process" ] \
-&& parse_check_process \
-|| guess_test_configuration
+    && parse_check_process \
+    || guess_test_configuration
 
 run_all_tests
 

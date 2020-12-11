@@ -111,13 +111,13 @@ LOAD_SNAPSHOT_OR_INSTALL_APP () {
     if [ ! -e "$LXC_SNAPSHOTS/$snapname" ]
     then
         LOAD_LXC_SNAPSHOT snap0 \
-        && INSTALL_APP "path=$check_path" \
-        && log_debug "Creating a snapshot for $_install_type installation." \
-        && CREATE_LXC_SNAPSHOT $snapname
+            && INSTALL_APP "path=$check_path" \
+            && log_debug "Creating a snapshot for $_install_type installation." \
+            && CREATE_LXC_SNAPSHOT $snapname
     else
         # Or uses an existing snapshot
         log_debug "Reusing an existing snapshot for $_install_type installation." \
-        && LOAD_LXC_SNAPSHOT $snapname
+            && LOAD_LXC_SNAPSHOT $snapname
     fi
 }
 
@@ -164,7 +164,7 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
         RUN_YUNOHOST_CMD "app setting $app_id_to_check skipped_uris -v \"/\""
         # Regen the config of sso
         RUN_YUNOHOST_CMD "app ssowatconf"
-    expected_to_be="public"
+        expected_to_be="public"
     fi
 
     # Try to access to the url in 2 times, with a final / and without
@@ -179,12 +179,12 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
         # Remove the previous curl output
         rm -f "$curl_output"
 
-    local http_code="noneyet"
+        local http_code="noneyet"
 
-    local retry=0
-    function should_retry() {
-              [ "${http_code}" = "noneyet" ] || [ "${http_code}" = "502" ] || [ "${http_code}" = "503" ] || [ "${http_code}" = "504" ]
-    }
+        local retry=0
+        function should_retry() {
+            [ "${http_code}" = "noneyet" ] || [ "${http_code}" = "502" ] || [ "${http_code}" = "503" ] || [ "${http_code}" = "504" ]
+        }
 
         while [ $retry -lt 3 ] && should_retry;
         do
@@ -216,16 +216,16 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
             retry=$((retry+1))
         done
 
-    # Analyze the http code (we're looking for 0xx 4xx 5xx 6xx codes)
+        # Analyze the http code (we're looking for 0xx 4xx 5xx 6xx codes)
         if [ -n "$http_code" ] && echo "0 4 5 6" | grep -q "${http_code:0:1}"
         then
             # If the http code is a 0xx 4xx or 5xx, it's an error code.
             curl_error=1
 
             # 401 is "Unauthorized", so is a answer of the server. So, it works!
-        [ "${http_code}" == "401" ] && curl_error=0
+            [ "${http_code}" == "401" ] && curl_error=0
 
-        [ $curl_error -eq 1 ] && log_error "The HTTP code shows an error."
+            [ $curl_error -eq 1 ] && log_error "The HTTP code shows an error."
         fi
 
         # Analyze the output of curl
@@ -233,14 +233,14 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
         then
             # Print the title of the page
             local page_title=$(grep "<title>" "$curl_output" | cut --delimiter='>' --fields=2 | cut --delimiter='<' --fields=1)
-        local page_extract=$(lynx -dump -force_html "$curl_output" | head --lines 20 | tee -a "$complete_log")
+            local page_extract=$(lynx -dump -force_html "$curl_output" | head --lines 20 | tee -a "$complete_log")
 
             # Check if the page title is neither the YunoHost portail or default nginx page
             if [ "$page_title" = "YunoHost Portal" ]
             then
                 log_debug "The connection attempt fall on the YunoHost portal."
-        fell_on_sso_portal=1
-            # Falling on nginx default page is an error.
+                fell_on_sso_portal=1
+                # Falling on nginx default page is an error.
             elif [ "$page_title" = "Welcome to nginx on Debian!" ]
             then
                 log_error "The connection attempt fall on nginx default page."
@@ -317,7 +317,7 @@ TEST_INSTALL () {
 
     # Install the application in a LXC container
     INSTALL_APP "path=$check_path" \
-    && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
+        && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
 
     # Check the result and print SUCCESS or FAIL
     if [ $? -eq 0 ]
@@ -325,17 +325,17 @@ TEST_INSTALL () {
         SET_RESULT global_setup 1
         local check_result_setup=1
 
-    if [ "$install_type" = "root" ]
-    then
-        [ -e "$LXC_SNAPSHOTS/snap_rootinstall" ] \
-        && log_debug "Create a snapshot for root installation." \
-        && CREATE_LXC_SNAPSHOT snap_rootinstall
-    else
-        # Check if a snapshot already exist for a subpath (or no_url) install
-        [ ! -e "$LXC_SNAPSHOTS/snap_subdirinstall" ] \
-        && log_debug "Create a snapshot for sub path installation." \
-        && CREATE_LXC_SNAPSHOT snap_subdirinstall
-    fi
+        if [ "$install_type" = "root" ]
+        then
+            [ -e "$LXC_SNAPSHOTS/snap_rootinstall" ] \
+                && log_debug "Create a snapshot for root installation." \
+                && CREATE_LXC_SNAPSHOT snap_rootinstall
+        else
+            # Check if a snapshot already exist for a subpath (or no_url) install
+            [ ! -e "$LXC_SNAPSHOTS/snap_subdirinstall" ] \
+                && log_debug "Create a snapshot for sub path installation." \
+                && CREATE_LXC_SNAPSHOT snap_subdirinstall
+        fi
     else
         SET_RESULT_IF_NONE_YET global_setup -1
         local check_result_setup=-1
@@ -361,7 +361,7 @@ TEST_INSTALL () {
         log_small_title "Reinstall the application after a removing."
 
         INSTALL_APP "path=$check_path" \
-        && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
+            && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
 
         # Check the result and print SUCCESS or FAIL
         [ $? -eq 0 ] && local check_result_setup=1 || local check_result_setup=-1
@@ -398,7 +398,7 @@ TEST_UPGRADE () {
             start_test "Upgrade from $upgrade_name"
         fi
 
-    validate_that_at_least_one_install_succeeded || return
+        validate_that_at_least_one_install_succeeded || return
 
         # Install the application in a LXC container
         log_small_title "Preliminary install..."
@@ -406,7 +406,7 @@ TEST_UPGRADE () {
         then
             # If no commit is specified, use the current version.
             LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path"
-        local ret=$?
+            local ret=$?
         else
             # Get the arguments of the manifest for this upgrade.
             if [ -n "$specific_upgrade_args" ]; then
@@ -419,11 +419,11 @@ TEST_UPGRADE () {
             sudo cp -a "$package_path" "${package_path}_back"
             (cd "$package_path"; git checkout --force --quiet "$commit")
 
-        LOAD_LXC_SNAPSHOT snap0
+            LOAD_LXC_SNAPSHOT snap0
 
             # Install the application
             INSTALL_APP "path=$check_path"
-        local ret=$?
+            local ret=$?
 
             if [ -n "$specific_upgrade_args" ]; then
                 mv "$test_serie_dir/install_args.bkp" "$test_serie_dir/install_args"
@@ -437,14 +437,14 @@ TEST_UPGRADE () {
         # Check if the install had work
         [ $ret -eq 0 ] || { log_error "Initial install failed... upgrade test ignore"; LXC_STOP; continue; }
 
-    log_small_title "Upgrade..."
+        log_small_title "Upgrade..."
 
         # Upgrade the application in a LXC container
         RUN_YUNOHOST_CMD "app upgrade $app_id -f ./app_folder/" \
-        && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
+            && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
 
-    if [ $? -eq 0 ]
-    then
+        if [ $? -eq 0 ]
+        then
             SET_RESULT_IF_NONE_YET check_upgrade 1
         else
             SET_RESULT check_upgrade -1
@@ -468,10 +468,10 @@ TEST_PUBLIC_PRIVATE () {
     # Set public or private according to type of test requested
     if [ "$install_type" = "private" ]; then
         local is_public="0"
-    local test_name_for_result="check_private"
+        local test_name_for_result="check_private"
     elif [ "$install_type" = "public" ]; then
         local is_public="1"
-    local test_name_for_result="check_private"
+        local test_name_for_result="check_private"
     fi
 
     # Try in 2 times, first in root and second in sub path.
@@ -484,39 +484,39 @@ TEST_PUBLIC_PRIVATE () {
             # Check if root installation worked
             [ $(GET_RESULT check_root) -eq 1 ] || { log_warning "Root install failed, therefore this test cannot be performed..."; continue; }
 
-        local check_path=/
+            local check_path=/
 
-        # Second, try with a sub path install
+            # Second, try with a sub path install
         elif [ $i -eq 1 ]
         then
             # Check if sub path installation worked, or if force_install_ok is setted.
             [ $(GET_RESULT check_sub_dir) -eq 1 ] || { log_warning "Sub path install failed, therefore this test cannot be performed..."; continue; }
 
-        local check_path=/path
+            local check_path=/path
         fi
 
-    LOAD_LXC_SNAPSHOT snap0
+        LOAD_LXC_SNAPSHOT snap0
 
         # Install the application in a LXC container
         INSTALL_APP "is_public=$is_public" "path=$check_path" \
-        && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path "$install_type"
+            && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path "$install_type"
 
-    local ret=$?
+        local ret=$?
 
         # Result code = 2 means that we were expecting the app to be public but it's private or viceversa
-    if [ $ret -eq 2 ]
+        if [ $ret -eq 2 ]
         then
             yunohost_result=1
             [ "$install_type" = "private" ] && log_error "App is not private: it should redirect to the Yunohost portal, but is publicly accessible instead"
             [ "$install_type" = "public" ]  && log_error "App page is not public: it should be publicly accessible, but redirects to the Yunohost portal instead"
-    fi
+        fi
 
         # Check the result and print SUCCESS or FAIL
         if [ $ret -eq 0 ]
         then
             SET_RESULT_IF_NONE_YET $test_name_for_result 1
         else
-        SET_RESULT $test_name_for_result -1
+            SET_RESULT $test_name_for_result -1
         fi
 
         break_before_continue
@@ -542,11 +542,11 @@ TEST_MULTI_INSTANCE () {
     LOAD_LXC_SNAPSHOT snap0
 
     log_small_title "First installation: path=$DOMAIN$check_path" \
-    && INSTALL_APP "domain=$DOMAIN" "path=$check_path" \
-    && log_small_title "Second installation: path=$SUBDOMAIN$check_path" \
-    && INSTALL_APP "path=$check_path" \
-    && VALIDATE_THAT_APP_CAN_BE_ACCESSED $DOMAIN $check_path \
-    && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path "" ${app_id}__2 \
+        && INSTALL_APP "domain=$DOMAIN" "path=$check_path" \
+        && log_small_title "Second installation: path=$SUBDOMAIN$check_path" \
+        && INSTALL_APP "path=$check_path" \
+        && VALIDATE_THAT_APP_CAN_BE_ACCESSED $DOMAIN $check_path \
+        && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path "" ${app_id}__2
 
     if [ $? -eq 0 ]
     then
@@ -591,7 +591,7 @@ TEST_PORT_ALREADY_USED () {
 
     # Install the application in a LXC container
     INSTALL_APP "path=$check_path" "port=$check_port" \
-    && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
+        && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
 
     [ $? -eq 0 ] && SET_RESULT check_port 1 || SET_RESULT check_port -1
 
@@ -623,7 +623,7 @@ TEST_BACKUP_RESTORE () {
             local check_path=/
             log_small_title "Preliminary installation on the root..."
 
-        # Second, try with a sub path install
+            # Second, try with a sub path install
         elif [ $i -eq 1 ]
         then
             # Check if sub path installation worked, or if force_install_ok is setted.
@@ -657,7 +657,7 @@ TEST_BACKUP_RESTORE () {
 
             ret=$?
 
-        if [ $ret -eq 0 ]; then
+            if [ $ret -eq 0 ]; then
                 log_debug "Backup successful"
             else
                 log_error "Backup failed."
@@ -699,14 +699,14 @@ TEST_BACKUP_RESTORE () {
                 sudo mv -f ./archives $LXC_SNAPSHOTS/snap0/rootfs/home/yunohost.backup/
 
                 LXC_STOP
-        LOAD_LXC_SNAPSHOT snap0
+                LOAD_LXC_SNAPSHOT snap0
 
                 log_small_title "Restore on a clean YunoHost system..."
             fi
 
             # Restore the application from the previous backup
             RUN_YUNOHOST_CMD "backup restore Backup_test --force --apps $app_id" \
-            && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
+                && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
 
             local ret=$?
 
@@ -747,37 +747,37 @@ TEST_CHANGE_URL () {
             local new_path=/path
             local new_domain=$SUBDOMAIN
 
-        # Same domain, path to path
+            # Same domain, path to path
         elif [ $i -eq 2 ]; then
             check_path=/path
             local new_path=/path_2
             local new_domain=$SUBDOMAIN
 
-        # Same domain, path to root
+            # Same domain, path to root
         elif [ $i -eq 3 ]; then
             check_path=/path
             local new_path=/
             local new_domain=$SUBDOMAIN
 
-        # Other domain, root to path
+            # Other domain, root to path
         elif [ $i -eq 4 ]; then
             check_path=/
             local new_path=/path
             local new_domain=$DOMAIN
 
-        # Other domain, path to path
+            # Other domain, path to path
         elif [ $i -eq 5 ]; then
             check_path=/path
             local new_path=/path_2
             local new_domain=$DOMAIN
 
-        # Other domain, path to root
+            # Other domain, path to root
         elif [ $i -eq 6 ]; then
             check_path=/path
             local new_path=/
             local new_domain=$DOMAIN
 
-        # Other domain, root to root
+            # Other domain, root to root
         elif [ $i -eq 7 ]; then
             check_path=/
             local new_path=/
@@ -786,20 +786,20 @@ TEST_CHANGE_URL () {
 
         # Validate that install worked in the corresponding configuration previously
 
-    # If any of the begin/end path is /, we need to have root install working
+        # If any of the begin/end path is /, we need to have root install working
         ( [ "$check_path" != "/" ] && [ "$new_path" != "/" ] ) || [ $(GET_RESULT check_root)    -eq 1 ] \
-    || { log_warning "Root install failed, therefore this test cannot be performed..."; continue; }
+            || { log_warning "Root install failed, therefore this test cannot be performed..."; continue; }
 
         # If any of the being/end path is not /, we need to have sub_dir install working
         ( [ "$new_path"   == "/" ] && [ "$new_path" == "/" ] ) || [ $(GET_RESULT check_sub_dir) -eq 1 ] \
-    || { log_warning "Subpath install failed, therefore this test cannot be performed..."; continue; }
+            || { log_warning "Subpath install failed, therefore this test cannot be performed..."; continue; }
 
         # Install the application in a LXC container
         log_small_title "Preliminary install..." \
-        && LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path" \
-        && log_small_title "Change the url from $SUBDOMAIN$check_path to $new_domain$new_path..." \
-        && RUN_YUNOHOST_CMD "app change-url $app_id -d '$new_domain' -p '$new_path'" \
-        && VALIDATE_THAT_APP_CAN_BE_ACCESSED $new_domain $new_path
+            && LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path" \
+            && log_small_title "Change the url from $SUBDOMAIN$check_path to $new_domain$new_path..." \
+            && RUN_YUNOHOST_CMD "app change-url $app_id -d '$new_domain' -p '$new_path'" \
+            && VALIDATE_THAT_APP_CAN_BE_ACCESSED $new_domain $new_path
 
         if [ $ret -eq 0 ]
         then
@@ -930,7 +930,7 @@ ACTIONS_CONFIG_PANEL () {
 
                 # Show the config-panel
                 RUN_YUNOHOST_CMD "app config show-panel $app_id"
-        local ret=$?
+                local ret=$?
 
                 validate_action_config_panel "yunohost app config show-panel"
             fi
@@ -1096,12 +1096,12 @@ ACTIONS_CONFIG_PANEL () {
                     then
                         # Aply a configuration
                         RUN_YUNOHOST_CMD "app config apply $app_id $action_config_action $action_config_argument_built"
-            ret=$?
+                        ret=$?
                     elif [ "$test_type" == "actions" ]
                     then
                         # Execute an action
                         RUN_YUNOHOST_CMD "app action run $app_id $action_config_action $action_config_argument_built"
-            ret=$?
+                        ret=$?
                     fi
                     validate_action_config_panel "yunohost action $action_config_action"
                 done
@@ -1235,7 +1235,7 @@ check_witness_files () {
     check_file_exist "/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf"
     check_file_exist "/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf"
 
-   # /etc
+    # /etc
     check_file_exist "/etc/witnessfile"
 
     # /opt directory

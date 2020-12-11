@@ -153,7 +153,7 @@ LXC_START () {
                 log_info "Rebooting the container..."
             fi
             LXC_STOP
-        # Try to ping security.debian.org to check the connectivity from the container
+            # Try to ping security.debian.org to check the connectivity from the container
         elif ! ssh $arg_ssh -o ConnectTimeout=60 $LXC_NAME "sudo ping -q -c 2 security.debian.org > /dev/null 2>&1; exit \$?" >> "$complete_log" 2>&1
         then
             log_critical "The container failed to connect to internet..."
@@ -162,7 +162,7 @@ LXC_START () {
                 log_info "Rebooting the container..."
             fi
             LXC_STOP
-        # Create files to check if the remove script does not remove them accidentally
+            # Create files to check if the remove script does not remove them accidentally
         else
             [ $avoid_witness -eq 0 ] && set_witness_files
 
