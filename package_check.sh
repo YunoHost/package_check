@@ -32,8 +32,6 @@ Usage:
 package_check.sh [OPTION]... PACKAGE_TO_CHECK
     -b, --branch=BRANCH
         Specify a branch to check.
-    -f, --force-install-ok
-        Force remaining tests even if installation tests failed or were not selected for execution.
     -i, --interactive
         Wait for the user to continue before each remove.
     -h, --help
@@ -92,7 +90,6 @@ do
         arguments[$i]=${arguments[$i]//--branch=/}
     fi
     # For each argument in the array, reduce to short argument for getopts
-    arguments[$i]=${arguments[$i]//--force-install-ok/-f}
     arguments[$i]=${arguments[$i]//--interactive/-i}
     arguments[$i]=${arguments[$i]//--help/-h}
     arguments[$i]=${arguments[$i]//--build-lxc/-l}
@@ -116,11 +113,6 @@ parse_arg () {
                     # --branch=branch-name
                     gitbranch="-b $OPTARG"
                     shift_value=2
-                    ;;
-                f)
-                    # --force-install-ok
-                    force_install_ok=1
-                    shift_value=1
                     ;;
                 i)
                     # --interactive
@@ -209,7 +201,6 @@ fi
 
 # Stop and restore the LXC container. In case of previous incomplete execution.
 LXC_STOP
-# Deactivate LXC network
 LXC_TURNOFF
 
 #=================================================
@@ -594,7 +585,15 @@ parse_check_process() {
 
     # Extract the Options section
     extract_check_process_section "^;;; Options" ";; " > $TEST_CONTEXT/check_process.options
+
+    # Extract the Upgrade infos
     extract_check_process_section "^;;; Upgrade options" ";; " > $TEST_CONTEXT/check_process.upgrade_options
+    mkdir -p $TEST_CONTEXT/upgrades.d
+    for commit in $(cat $TEST_CONTEXT/check_process.upgrade_options | grep "^; commit=.*" | awk -F= '{print $2}')
+    do
+    	cat $TEST_CONTEXT/check_process.upgrade_options | sed -n -e "/^;; $commit/,/^;;/ p" | grep -v "^;;" > $TEST_CONTEXT/upgrades
+    done
+    rm $TEST_CONTEXT/check_process.upgrade_options
 
     # Parse each tests serie
     while read <&3 tests_serie
@@ -612,14 +611,19 @@ parse_check_process() {
         echo "$tests_serie" > $test_serie_dir/test_serie_name
         extract_check_process_section "^$tests_serie"   "^;;" > $test_serie_rawconf
         extract_check_process_section "^; pre-install"  "^; "   $test_serie_rawconf > $test_serie_dir/preinstall.sh.template
-        extract_check_process_section "^; Manifest"     "^; "   $test_serie_rawconf > $test_serie_dir/check_process.manifest_infos
+        # This is the arg list to be later fed to "yunohost app install"
+        extract_check_process_section "^; Manifest"     "^; "   $test_serie_rawconf | awk '{print $1}' | tr -d '"' | tr '\n' '&' > $test_serie_dir/install_args
         extract_check_process_section "^; Actions"      "^; "   $test_serie_rawconf > $test_serie_dir/check_process.actions_infos
         extract_check_process_section "^; Config_panel" "^; "   $test_serie_rawconf > $test_serie_dir/check_process.configpanel_infos
         extract_check_process_section "^; Checks"       "^; "   $test_serie_rawconf > $test_serie_dir/check_process.tests_infos
 
-        # This is the arg list to be later fed to "yunohost app install"
-        cat $test_serie_dir/check_process.manifest_infos \
-        | awk '{print $1}' | tr -d '"' | tr '\n' '&' > $test_serie_dir/install_args
+	# This is the test of commits to test upgrade from
+        for LINE in $(grep "^upgrade=1" "$test_serie_dir/check_process.tests_infos")
+        do
+             commit=$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')
+             [ -n "$commit" ] || commit="current"
+	     echo $commit >> $test_serie_dir/upgrades_to_test
+        done
 
         is_test_enabled () {
             # Find the line for the given check option
@@ -715,12 +719,7 @@ run_all_tests() {
         # Print the final results of the tests
         COMPUTE_RESULTS_SUMMARY $test_serie_id
 
-        # Set snap0 as the current snapshot
-        current_snapshot=snap0
-        # And clean temporary snapshots
-        unset root_snapshot
-        unset subpath_snapshot
-
+        # FIXME FIXME FIXME gotta reset the snapshot
     done
 
     # Restore the started time for the timer

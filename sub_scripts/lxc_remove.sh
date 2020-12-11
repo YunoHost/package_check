@@ -20,8 +20,8 @@ sudo rm -f /etc/network/interfaces.d/$LXC_BRIDGE
 
 log_title "Suppression de la machine et de son snapshots"
 sudo lxc-snapshot -n $LXC_NAME -d snap0
-sudo lxc-snapshot -n $LXC_NAME -d snap1
-sudo lxc-snapshot -n $LXC_NAME -d snap2
+sudo lxc-snapshot -n $LXC_NAME -d snap_rootinstall
+sudo lxc-snapshot -n $LXC_NAME -d snap_subdirinstall
 sudo rm -f /var/lib/lxcsnaps/$LXC_NAME/snap0.tar.gz
 sudo lxc-destroy -n $LXC_NAME -f
 

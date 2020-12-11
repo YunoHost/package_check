@@ -6,7 +6,6 @@
 
 # -q aims to disable the display of 'Debian GNU/Linux' each time a command is ran
 arg_ssh="-tt -q"
-current_snapshot=snap0
 
 #=================================================
 # RUNNING SNAPSHOT
@@ -15,8 +14,7 @@ current_snapshot=snap0
 CREATE_LXC_SNAPSHOT () {
     # Create a temporary snapshot
 
-    # snap1 for subpath or snap2 for root install
-    snap_number=$1
+    local snapname=$1
 
     start_timer
     # Check all the witness files, to verify if them still here
@@ -34,26 +32,23 @@ CREATE_LXC_SNAPSHOT () {
     fi
 
     # Check if the snapshot already exist
-    if [ ! -e "$LXC_SNAPSHOTS/snap$snap_number" ]
+    if [ ! -e "$LXC_SNAPSHOTS/$snapname" ]
     then
-        log_debug "snap$snap_number doesn't exist, its first creation can takes a little while." >&2
+        log_debug "$snapname doesn't exist, its first creation can takes a little while." >&2
         # Create the snapshot.
         sudo lxc-snapshot --name $LXC_NAME >> "$complete_log" 2>&1
 
         # lxc always creates the first snapshot it can creates.
-        # So if snap1 doesn't exist and you try to create snap2, it will be named snap1.
-        if [ "$snap_number" == "2" ] && [ ! -e "$LXC_SNAPSHOTS/snap2" ]
+        # So if snap1 doesn't exist and you try to create snap_foo, it will be named snap1.
+        if [ "$snapname" != "snap1" ] && [ ! -e "$LXC_SNAPSHOTS/$snapname" ]
         then
-            # Rename snap1 to snap2
-            sudo mv "$LXC_SNAPSHOTS/snap1" "$LXC_SNAPSHOTS/snap2"
+            # Rename snap1
+            sudo mv "$LXC_SNAPSHOTS/snap1" "$LXC_SNAPSHOTS/$snapname"
         fi
     fi
 
     # Update the snapshot with rsync to clone the current lxc state
-    sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$LXC_ROOTFS/" "$LXC_SNAPSHOTS/snap$snap_number/rootfs/" > /dev/null 2>> "$complete_log"
-
-    # Set this snapshot as the current snapshot
-    current_snapshot=snap$snap_number
+    sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$LXC_ROOTFS/" "$LXC_SNAPSHOTS/$snapname/rootfs/" > /dev/null 2>> "$complete_log"
 
     stop_timer 1
 
@@ -64,19 +59,21 @@ CREATE_LXC_SNAPSHOT () {
 LOAD_LXC_SNAPSHOT () {
     # Use a temporary snapshot, if it already exists
     # $1 = Name of the snapshot to use
-    current_snapshot=$1
+    local snapshot=$1
+
+    log_debug "Restoring snapshot $snapshot"
 
     start_timer
     # Fix the missing hostname in the hosts file...
-    echo "127.0.0.1 $LXC_NAME" | sudo tee --append "$LXC_SNAPSHOTS/$current_snapshot/rootfs/etc/hosts" > /dev/null
+    echo "127.0.0.1 $LXC_NAME" | sudo tee --append "$LXC_SNAPSHOTS/$snapshot/rootfs/etc/hosts" > /dev/null
 
     # Restore this snapshot.
-    sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$LXC_SNAPSHOTS/$current_snapshot/rootfs/" "$LXC_ROOTFS/" > /dev/null 2>> "$complete_log"
+    sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$LXC_SNAPSHOTS/$snapshot/rootfs/" "$LXC_ROOTFS/" > /dev/null 2>> "$complete_log"
+    local ret=$?
 
     stop_timer 1
 
-    # Fake the yunohost_result return code of the installation
-    yunohost_result=0
+    return $ret
 }
 
 #=================================================
@@ -91,10 +88,10 @@ LXC_INIT () {
     sudo rm --force $LXC_ROOTFS/swap_*
     sudo swapoff $LXC_SNAPSHOTS/snap0/rootfs/swap_* 2>/dev/null
     sudo rm --force $LXC_SNAPSHOTS/snap0/rootfs/swap_*
-    sudo swapoff $LXC_SNAPSHOTS/snap1/rootfs/swap_* 2>/dev/null
-    sudo rm --force $LXC_SNAPSHOTS/snap1/rootfs/swap_*
-    sudo swapoff $LXC_SNAPSHOTS/snap2/rootfs/swap_* 2>/dev/null
-    sudo rm --force $LXC_SNAPSHOTS/snap2/rootfs/swap_*
+    sudo swapoff $LXC_SNAPSHOTS/snap_rootinstall/rootfs/swap_* 2>/dev/null
+    sudo rm --force $LXC_SNAPSHOTS/snap_rooinstall/rootfs/swap_*
+    sudo swapoff $LXC_SNAPSHOTS/snap_subdirintsall/rootfs/swap_* 2>/dev/null
+    sudo rm --force $LXC_SNAPSHOTS/snap_subdirinstall/rootfs/swap_*
 
     # Initialize LXC network
 
@@ -111,7 +108,7 @@ LXC_INIT () {
 
 LXC_START () {
     # Start the lxc container and execute the given command in it
-    # $1 = Command to execute in the container
+    local cmd=$1
 
     start_timer
     # Try to start the container 3 times.
@@ -143,13 +140,11 @@ LXC_START () {
             fi
             sleep 1
         done
-        echo ""
-        if [ "$(uname -m)" == "aarch64" ]
-        then
-            sleep 30
-        fi
+
+        [ "$(uname -m)" == "aarch64" ] && sleep 30
 
         local failstart=0
+
         # Check if the container is running
         if ! is_lxc_running; then
             log_critical "The LXC container didn't start..."
@@ -158,7 +153,7 @@ LXC_START () {
                 log_info "Rebooting the container..."
             fi
             LXC_STOP
-            # Try to ping security.debian.org to check the connectivity from the container
+        # Try to ping security.debian.org to check the connectivity from the container
         elif ! ssh $arg_ssh -o ConnectTimeout=60 $LXC_NAME "sudo ping -q -c 2 security.debian.org > /dev/null 2>&1; exit \$?" >> "$complete_log" 2>&1
         then
             log_critical "The container failed to connect to internet..."
@@ -167,7 +162,7 @@ LXC_START () {
                 log_info "Rebooting the container..."
             fi
             LXC_STOP
-            # Create files to check if the remove script does not remove them accidentally
+        # Create files to check if the remove script does not remove them accidentally
         else
             [ $avoid_witness -eq 0 ] && set_witness_files
 
@@ -243,7 +238,7 @@ LXC_START () {
     rsync -rq --delete "$package_path" "$LXC_NAME": >> "$complete_log" 2>&1
 
     # Execute the command given in argument in the container and log its results.
-    ssh $arg_ssh $LXC_NAME "$1; exit $?" | tee -a "$complete_log"
+    ssh $arg_ssh $LXC_NAME "$cmd; exit $?" | tee -a "$complete_log"
 
     # Store the return code of the command
     local returncode=${PIPESTATUS[0]}
@@ -254,34 +249,20 @@ LXC_START () {
 }
 
 LXC_STOP () {
-    # Stop and restore the LXC container
-
-    start_timer
-    # Stop the LXC container
-    if is_lxc_running; then
+    if is_lxc_running;
+    then
         log_debug "Stop the LXC container"
         sudo lxc-stop --name=$LXC_NAME | tee --append "$complete_log" 2>&1
     fi
+}
 
-    # Fix the missing hostname in the hosts file
-    # If the hostname is missing in /etc/hosts inside the snapshot
-    if ! sudo grep --quiet "$LXC_NAME" "$LXC_SNAPSHOTS/$current_snapshot/rootfs/etc/hosts"
-    then
-        # If the hostname was replaced by name of the snapshot, fix it
-        if sudo grep --quiet "$current_snapshot" "$LXC_SNAPSHOTS/$current_snapshot/rootfs/etc/hosts"
-        then
-            # Replace snapX by the real hostname
-            sudo sed --in-place "s/$current_snapshot/$LXC_NAME/" "$LXC_SNAPSHOTS/$current_snapshot/rootfs/etc/hosts"
-        else
-            # Otherwise, simply add the hostname
-            echo "127.0.0.1 $LXC_NAME" | sudo tee --append "$LXC_SNAPSHOTS/$current_snapshot/rootfs/etc/hosts" > /dev/null
-        fi
-    fi
+LOAD_LXC_SNAPSHOT () {
+    snapname=$1
 
-    # Restore the snapshot.
-    log_debug "Restore the previous snapshot."
-    sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$LXC_SNAPSHOTS/$current_snapshot/rootfs/" "$LXC_ROOTFS/" > /dev/null 2>> "$complete_log"
-    stop_timer 1
+    LXC_STOP
+
+    log_debug "Restoring snapshot $snapname"
+    sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$LXC_SNAPSHOTS/$snapname/rootfs/" "$LXC_ROOTFS/" > /dev/null 2>> "$complete_log"
 }
 
 LXC_TURNOFF () {
@@ -306,7 +287,4 @@ LXC_TURNOFF () {
     then
         sudo ifdown --force $LXC_BRIDGE | tee --append "$complete_log" 2>&1
     fi
-
-    # Set snap0 as the current snapshot
-    current_snapshot=snap0
 }
