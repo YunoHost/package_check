@@ -88,10 +88,10 @@ LXC_INIT () {
     sudo rm --force $LXC_ROOTFS/swap_*
     sudo swapoff $LXC_SNAPSHOTS/snap0/rootfs/swap_* 2>/dev/null
     sudo rm --force $LXC_SNAPSHOTS/snap0/rootfs/swap_*
-    sudo swapoff $LXC_SNAPSHOTS/snap_rootinstall/rootfs/swap_* 2>/dev/null
-    sudo rm --force $LXC_SNAPSHOTS/snap_rooinstall/rootfs/swap_*
-    sudo swapoff $LXC_SNAPSHOTS/snap_subdirintsall/rootfs/swap_* 2>/dev/null
-    sudo rm --force $LXC_SNAPSHOTS/snap_subdirinstall/rootfs/swap_*
+    sudo swapoff $LXC_SNAPSHOTS/snap_afterinstall/rootfs/swap_* 2>/dev/null
+    sudo rm --force $LXC_SNAPSHOTS/snap_afterinstall/rootfs/swap_*
+
+    LXC_PURGE_SNAPSHOTS
 
     # Initialize LXC network
 
@@ -104,6 +104,15 @@ LXC_INIT () {
     sudo iptables --append FORWARD --in-interface $LXC_BRIDGE --out-interface $MAIN_NETWORK_INTERFACE --jump ACCEPT | tee --append "$complete_log" 2>&1
     sudo iptables --append FORWARD --in-interface $MAIN_NETWORK_INTERFACE --out-interface $LXC_BRIDGE --jump ACCEPT | tee --append "$complete_log" 2>&1
     sudo iptables --table nat --append POSTROUTING --source $LXC_NETWORK.0/24 --jump MASQUERADE | tee --append "$complete_log" 2>&1
+}
+
+LXC_PURGE_SNAPSHOTS() {
+    LXC_STOP
+
+    for SNAP in $(sudo ls $LXC_SNAPSHOTS/snap_*install)
+    do
+        sudo lxc-snapshot -n $LXC_NAME -d $(basename $SNAP)
+    done
 }
 
 LXC_START () {

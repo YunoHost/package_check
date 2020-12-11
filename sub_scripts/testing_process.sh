@@ -55,6 +55,27 @@ GET_RESULT() {
     grep "RESULT_$1=" $test_serie_dir/results | awk -F= '{print $2}'
 }
 
+at_least_one_install_succeeded () {
+
+    [ "$(GET_RESULT check_sub_dir)" -eq 1 ] \
+        || [ "$(GET_RESULT check_root)" -eq 1 ] \
+        || [ "$(GET_RESULT check_nourl)" -eq 1 ] \
+        || {  log_error "All installs failed, therefore the following tests cannot be performed...";
+              return 1; }
+}
+
+this_is_a_web_app () {
+    # Usually the fact that we test "nourl"
+    # installs should be a good indicator for this
+    grep "TEST_INSTALL nourl"  $test_serie_dir/tests_to_perform && return 1
+}
+
+default_install_path() {
+    this_is_a_web_app && echo ""
+    || [ "$(GET_RESULT check_sub_dir)" -eq 1 ] && echo "/path "
+    || echo "/"
+}
+
 #=================================================
 # Install and remove an app
 #=================================================
@@ -102,10 +123,19 @@ INSTALL_APP () {
     return $ret
 }
 
+path_to_install_type() {
+    local check_path="$1"
+
+    [ -z "$check_path" ] && echo "nourl" \
+    || [ "$check_path" == "/" ] && echo "root" \
+    || echo "subdir"
+
+}
+
 LOAD_SNAPSHOT_OR_INSTALL_APP () {
 
     local check_path="$1"
-    local _install_type=$([ "$check_path" = "/" ] && echo "root" || echo "subdir")
+    local _install_type=$(path_to_install_type $check_path)
     local snapname="snap_${_install_type}install"
 
     if [ ! -e "$LXC_SNAPSHOTS/$snapname" ]
@@ -120,6 +150,7 @@ LOAD_SNAPSHOT_OR_INSTALL_APP () {
             && LOAD_LXC_SNAPSHOT $snapname
     fi
 }
+
 
 REMOVE_APP () {
     # Remove an application
@@ -151,8 +182,8 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
     local fell_on_sso_portal=0
     local curl_output=$test_serie_dir/curl_output
 
-    # Not checking this if this ain't relevant for the current test / app
-    [ $enable_validate_that_app_can_be_accessed == "true" ] || return 0
+    # Not checking this if this ain't relevant for the current app
+    this_is_a_web_app || return 0
 
     log_small_title "Validating that the app can (or cannot) be accessed with its url..."
 
@@ -253,7 +284,7 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
         log_debug "HTTP code: $http_code"
         log_debug "$test_url_details"
         log_debug "Page title: $page_title"
-        log_debug "Page extract: $page_extract"
+        log_debug "Page extract:\n$page_extract"
 
         if [[ $curl_error -ne 0 ]]
         then
@@ -262,7 +293,7 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
             log_warning "HTTP code: $http_code"
             log_warning "$test_url_details"
             log_warning "Page title: $page_title"
-            log_warning "Page extract: $page_extract"
+            log_warning "Page extract:\n$page_extract"
         fi
     done
 
@@ -286,21 +317,6 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 }
 
 #=================================================
-# Generic functions for unit tests
-#=================================================
-
-
-validate_that_at_least_one_install_succeeded () {
-
-    if [ $(GET_RESULT check_sub_dir) -eq 0 ] && [ $(GET_RESULT check_root) -eq 0 ]
-    then
-        log_error "All installs failed, therefore this test cannot be performed..."
-        return 1
-    fi
-
-}
-
-#=================================================
 # Unit tests
 #=================================================
 
@@ -311,7 +327,8 @@ TEST_INSTALL () {
     local install_type=$1
     [ "$install_type" = "subdir" ] && { start_test "Installation in a sub path";      local check_path=/path; }
     [ "$install_type" = "root"   ] && { start_test "Installation on the root";        local check_path=/;     }
-    [ "$install_type" = "no_url" ] && { start_test "Installation without url access"; local check_path="";    }
+    [ "$install_type" = "nourl"  ] && { start_test "Installation without url access"; local check_path="";    }
+    local snapname=snap_${install_type}install
 
     LOAD_LXC_SNAPSHOT snap0
 
@@ -319,151 +336,108 @@ TEST_INSTALL () {
     INSTALL_APP "path=$check_path" \
         && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
 
-    # Check the result and print SUCCESS or FAIL
-    if [ $? -eq 0 ]
-    then
-        SET_RESULT global_setup 1
-        local check_result_setup=1
+    local install=$?
 
-        if [ "$install_type" = "root" ]
-        then
-            [ -e "$LXC_SNAPSHOTS/snap_rootinstall" ] \
-                && log_debug "Create a snapshot for root installation." \
-                && CREATE_LXC_SNAPSHOT snap_rootinstall
-        else
-            # Check if a snapshot already exist for a subpath (or no_url) install
-            [ ! -e "$LXC_SNAPSHOTS/snap_subdirinstall" ] \
-                && log_debug "Create a snapshot for sub path installation." \
-                && CREATE_LXC_SNAPSHOT snap_subdirinstall
-        fi
-    else
-        SET_RESULT_IF_NONE_YET global_setup -1
-        local check_result_setup=-1
-    fi
+    # Create the snapshot that'll be used by other tests later
+    [ $install -eq 0 ] \
+        && [ ! -e "$LXC_SNAPSHOTS/$snapname" ] \
+        && log_debug "Create a snapshot after app install" \
+        && CREATE_LXC_SNAPSHOT $snapname
 
-    # Remove the application
-    REMOVE_APP
-
-    if [ $? -eq 0 ]
-    then
-        local check_result_remove=1
-        SET_RESULT global_remove 1
-    else
-        # The global success for a deletion can't be failed if another remove succeed
-        SET_RESULT_IF_NONE_YET global_remove -1
-        local check_result_remove=-1
-    fi
+    # Remove and reinstall the application
+    [ $install -eq 0 ] \
+        && log_small_title "Remove and reinstall the application after a removal." \
+        && REMOVE_APP \
+        && INSTALL_APP "path=$check_path" \
+        && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
 
     # Reinstall the application after the removing
     # Try to resintall only if the first install is a success.
-    if [ $check_result_setup -eq 1 ]
-    then
-        log_small_title "Reinstall the application after a removing."
-
-        INSTALL_APP "path=$check_path" \
-            && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
-
-        # Check the result and print SUCCESS or FAIL
-        [ $? -eq 0 ] && local check_result_setup=1 || local check_result_setup=-1
-    fi
-
-    # Fill the correct variable depend on the type of test
-    if [ "$install_type" = "subdir" ]
-    then
-        SET_RESULT check_sub_dir $check_result_setup
-        SET_RESULT check_remove_sub_dir $check_result_remove
-    else    # root and no_url
-        SET_RESULT check_root $check_result_setup
-        SET_RESULT check_remove_root $check_result_remove
-    fi
+    [ $? -eq 0 ] \
+        && SET_RESULT check_$install_type 1 \
+        || SET_RESULT check_$install_type -1
 
     break_before_continue
 }
 
 TEST_UPGRADE () {
 
-    [ $(GET_RESULT check_sub_dir) -eq 1 ] && local check_path=/path || local check_path=/
+    if [ "$commit" == "current" ]
+    then
+        start_test "Upgrade from the same version"
+    else
+        specific_upgrade_args="$(grep "^manifest_arg=" "$test_serie_dir/upgrades/$commit" | cut -d'=' -f2-)"
+        upgrade_name=$(grep "^name=" "$test_serie_dir/upgrades/$commit" | cut -d'=' -f2)
 
-    # Do an upgrade test for each commit in the upgrade list
-    for commit in $(cat $test_serie_dir/upgrades_to_test)
-    do
-        if [ "$commit" == "current" ]
-        then
-            start_test "Upgrade from the same version"
-        else
-            specific_upgrade_args="$(grep "^manifest_arg=" "$test_serie_dir/upgrades/$commit" | cut -d'=' -f2-)"
-            upgrade_name=$(grep "^name=" "$test_serie_dir/upgrades/$commit" | cut -d'=' -f2)
+        [ -n "$upgrade_name" ] || upgrade_name="commit $commit"
+        start_test "Upgrade from $upgrade_name"
+    fi
 
-            [ -n "$upgrade_name" ] || upgrade_name="commit $commit"
-            start_test "Upgrade from $upgrade_name"
+    at_least_one_install_succeeded || return
+
+    local check_path=$(default_install_path)
+
+    # Install the application in a LXC container
+    log_small_title "Preliminary install..."
+    if [ "$commit" == "current" ]
+    then
+        # If no commit is specified, use the current version.
+        LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path"
+        local ret=$?
+    else
+        # Get the arguments of the manifest for this upgrade.
+        if [ -n "$specific_upgrade_args" ]; then
+            cp "$test_serie_dir/install_args" "$test_serie_dir/install_args.bkp"
+            echo "$specific_upgrade_args" > "$test_serie_dir/install_args"
         fi
 
-        validate_that_at_least_one_install_succeeded || return
+        # Make a backup of the directory
+        # and Change to the specified commit
+        sudo cp -a "$package_path" "${package_path}_back"
+        (cd "$package_path"; git checkout --force --quiet "$commit")
 
-        # Install the application in a LXC container
-        log_small_title "Preliminary install..."
-        if [ "$commit" == "current" ]
-        then
-            # If no commit is specified, use the current version.
-            LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path"
-            local ret=$?
-        else
-            # Get the arguments of the manifest for this upgrade.
-            if [ -n "$specific_upgrade_args" ]; then
-                cp "$test_serie_dir/install_args" "$test_serie_dir/install_args.bkp"
-                echo "$specific_upgrade_args" > "$test_serie_dir/install_args"
-            fi
+        LOAD_LXC_SNAPSHOT snap0
 
-            # Make a backup of the directory
-            # and Change to the specified commit
-            sudo cp -a "$package_path" "${package_path}_back"
-            (cd "$package_path"; git checkout --force --quiet "$commit")
+        # Install the application
+        INSTALL_APP "path=$check_path"
+        local ret=$?
 
-            LOAD_LXC_SNAPSHOT snap0
-
-            # Install the application
-            INSTALL_APP "path=$check_path"
-            local ret=$?
-
-            if [ -n "$specific_upgrade_args" ]; then
-                mv "$test_serie_dir/install_args.bkp" "$test_serie_dir/install_args"
-            fi
-
-            # Then replace the backup
-            sudo rm -r "$package_path"
-            sudo mv "${package_path}_back" "$package_path"
+        if [ -n "$specific_upgrade_args" ]; then
+            mv "$test_serie_dir/install_args.bkp" "$test_serie_dir/install_args"
         fi
 
-        # Check if the install had work
-        [ $ret -eq 0 ] || { log_error "Initial install failed... upgrade test ignore"; LXC_STOP; continue; }
+        # Then replace the backup
+        sudo rm -r "$package_path"
+        sudo mv "${package_path}_back" "$package_path"
+    fi
 
-        log_small_title "Upgrade..."
+    # Check if the install had work
+    [ $ret -eq 0 ] || { log_error "Initial install failed... upgrade test ignore"; LXC_STOP; continue; }
 
-        # Upgrade the application in a LXC container
-        RUN_YUNOHOST_CMD "app upgrade $app_id -f ./app_folder/" \
-            && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
+    log_small_title "Upgrade..."
 
-        if [ $? -eq 0 ]
-        then
-            SET_RESULT_IF_NONE_YET check_upgrade 1
-        else
-            SET_RESULT check_upgrade -1
-        fi
+    # Upgrade the application in a LXC container
+    RUN_YUNOHOST_CMD "app upgrade $app_id -f ./app_folder/" \
+        && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
 
-        # Remove the application
-        REMOVE_APP
-    done
+    if [ $? -eq 0 ]
+    then
+        SET_RESULT_IF_NONE_YET check_upgrade 1
+    else
+        SET_RESULT check_upgrade -1
+    fi
+
+    # Remove the application
+    REMOVE_APP
 }
 
 TEST_PUBLIC_PRIVATE () {
-    # Try to install in public or private mode
-    # $1 = install type
 
     local install_type=$1
     [ "$install_type" = "private" ] && start_test "Installation in private mode"
     [ "$install_type" = "public"  ] && start_test "Installation in public mode"
 
-    validate_that_at_least_one_install_succeeded || return
+    at_least_one_install_succeeded || return
 
     # Set public or private according to type of test requested
     if [ "$install_type" = "private" ]; then
@@ -526,18 +500,13 @@ TEST_PUBLIC_PRIVATE () {
 }
 
 TEST_MULTI_INSTANCE () {
-    # Try multi-instance installations
 
     start_test "Multi-instance installations"
 
     # Check if an install have previously work
-    validate_that_at_least_one_install_succeeded || return
+    at_least_one_install_succeeded || return
 
-    [ $(GET_RESULT check_sub_dir) -eq 1 ] && local check_path=/path || local check_path=/
-
-    local multi_yunohost_result_1=0
-    local multi_yunohost_result_2=0
-
+    local check_path=$(default_install_path)
 
     LOAD_LXC_SNAPSHOT snap0
 
@@ -559,23 +528,15 @@ TEST_MULTI_INSTANCE () {
 }
 
 TEST_PORT_ALREADY_USED () {
-    # Try to install with specific complications
-    # $1 = install type
 
     start_test "Port already used"
 
     # Check if an install have previously work
-    validate_that_at_least_one_install_succeeded || return
-
-    # Use a path according to previous succeeded installs
-
-    if grep -q -m1 "port_already_use=1" "$test_serie_dir/check_process.tests_infos"
-    then
-        local check_port=$(grep -m1 "port_already_use=1" "$test_serie_dir/check_process.tests_infos" | grep -o -E "\([0-9]+\)" | tr -d '()')
-    else
-        local check_port=6660
-    fi
-
+    at_least_one_install_succeeded || return
+    
+    local check_port=$1
+    local check_path=$(default_install_path)
+    
     LOAD_LXC_SNAPSHOT snap0
 
     # Build a service with netcat for use this port before the app.
@@ -587,8 +548,6 @@ TEST_PORT_ALREADY_USED () {
     # Then start this service to block this port.
     LXC_START "sudo systemctl enable netcat & sudo systemctl start netcat"
 
-    [ $(GET_RESULT check_sub_dir) -eq 1 ] && local check_path=/path || local check_path=/
-
     # Install the application in a LXC container
     INSTALL_APP "path=$check_path" "port=$check_port" \
         && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
@@ -597,133 +556,105 @@ TEST_PORT_ALREADY_USED () {
 
     break_before_continue
 }
-
+   
 TEST_BACKUP_RESTORE () {
+    
     # Try to backup then restore the app
 
     start_test "Backup/Restore"
 
     # Check if an install have previously work
-    validate_that_at_least_one_install_succeeded || return
+    at_least_one_install_succeeded || return
+    
+    local check_path=$(default_install_path)
 
-    # Try in 2 times, first in root and second in sub path.
-    local i=0
-    for i in 0 1
+    # Install the application in a LXC container
+    LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path"
+
+    local ret=$?
+
+    # Remove the previous residual backups
+    sudo rm -rf $LXC_ROOTFS/home/yunohost.backup/archives
+
+    # BACKUP
+    # Made a backup if the installation succeed
+    if [ $ret -ne 0 ]
+    then
+        log_error "Installation failed..."
+    else
+        log_small_title "Backup of the application..."
+
+        # Made a backup of the application
+        RUN_YUNOHOST_CMD "backup create -n Backup_test --apps $app_id"
+
+        ret=$?
+
+        if [ $ret -eq 0 ]; then
+            log_debug "Backup successful"
+        else
+            log_error "Backup failed."
+        fi
+    fi
+
+    # Check the result and print SUCCESS or FAIL
+    if [ $ret -eq 0 ]
+    then
+        SET_RESULT_IF_NONE_YET check_backup 1
+    else
+        SET_RESULT check_backup -1
+    fi
+
+    # Grab the backup archive into the LXC container, and keep a copy
+    sudo cp -a $LXC_ROOTFS/home/yunohost.backup/archives ./
+
+    # RESTORE
+    # Try the restore process in 2 times, first after removing the app, second after a restore of the container.
+    local j=0
+    for j in 0 1
     do
-        # First, try with a root install
-        if [ $i -eq 0 ]
+        # First, simply remove the application
+        if [ $j -eq 0 ]
         then
-            # Check if root installation worked, or if force_install_ok is setted.
-            if [ $(GET_RESULT check_root) -eq 0 ]
-            then
-                log_warning "Root install failed, therefore this test cannot be performed..."
-                continue
-            fi
+            # Remove the application
+            REMOVE_APP
 
-            local check_path=/
-            log_small_title "Preliminary installation on the root..."
+            log_small_title "Restore after removing the application..."
 
-            # Second, try with a sub path install
-        elif [ $i -eq 1 ]
+            # Second, restore the whole container to remove completely the application
+        elif [ $j -eq 1 ]
         then
-            # Check if sub path installation worked, or if force_install_ok is setted.
-            if [ $(GET_RESULT check_sub_dir) -eq 1 ]
-            then
-                log_warning "Sub path install failed, therefore this test cannot be performed..."
-                continue
-            fi
-            local check_path=/path
-            log_small_title "Preliminary installation in a sub path..." "white" "bold" clog
+
+            # Remove the previous residual backups
+            sudo rm -rf $LXC_SNAPSHOTS/snap0/rootfs/home/yunohost.backup/archives
+
+            # Place the copy of the backup archive in the container.
+            sudo mv -f ./archives $LXC_SNAPSHOTS/snap0/rootfs/home/yunohost.backup/
+
+            LXC_STOP
+            LOAD_LXC_SNAPSHOT snap0
+
+            log_small_title "Restore on a clean YunoHost system..."
         fi
 
-        # Install the application in a LXC container
-        LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path"
+        # Restore the application from the previous backup
+        RUN_YUNOHOST_CMD "backup restore Backup_test --force --apps $app_id" \
+            && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
 
         local ret=$?
 
-        # Remove the previous residual backups
-        sudo rm -rf $LXC_ROOTFS/home/yunohost.backup/archives
-
-        # BACKUP
-        # Made a backup if the installation succeed
-        if [ $ret -ne 0 ]
-        then
-            log_error "Installation failed..."
+        # Print the result of the backup command
+        if [ $ret -eq 0 ]; then
+            log_debug "Restore successful."
+            SET_RESULT_IF_NONE_YET check_restore 1
         else
-            log_small_title "Backup of the application..."
-
-            # Made a backup of the application
-            RUN_YUNOHOST_CMD "backup create -n Backup_test --apps $app_id"
-
-            ret=$?
-
-            if [ $ret -eq 0 ]; then
-                log_debug "Backup successful"
-            else
-                log_error "Backup failed."
-            fi
+            log_error "Restore failed."
+            SET_RESULT check_restore -1
         fi
 
-        # Check the result and print SUCCESS or FAIL
-        if [ $ret -eq 0 ]
-        then
-            SET_RESULT_IF_NONE_YET check_backup 1
-        else
-            SET_RESULT check_backup -1
-        fi
+        break_before_continue
 
-        # Grab the backup archive into the LXC container, and keep a copy
-        sudo cp -a $LXC_ROOTFS/home/yunohost.backup/archives ./
-
-        # RESTORE
-        # Try the restore process in 2 times, first after removing the app, second after a restore of the container.
-        local j=0
-        for j in 0 1
-        do
-            # First, simply remove the application
-            if [ $j -eq 0 ]
-            then
-                # Remove the application
-                REMOVE_APP
-
-                log_small_title "Restore after removing the application..."
-
-                # Second, restore the whole container to remove completely the application
-            elif [ $j -eq 1 ]
-            then
-
-                # Remove the previous residual backups
-                sudo rm -rf $LXC_SNAPSHOTS/snap0/rootfs/home/yunohost.backup/archives
-
-                # Place the copy of the backup archive in the container.
-                sudo mv -f ./archives $LXC_SNAPSHOTS/snap0/rootfs/home/yunohost.backup/
-
-                LXC_STOP
-                LOAD_LXC_SNAPSHOT snap0
-
-                log_small_title "Restore on a clean YunoHost system..."
-            fi
-
-            # Restore the application from the previous backup
-            RUN_YUNOHOST_CMD "backup restore Backup_test --force --apps $app_id" \
-                && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
-
-            local ret=$?
-
-            # Print the result of the backup command
-            if [ $ret -eq 0 ]; then
-                log_debug "Restore successful."
-                SET_RESULT_IF_NONE_YET check_restore 1
-            else
-                log_error "Restore failed."
-                SET_RESULT check_restore -1
-            fi
-
-            break_before_continue
-
-            # Stop and restore the LXC container
-            LXC_STOP
-        done
+        # Stop and restore the LXC container
+        LXC_STOP
     done
 }
 
@@ -733,13 +664,14 @@ TEST_CHANGE_URL () {
     start_test "Change URL"
 
     # Check if an install have previously work
-    validate_that_at_least_one_install_succeeded || return
+    at_least_one_install_succeeded || return
+    this_is_a_web_app || return
 
     # Try in 6 times !
     # Without modify the domain, root to path, path to path and path to root.
     # And then, same with a domain change
     local i=0
-    for i in `seq 1 7`
+    for i in $(seq 1 7)
     do
         # Same domain, root to path
         if [ $i -eq 1 ]; then
@@ -747,37 +679,37 @@ TEST_CHANGE_URL () {
             local new_path=/path
             local new_domain=$SUBDOMAIN
 
-            # Same domain, path to path
+        # Same domain, path to path
         elif [ $i -eq 2 ]; then
             check_path=/path
             local new_path=/path_2
             local new_domain=$SUBDOMAIN
 
-            # Same domain, path to root
+        # Same domain, path to root
         elif [ $i -eq 3 ]; then
             check_path=/path
             local new_path=/
             local new_domain=$SUBDOMAIN
 
-            # Other domain, root to path
+        # Other domain, root to path
         elif [ $i -eq 4 ]; then
             check_path=/
             local new_path=/path
             local new_domain=$DOMAIN
 
-            # Other domain, path to path
+        # Other domain, path to path
         elif [ $i -eq 5 ]; then
             check_path=/path
             local new_path=/path_2
             local new_domain=$DOMAIN
 
-            # Other domain, path to root
+        # Other domain, path to root
         elif [ $i -eq 6 ]; then
             check_path=/path
             local new_path=/
             local new_domain=$DOMAIN
 
-            # Other domain, root to root
+        # Other domain, root to root
         elif [ $i -eq 7 ]; then
             check_path=/
             local new_path=/
@@ -878,13 +810,11 @@ ACTIONS_CONFIG_PANEL () {
     fi
 
     # Check if an install have previously work
-    validate_that_at_least_one_install_succeeded || return
-
-    # Use a path according to previous succeeded installs
-    [ $(GET_RESULT check_sub_dir) -eq 1 ] && local check_path=/path || local check_path=/
+    at_least_one_install_succeeded || return
 
     # Install the application in a LXC container
     log_small_title "Preliminary install..."
+    local check_path=$(default_install_path)
     LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path"
 
     validate_action_config_panel()
@@ -1277,6 +1207,7 @@ check_witness_files () {
     [ $(GET_RESULT witness) -eq 1 ] && return 1 || return 0
 }
 
+
 RUN_TEST_SERIE() {
     # Launch all tests successively
     test_serie_dir=$1
@@ -1293,54 +1224,16 @@ RUN_TEST_SERIE() {
     # Print the version of YunoHost from the LXC container
     LXC_START "sudo yunohost --version"
 
-    source $test_serie_dir/tests_to_perform
     # Init the value for the current test
     current_test_number=1
 
-    # We will chech that the app can be accessed
-    # (except if it's a no-url app)
-    [ $setup_nourl      -eq 0 ] \
-        && enable_validate_that_app_can_be_accessed="true" \
-        ||enable_validate_that_app_can_be_accessed="false"
+    # The list of test contains for example "TEST_UPGRADE some_commit_id"
+    for test in $test_serie_dir/tests_to_perform
+    do
+        TEST_LAUNCHER $test
+    done
 
-    # Check the package with package linter
-    [ $pkg_linter       -eq 1 ] && PACKAGE_LINTER
 
-    # Try to install in a sub path
-    [ $setup_sub_dir    -eq 1 ] && TEST_LAUNCHER TEST_INSTALL subdir
-
-    # Try to install on root
-    [ $setup_root       -eq 1 ] && TEST_LAUNCHER TEST_INSTALL root
-
-    # Try to install without url access
-    [ $setup_nourl      -eq 1 ] && TEST_LAUNCHER TEST_INSTALL no_url
-
-    # Try the upgrade script
-    [ $upgrade          -eq 1 ] && TEST_LAUNCHER TEST_UPGRADE
-
-    # Try to install in private mode
-    [ $setup_private    -eq 1 ] && TEST_LAUNCHER TEST_PUBLIC_PRIVATE private
-
-    # Try to install in public mode
-    [ $setup_public     -eq 1 ] && TEST_LAUNCHER TEST_PUBLIC_PRIVATE public
-
-    # Try multi-instance installations
-    [ $multi_instance   -eq 1 ] && TEST_LAUNCHER TEST_MULTI_INSTANCE
-
-    # Try to install with a port already used
-    [ $port_already_use -eq 1 ] && TEST_LAUNCHER TEST_PORT_ALREADY_USED
-
-    # Try to backup then restore the app
-    [ $backup_restore   -eq 1 ] && TEST_LAUNCHER TEST_BACKUP_RESTORE
-
-    # Try the change_url script
-    [ $change_url       -eq 1 ] && TEST_LAUNCHER TEST_CHANGE_URL
-
-    # Try the actions
-    [ $actions          -eq 1 ] && TEST_LAUNCHER ACTIONS_CONFIG_PANEL actions
-
-    # Try the config-panel
-    [ $config_panel     -eq 1 ] && TEST_LAUNCHER ACTIONS_CONFIG_PANEL config_panel
 }
 
 TEST_LAUNCHER () {
@@ -1356,18 +1249,16 @@ TEST_LAUNCHER () {
     # Execute the test
     $1 $2
 
-    # Stop and restore the LXC container
-    LXC_STOP
-
     # Restore the started time for the timer
     starttime=$global_start_timer
     # End the timer for the test
     stop_timer 2
+    
+    LXC_STOP
 
     # Update the lock file with the date of the last finished test.
     # $$ is the PID of package_check itself.
     echo "$1 $2:$(date +%s):$$" > "$lock_file"
-
 }
 
 

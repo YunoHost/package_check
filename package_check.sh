@@ -289,20 +289,17 @@ COMPUTE_RESULTS_SUMMARY () {
     # Print the result for each test
     echo -e "\n\n"
     print_result "Package linter" $RESULT_linter
-    print_result "Install" $RESULT_global_setup
-    print_result "Remove" $RESULT_global_remove
-    print_result "Install (subpath)" $RESULT_check_sub_dir
-    print_result "Remove  (subpath)" $RESULT_check_remove_sub_dir
     print_result "Install (root)" $RESULT_check_root
-    print_result "Remove  (root)" $RESULT_check_remove_root
-    print_result "Upgrade" $RESULT_check_upgrade
+    print_result "Install (subpath)" $RESULT_check_sub_dir
+    print_result "Install (no url)" $RESULT_check_nourl
     print_result "Install (private mode)" $RESULT_check_private
     print_result "Install (public mode)" $RESULT_check_public
     print_result "Install (multi-instance)" $RESULT_check_multi_instance
-    print_result "Port already used" $RESULT_check_port
+    print_result "Upgrade" $RESULT_check_upgrade
     print_result "Backup" $RESULT_check_backup
     print_result "Restore" $RESULT_check_restore
     print_result "Change URL" $RESULT_change_url
+    print_result "Port already used" $RESULT_check_port
     print_result "Actions and config-panel" $RESULT_action_config_panel
 
     # Determine the level for this app
@@ -330,16 +327,13 @@ COMPUTE_RESULTS_SUMMARY () {
     pass_level_1() {
         # -> The package can be install and remove.
         [ $RESULT_global_setup -eq 1 ] && \
-        [ $RESULT_global_remove -eq 1 ]
     }
 
     pass_level_2() {
         # -> The package can be install and remove in all tested configurations.
         # Validated if none install failed
         [ $RESULT_check_sub_dir -ne -1 ] && \
-        [ $RESULT_check_remove_sub_dir -ne -1 ] && \
         [ $RESULT_check_root -ne -1 ] && \
-        [ $RESULT_check_remove_root -ne -1 ] && \
         [ $RESULT_check_private -ne -1 ] && \
         [ $RESULT_check_public -ne -1 ] && \
         [ $RESULT_check_multi_instance -ne -1 ]
@@ -450,12 +444,7 @@ COMPUTE_RESULTS_SUMMARY () {
             # So this level will set at 0.
             level[i]=0
 
-            # If the level is at 'na', it will be ignored
-        elif [ "${level[i]}" == "na" ]
-        then
-            continue
-
-            # If the level is at 1 or 2. The global level will be set at this level
+        # If the level is at 1 or 2. The global level will be set at this level
         elif [ "${level[i]}" -ge 1 ]
         then
             global_level=$i
@@ -496,9 +485,7 @@ COMPUTE_RESULTS_SUMMARY () {
     for i in `seq 1 10`
     do
         display="0"
-        if [ "${level[$i]}" == "na" ]; then
-            display="N/A"
-        elif [ "${level[$i]}" -ge 1 ]; then
+        if [ "${level[$i]}" -ge 1 ]; then
             display="1"
         fi
         echo -e "\t   Level $i: $display"
@@ -521,12 +508,9 @@ RESULT_linter_level_6=0
 RESULT_linter_level_7=0
 RESULT_linter_level_8=0
 RESULT_linter_broken=0
-RESULT_global_setup=0
-RESULT_global_remove=0
 RESULT_check_sub_dir=0
 RESULT_check_root=0
-RESULT_check_remove_sub_dir=0
-RESULT_check_remove_root=0
+RESULT_check_nourl=0
 RESULT_check_upgrade=0
 RESULT_check_backup=0
 RESULT_check_restore=0
@@ -612,18 +596,13 @@ parse_check_process() {
         extract_check_process_section "^$tests_serie"   "^;;" > $test_serie_rawconf
         extract_check_process_section "^; pre-install"  "^; "   $test_serie_rawconf > $test_serie_dir/preinstall.sh.template
         # This is the arg list to be later fed to "yunohost app install"
+        # Looking like domain=foo.com&path=/bar&password=stuff
+        # "Standard" arguments like domain/path will later be overwritten
+        # during tests
         extract_check_process_section "^; Manifest"     "^; "   $test_serie_rawconf | awk '{print $1}' | tr -d '"' | tr '\n' '&' > $test_serie_dir/install_args
         extract_check_process_section "^; Actions"      "^; "   $test_serie_rawconf > $test_serie_dir/check_process.actions_infos
         extract_check_process_section "^; Config_panel" "^; "   $test_serie_rawconf > $test_serie_dir/check_process.configpanel_infos
         extract_check_process_section "^; Checks"       "^; "   $test_serie_rawconf > $test_serie_dir/check_process.tests_infos
-
-        # This is the test of commits to test upgrade from
-        for LINE in $(grep "^upgrade=1" "$test_serie_dir/check_process.tests_infos")
-        do
-            commit=$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')
-            [ -n "$commit" ] || commit="current"
-            echo $commit >> $test_serie_dir/upgrades_to_test
-        done
 
         is_test_enabled () {
             # Find the line for the given check option
@@ -640,21 +619,40 @@ parse_check_process() {
             fi
         }
 
-        cat << EOF > $test_serie_dir/tests_to_perform
-pkg_linter=$(is_test_enabled pkg_linter)
-setup_sub_dir=$(is_test_enabled setup_sub_dir)
-setup_root=$(is_test_enabled setup_root)
-setup_nourl=$(is_test_enabled setup_nourl)
-setup_private=$(is_test_enabled setup_private)
-setup_public=$(is_test_enabled setup_public)
-upgrade=$(is_test_enabled upgrade)
-backup_restore=$(is_test_enabled backup_restore)
-multi_instance=$(is_test_enabled multi_instance)
-port_already_use=$(is_test_enabled port_already_use)
-change_url=$(is_test_enabled change_url)
-actions=$(is_test_enabled actions)
-config_panel=$(is_test_enabled config_panel)
-EOF
+        is_test_enabled pkg_linter     && echo "PACKAGE_LINTER"               >> $test_serie_dir/tests_to_perform
+        is_test_enabled setup_sub_dir  && echo "TEST_INSTALL subdir         " >> $test_serie_dir/tests_to_perform
+        is_test_enabled setup_root     && echo "TEST_INSTALL root"            >> $test_serie_dir/tests_to_perform
+        is_test_enabled setup_nourl    && echo "TEST_INSTALL nourl"           >> $test_serie_dir/tests_to_perform
+        is_test_enabled setup_private  && echo "TEST_PUBLIC_PRIVATE private"  >> $test_serie_dir/tests_to_perform
+        is_test_enabled setup_public   && echo "TEST_PUBLIC_PRIVATE public"   >> $test_serie_dir/tests_to_perform
+        is_test_enabled multi_instance && echo "TEST_MULTI_INSTANCE"          >> $test_serie_dir/tests_to_perform
+        is_test_enabled backup_restore && echo "TEST_BACKUP_RESTORE"          >> $test_serie_dir/tests_to_perform
+       
+        # Upgrades
+        
+        for LINE in $(grep "^upgrade=1" "$test_serie_dir/check_process.tests_infos")
+        do
+            commit=$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')
+            [ -n "$commit" ] || commit="current"
+            echo "TEST_UPGRADE $commit" >> $test_serie_dir/tests_to_perform
+        done
+       
+        # "Advanced" features
+
+        is_test_enabled change_url       && echo "TEST_CHANGE_URL"                   >> $test_serie_dir/tests_to_perform
+        is_test_enabled actions          && echo "ACTIONS_CONFIG_PANEL actions"      >> $test_serie_dir/tests_to_perform
+        is_test_enabled config_panel     && echo "ACTIONS_CONFIG_PANEL config_panel" >> $test_serie_dir/tests_to_perform
+
+        # Port already used ... do we really need this ...
+
+        if grep -q -m1 "port_already_use=1" "$test_serie_dir/check_process.tests_infos"
+        then
+            local check_port=$(grep -m1 "port_already_use=1" "$test_serie_dir/check_process.tests_infos" | grep -o -E "\([0-9]+\)" | tr -d '()')
+        else
+            local check_port=6660
+        fi
+
+        is_test_enabled port_already_use && echo "TEST_PORT_ALREADY_USED $check_port" >> $test_serie_dir/tests_to_perform
 
     done 3<<< "$(grep "^;; " "$check_process")"
 
@@ -677,19 +675,20 @@ guess_test_configuration() {
     python "./sub_scripts/manifest_parsing.py" "$package_path/manifest.json" \
         | cut -d ':' -f1,2 | tr ':' '=' | tr '\n' '&' > $test_serie_dir/install_args
 
-    cat << EOF > $test_serie_dir/tests_to_perform
-pkg_linter=1
-setup_sub_dir=1
-setup_root=1
-setup_nourl=0
-setup_private=$(grep -q "is_public=" $test_serie_dir/install_args && echo 1 || echo 0)
-setup_public=$(grep -q "is_public=" $test_serie_dir/install_args && echo 1 || echo 0)0
-upgrade=1
-backup_restore=1
-multi_instance=$(grep multi_instance "$package_path/manifest.json" | grep -q true && echo 1 || echo 0)
-port_already_use=0
-change_url=0
-EOF
+    echo "PACKAGE_LINTER"                   >> $test_serie_dir/tests_to_perform
+    echo "TEST_INSTALL subdir"              >> $test_serie_dir/tests_to_perform
+    echo "TEST_INSTALL root"                >> $test_serie_dir/tests_to_perform
+    if grep -q "is_public=" $test_serie_dir/install_args
+    then
+        echo "TEST_PUBLIC_PRIVATE private"  >> $test_serie_dir/tests_to_perform
+        echo "TEST_PUBLIC_PRIVATE public"   >> $test_serie_dir/tests_to_perform
+    fi
+    if grep multi_instance "$package_path/manifest.json" | grep -q true
+    then
+        echo "TEST_MULTI_INSTANCE"          >> $test_serie_dir/tests_to_perform
+    fi
+    echo "TEST_BACKUP_RESTORE"              >> $test_serie_dir/tests_to_perform
+    echo "TEST_UPGRADE current"             >> $test_serie_dir/tests_to_perform
 }
 
 #=================================================
@@ -700,7 +699,6 @@ run_all_tests() {
     start_timer
     # And keep this value separately
     complete_start_timer=$starttime
-
 
     LXC_INIT
 
@@ -719,7 +717,7 @@ run_all_tests() {
         # Print the final results of the tests
         COMPUTE_RESULTS_SUMMARY $test_serie_id
 
-        # FIXME FIXME FIXME gotta reset the snapshot
+        LXC_PURGE_SNAPSHOTS
     done
 
     # Restore the started time for the timer
