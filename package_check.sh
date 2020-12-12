@@ -290,7 +290,7 @@ COMPUTE_RESULTS_SUMMARY () {
     echo -e "\n\n"
     print_result "Package linter" $RESULT_linter
     print_result "Install (root)" $RESULT_check_root
-    print_result "Install (subpath)" $RESULT_check_sub_dir
+    print_result "Install (subpath)" $RESULT_check_subdir
     print_result "Install (no url)" $RESULT_check_nourl
     print_result "Install (private mode)" $RESULT_check_private
     print_result "Install (public mode)" $RESULT_check_public
@@ -325,14 +325,14 @@ COMPUTE_RESULTS_SUMMARY () {
     test -n "${level[10]}" || level[10]=0
 
     pass_level_1() {
-        # -> The package can be install and remove.
-        [ $RESULT_global_setup -eq 1 ] && \
+	 # FIXME FIXME #FIXME
+	 return 0
     }
 
     pass_level_2() {
         # -> The package can be install and remove in all tested configurations.
         # Validated if none install failed
-        [ $RESULT_check_sub_dir -ne -1 ] && \
+        [ $RESULT_check_subdir -ne -1 ] && \
         [ $RESULT_check_root -ne -1 ] && \
         [ $RESULT_check_private -ne -1 ] && \
         [ $RESULT_check_public -ne -1 ] && \
@@ -378,11 +378,7 @@ COMPUTE_RESULTS_SUMMARY () {
     pass_level_7() {
         # -> None errors in all tests performed
         # Validated if none errors is happened.
-        [ $RESULT_global_setup -ne -1 ] && \
-        [ $RESULT_global_remove -ne -1 ] && \
-        [ $RESULT_check_sub_dir -ne -1 ] && \
-        [ $RESULT_check_remove_sub_dir -ne -1 ] && \
-        [ $RESULT_check_remove_root -ne -1 ] && \
+        [ $RESULT_check_subdir -ne -1 ] && \
         [ $RESULT_check_upgrade -ne -1 ] && \
         [ $RESULT_check_private -ne -1 ] && \
         [ $RESULT_check_public -ne -1 ] && \
@@ -508,7 +504,7 @@ RESULT_linter_level_6=0
 RESULT_linter_level_7=0
 RESULT_linter_level_8=0
 RESULT_linter_broken=0
-RESULT_check_sub_dir=0
+RESULT_check_subdir=0
 RESULT_check_root=0
 RESULT_check_nourl=0
 RESULT_check_upgrade=0
@@ -572,10 +568,11 @@ parse_check_process() {
 
     # Extract the Upgrade infos
     extract_check_process_section "^;;; Upgrade options" ";; " > $TEST_CONTEXT/check_process.upgrade_options
-    mkdir -p $TEST_CONTEXT/upgrades.d
+    mkdir -p $TEST_CONTEXT/upgrades
+    local commit
     for commit in $(cat $TEST_CONTEXT/check_process.upgrade_options | grep "^; commit=.*" | awk -F= '{print $2}')
     do
-        cat $TEST_CONTEXT/check_process.upgrade_options | sed -n -e "/^;; $commit/,/^;;/ p" | grep -v "^;;" > $TEST_CONTEXT/upgrades
+        cat $TEST_CONTEXT/check_process.upgrade_options | sed -n -e "/^;; $commit/,/^;;/ p" | grep -v "^;;" > $TEST_CONTEXT/upgrades/$commit
     done
     rm $TEST_CONTEXT/check_process.upgrade_options
 
@@ -608,19 +605,11 @@ parse_check_process() {
             # Find the line for the given check option
             local value=$(grep -m1 -o "^$1=." "$test_serie_dir/check_process.tests_infos" | awk -F= '{print $2}')
             # And return this value
-            if [ "${value:0:1}" = "1" ]
-            then
-                echo 1
-            elif [ "${value:0:1}" = "0" ]
-            then
-                echo 0
-            else
-                echo -1
-            fi
+            [ "${value:0:1}" = "1" ]
         }
 
         is_test_enabled pkg_linter     && echo "PACKAGE_LINTER"               >> $test_serie_dir/tests_to_perform
-        is_test_enabled setup_sub_dir  && echo "TEST_INSTALL subdir         " >> $test_serie_dir/tests_to_perform
+        is_test_enabled setup_sub_dir  && echo "TEST_INSTALL subdir"          >> $test_serie_dir/tests_to_perform
         is_test_enabled setup_root     && echo "TEST_INSTALL root"            >> $test_serie_dir/tests_to_perform
         is_test_enabled setup_nourl    && echo "TEST_INSTALL nourl"           >> $test_serie_dir/tests_to_perform
         is_test_enabled setup_private  && echo "TEST_PUBLIC_PRIVATE private"  >> $test_serie_dir/tests_to_perform
@@ -629,13 +618,13 @@ parse_check_process() {
         is_test_enabled backup_restore && echo "TEST_BACKUP_RESTORE"          >> $test_serie_dir/tests_to_perform
        
         # Upgrades
-        
-        for LINE in $(grep "^upgrade=1" "$test_serie_dir/check_process.tests_infos")
+        grep "^upgrade=1" "$test_serie_dir/check_process.tests_infos" |
+	while IFS= read -r LINE;
         do
             commit=$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')
             [ -n "$commit" ] || commit="current"
             echo "TEST_UPGRADE $commit" >> $test_serie_dir/tests_to_perform
-        done
+        done 
        
         # "Advanced" features
 
@@ -654,8 +643,11 @@ parse_check_process() {
 
         is_test_enabled port_already_use && echo "TEST_PORT_ALREADY_USED $check_port" >> $test_serie_dir/tests_to_perform
 
+	cat $test_serie_dir/tests_to_perform
+
     done 3<<< "$(grep "^;; " "$check_process")"
 
+    return 0
 }
 
 guess_test_configuration() {
@@ -665,9 +657,11 @@ guess_test_configuration() {
 
     local test_serie_id=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 16)
     local test_serie_dir=$TEST_CONTEXT/$test_serie_id
-
+        
     mkdir -p $test_serie_dir
     init_results $test_serie_id
+    
+    echo "Auto generated test serie" > $test_serie_dir/test_serie_name
 
     test_series+="$test_serie_id "
 

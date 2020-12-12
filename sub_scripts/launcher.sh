@@ -109,7 +109,7 @@ LXC_INIT () {
 LXC_PURGE_SNAPSHOTS() {
     LXC_STOP
 
-    for SNAP in $(sudo ls $LXC_SNAPSHOTS/snap_*install)
+    for SNAP in $(sudo ls $LXC_SNAPSHOTS/snap_*install 2>/dev/null)
     do
         sudo lxc-snapshot -n $LXC_NAME -d $(basename $SNAP)
     done
@@ -247,10 +247,12 @@ LXC_START () {
     rsync -rq --delete "$package_path" "$LXC_NAME": >> "$complete_log" 2>&1
 
     # Execute the command given in argument in the container and log its results.
-    ssh $arg_ssh $LXC_NAME "$cmd; exit $?" | tee -a "$complete_log"
+    ssh $arg_ssh $LXC_NAME "$cmd" | tee -a "$complete_log"
 
     # Store the return code of the command
     local returncode=${PIPESTATUS[0]}
+
+    log_debug "Return code: $return_code"
 
     stop_timer 1
     # Return the exit code of the ssh command

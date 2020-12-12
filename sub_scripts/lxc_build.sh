@@ -20,7 +20,7 @@ LXC_BUILD()
     touch "$lock_file"
     echo $(whoami) > "./.setup_user"
 
-    log_title "Installing dependencies..."
+    log_title "Installing host dependencies..."
 
     DEPENDENCIES="lxc lxctl git curl lynx jq python3-pip debootstrap rsync bridge-utils"
     sudo apt-get update
@@ -128,7 +128,7 @@ EOF
             fi
     done
 
-    log_title "Update et install aptitude sudo git"
+    log_title "Installing container dependencies"
     RUN_INSIDE_LXC apt-get update
     RUN_INSIDE_LXC apt-get install -y sudo git ssh openssh-server
 

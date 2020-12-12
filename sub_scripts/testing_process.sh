@@ -17,7 +17,7 @@ break_before_continue () {
 
 start_test () {
 
-    total_number_of_test=$(grep -c "=1$" $test_serie_dir/tests_to_perform)
+    total_number_of_test=$(cat $test_serie_dir/tests_to_perform | wc -l)
 
     log_title "$1 [Test $current_test_number/$total_number_of_test]"
 
@@ -57,7 +57,7 @@ GET_RESULT() {
 
 at_least_one_install_succeeded () {
 
-    [ "$(GET_RESULT check_sub_dir)" -eq 1 ] \
+    [ "$(GET_RESULT check_subdir)" -eq 1 ] \
         || [ "$(GET_RESULT check_root)" -eq 1 ] \
         || [ "$(GET_RESULT check_nourl)" -eq 1 ] \
         || {  log_error "All installs failed, therefore the following tests cannot be performed...";
@@ -67,12 +67,12 @@ at_least_one_install_succeeded () {
 this_is_a_web_app () {
     # Usually the fact that we test "nourl"
     # installs should be a good indicator for this
-    grep "TEST_INSTALL nourl"  $test_serie_dir/tests_to_perform && return 1
+    grep -q "TEST_INSTALL nourl"  $test_serie_dir/tests_to_perform && return 1
 }
 
 default_install_path() {
-    this_is_a_web_app && echo ""
-    || [ "$(GET_RESULT check_sub_dir)" -eq 1 ] && echo "/path "
+    this_is_a_web_app && echo "" \
+    || [ "$(GET_RESULT check_subdir)" -eq 1 ] && echo "/path " \
     || echo "/"
 }
 
@@ -86,7 +86,7 @@ INSTALL_APP () {
 
     # We have default values for domain, user and is_public, but these
     # may still be overwritten by the args ($@)
-    for arg_override in "domain=$SUBDOMAIN" "user=$TEST_USER" "is_public=1" "$@"
+    for arg_override in "domain=$SUBDOMAIN" "admin=$TEST_USER" "user=$TEST_USER" "is_public=1" "$@"
     do
         key="$(echo $arg_override | cut -d '=' -f 1)"
         value="$(echo $arg_override | cut -d '=' -f 2-)"
@@ -95,7 +95,7 @@ INSTALL_APP () {
 
     # Exec the pre-install instruction, if there one
     preinstall_script_template="$test_serie_dir/preinstall.sh.template"
-    if [ -n "$(cat $preinstall_script_template)" ]
+    if [ -e "$preinstall_script_template" ] && [ -n "$(cat $preinstall_script_template)" ]
     then
         log_small_title "Pre installation request"
         # Start the lxc container
@@ -346,8 +346,8 @@ TEST_INSTALL () {
 
     # Remove and reinstall the application
     [ $install -eq 0 ] \
-        && log_small_title "Remove and reinstall the application after a removal." \
         && REMOVE_APP \
+        && log_small_title "Reinstalling after removal." \
         && INSTALL_APP "path=$check_path" \
         && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
 
@@ -361,6 +361,8 @@ TEST_INSTALL () {
 }
 
 TEST_UPGRADE () {
+
+    local commit=$1
 
     if [ "$commit" == "current" ]
     then
@@ -464,7 +466,7 @@ TEST_PUBLIC_PRIVATE () {
         elif [ $i -eq 1 ]
         then
             # Check if sub path installation worked, or if force_install_ok is setted.
-            [ $(GET_RESULT check_sub_dir) -eq 1 ] || { log_warning "Sub path install failed, therefore this test cannot be performed..."; continue; }
+            [ $(GET_RESULT check_subdir) -eq 1 ] || { log_warning "Sub path install failed, therefore this test cannot be performed..."; continue; }
 
             local check_path=/path
         fi
@@ -723,7 +725,7 @@ TEST_CHANGE_URL () {
             || { log_warning "Root install failed, therefore this test cannot be performed..."; continue; }
 
         # If any of the being/end path is not /, we need to have sub_dir install working
-        ( [ "$new_path"   == "/" ] && [ "$new_path" == "/" ] ) || [ $(GET_RESULT check_sub_dir) -eq 1 ] \
+        ( [ "$new_path"   == "/" ] && [ "$new_path" == "/" ] ) || [ $(GET_RESULT check_subdir) -eq 1 ] \
             || { log_warning "Subpath install failed, therefore this test cannot be performed..."; continue; }
 
         # Install the application in a LXC container
@@ -1227,12 +1229,12 @@ RUN_TEST_SERIE() {
     # Init the value for the current test
     current_test_number=1
 
-    # The list of test contains for example "TEST_UPGRADE some_commit_id"
-    for test in $test_serie_dir/tests_to_perform
+    # The list of test contains for example "TEST_UPGRADE some_commit_id
+    readarray -t tests < $test_serie_dir/tests_to_perform
+    for test in "${tests[@]}";
     do
         TEST_LAUNCHER $test
     done
-
 
 }
 
