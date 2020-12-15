@@ -2018,7 +2018,7 @@ PACKAGE_LINTER () {
 	# Check we qualify for level 6, 7, 8
     # Linter will have a warning called "app_in_github_org" if app ain't in the
     # yunohost-apps org...
-	if ! cat "$script_dir/temp_linter_result.json" | jq ".warning" | grep -q "app_in_github_org"
+	if ! cat "$script_dir/temp_linter_result.json" | jq ".warning" | grep -q "is_in_github_org"
 	then
 		RESULT_linter_level_6=1
     fi
