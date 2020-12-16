@@ -17,7 +17,7 @@ break_before_continue () {
 
 start_test () {
 
-    total_number_of_test=$(cat $test_serie_dir/tests_to_perform | wc -l)
+    total_number_of_test=$(ls $TEST_CONTEXT/tests/*.json | wc -l)
 
     log_title "$1 [Test $current_test_number/$total_number_of_test]"
 
@@ -38,42 +38,22 @@ RUN_YUNOHOST_CMD() {
     check_witness_files && return $returncode || return 2
 }
 
-SET_RESULT() {
-    [ $2 -eq 1 ] && log_report_test_success || log_report_test_failed
-    sed --in-place "s/RESULT_$1=.*$/RESULT_$1=$2/g" $test_serie_dir/results
-}
-
-SET_RESULT_IF_NONE_YET() {
-    [ $2 -eq 1 ] && log_report_test_success || log_report_test_failed
-    if [ $(GET_RESULT $1) -eq 0 ]
-    then
-        sed --in-place "s/RESULT_$1=.*$/RESULT_$1=$2/g" $test_serie_dir/results
-    fi
-}
-
-GET_RESULT() {
-    grep "RESULT_$1=" $test_serie_dir/results | awk -F= '{print $2}'
-}
-
-at_least_one_install_succeeded () {
-
-    [ "$(GET_RESULT check_subdir)" -eq 1 ] \
-        || [ "$(GET_RESULT check_root)" -eq 1 ] \
-        || [ "$(GET_RESULT check_nourl)" -eq 1 ] \
-        || {  log_error "All installs failed, therefore the following tests cannot be performed...";
-              return 1; }
-}
-
 this_is_a_web_app () {
+
     # Usually the fact that we test "nourl"
-    # installs should be a good indicator for this
-    grep -q "TEST_INSTALL nourl"  $test_serie_dir/tests_to_perform && return 1
+    # installs should be a good indicator for the fact that it's not a webapp
+    for TEST in $(ls $TEST_CONTEXT/tests/*.json)
+    do
+        jq -e '. | select(.test_type == "TEST_INSTALL") | select(.test_arg == "nourl")' $TEST \
+        && return 1
+    done
+
+    return 0
 }
 
 default_install_path() {
-    this_is_a_web_app && echo "" \
-    || [ "$(GET_RESULT check_subdir)" -eq 1 ] && echo "/path " \
-    || echo "/"
+    # All webapps should be installable at the root of a domain ?
+    this_is_a_web_app && echo "/" || echo ""
 }
 
 #=================================================
@@ -81,8 +61,8 @@ default_install_path() {
 #=================================================
 
 INSTALL_APP () {
-
-    local install_args="$(cat "$test_serie_dir/install_args")"
+    local install_args="$(jq '.install_args' $current_test_infos)"
+    local preinstall_template="$(jq '.preinstall_template' $current_test_infos)"
 
     # We have default values for domain, user and is_public, but these
     # may still be overwritten by the args ($@)
@@ -94,15 +74,14 @@ INSTALL_APP () {
     done
 
     # Exec the pre-install instruction, if there one
-    preinstall_script_template="$test_serie_dir/preinstall.sh.template"
-    if [ -e "$preinstall_script_template" ] && [ -n "$(cat $preinstall_script_template)" ]
+    if [ -n "$preinstall_template" ]
     then
         log_small_title "Pre installation request"
         # Start the lxc container
         LXC_START "true"
         # Copy all the instructions into a script
-        preinstall_script="$test_serie_dir/preinstall.sh"
-        cp "$preinstall_script_template" "$preinstall_script"
+        local preinstall_script="$TEST_CONTEXT/preinstall.sh"
+        echo "$preinstall_template" > "$preinstall_script"
         chmod +x "$preinstall_script"
         # Hydrate the template with variables
         sed -i "s/\$USER/$TEST_USER/" "$preinstall_script"
@@ -175,7 +154,7 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
     local check_domain=$1
     local check_path=$2
-    local expected_to_be=${3}      # Can be empty, public or private, later used to check if it's okay to end up on the portal
+    local install_type=${3}      # Can be anything or 'private', later used to check if it's okay to end up on the portal
     local app_id_to_check=${4:-$app_id}
 
     local curl_error=0
@@ -188,14 +167,13 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
     log_small_title "Validating that the app can (or cannot) be accessed with its url..."
 
     # Force a skipped_uris if public mode is not set
-    if [ -z "$expected_to_be" ]
+    if [ "$install_type" != 'private' ]
     then
         log_debug "Forcing public access using a skipped_uris setting"
         # Add a skipped_uris on / for the app
         RUN_YUNOHOST_CMD "app setting $app_id_to_check skipped_uris -v \"/\""
         # Regen the config of sso
         RUN_YUNOHOST_CMD "app ssowatconf"
-        expected_to_be="public"
     fi
 
     # Try to access to the url in 2 times, with a final / and without
@@ -308,11 +286,11 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
     curl --location --insecure --silent $check_domain$check_path../html/alias_traversal.html \
         | grep "title" | grep --quiet "alias_traversal test" \
         && log_error "Issue alias_traversal detected ! Please see here https://github.com/YunoHost/example_ynh/pull/45 to fix that." \
-        && SET_RESULT alias_traversal 1
+        && SET_RESULT "failure" alias_traversal
 
     [ "$curl_error" -eq 0 ] || return 1
-    [ "$expected_to_be" == "public"  ] && [ $fell_on_sso_portal -eq 0 ] || return 2
-    [ "$expected_to_be" == "private" ] && [ $fell_on_sso_portal -eq 1 ] || return 2
+    [ "$install_type" != "private" ] && [ $fell_on_sso_portal -eq 0 ] || return 2
+    [ "$install_type" == "private" ] && [ $fell_on_sso_portal -eq 1 ] || return 2
     return 0
 }
 
@@ -325,74 +303,66 @@ TEST_INSTALL () {
     # $1 = install type
 
     local install_type=$1
-    [ "$install_type" = "subdir" ] && { start_test "Installation in a sub path";      local check_path=/path; }
-    [ "$install_type" = "root"   ] && { start_test "Installation on the root";        local check_path=/;     }
-    [ "$install_type" = "nourl"  ] && { start_test "Installation without url access"; local check_path="";    }
+    local check_path="/"
+    local is_public="1"
+    [ "$install_type" = "subdir"   ] && { start_test "Installation in a sub path";      local check_path=/path; }
+    [ "$install_type" = "root"     ] && { start_test "Installation on the root";                                }
+    [ "$install_type" = "nourl"    ] && { start_test "Installation without url access"; local check_path="";    }
+    [ "$install_type" = "private"  ] && { start_test "Installation in private mode";    local is_public="0";    }
     local snapname=snap_${install_type}install
 
     LOAD_LXC_SNAPSHOT snap0
 
     # Install the application in a LXC container
-    INSTALL_APP "path=$check_path" \
-        && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
+    INSTALL_APP "path=$check_path" "is_public=$is_public" \
+        && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path $install_type
 
     local install=$?
 
+    [ $install -eq 0 ] || return 1
+
     # Create the snapshot that'll be used by other tests later
-    [ $install -eq 0 ] \
+    [ "$install_type" != "private" ] \
         && [ ! -e "$LXC_SNAPSHOTS/$snapname" ] \
         && log_debug "Create a snapshot after app install" \
         && CREATE_LXC_SNAPSHOT $snapname
 
     # Remove and reinstall the application
-    [ $install -eq 0 ] \
-        && REMOVE_APP \
+    REMOVE_APP \
         && log_small_title "Reinstalling after removal." \
-        && INSTALL_APP "path=$check_path" \
-        && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
+        && INSTALL_APP "path=$check_path" "is_public=$is_public" \
+        && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path $install_type
 
-    # Reinstall the application after the removing
-    # Try to resintall only if the first install is a success.
-    [ $? -eq 0 ] \
-        && SET_RESULT check_$install_type 1 \
-        || SET_RESULT check_$install_type -1
-
-    break_before_continue
+    return $?
 }
 
 TEST_UPGRADE () {
 
     local commit=$1
 
-    if [ "$commit" == "current" ]
+    # FIXME FIXME FIXME FIXME : fetch upgrade name, specific upgrade args
+
+    if [ "$commit" == "" ]
     then
         start_test "Upgrade from the same version"
     else
-        specific_upgrade_args="$(grep "^manifest_arg=" "$test_serie_dir/upgrades/$commit" | cut -d'=' -f2-)"
-        upgrade_name=$(grep "^name=" "$test_serie_dir/upgrades/$commit" | cut -d'=' -f2)
-
+        upgrade_name="$(jq '.extra.upgrade_name' $current_test_infos)"
         [ -n "$upgrade_name" ] || upgrade_name="commit $commit"
         start_test "Upgrade from $upgrade_name"
     fi
 
-    at_least_one_install_succeeded || return
+    at_least_one_install_succeeded || return 1
 
     local check_path=$(default_install_path)
 
     # Install the application in a LXC container
     log_small_title "Preliminary install..."
-    if [ "$commit" == "current" ]
+    if [ "$commit" == "" ]
     then
         # If no commit is specified, use the current version.
         LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path"
         local ret=$?
     else
-        # Get the arguments of the manifest for this upgrade.
-        if [ -n "$specific_upgrade_args" ]; then
-            cp "$test_serie_dir/install_args" "$test_serie_dir/install_args.bkp"
-            echo "$specific_upgrade_args" > "$test_serie_dir/install_args"
-        fi
-
         # Make a backup of the directory
         # and Change to the specified commit
         sudo cp -a "$package_path" "${package_path}_back"
@@ -404,17 +374,13 @@ TEST_UPGRADE () {
         INSTALL_APP "path=$check_path"
         local ret=$?
 
-        if [ -n "$specific_upgrade_args" ]; then
-            mv "$test_serie_dir/install_args.bkp" "$test_serie_dir/install_args"
-        fi
-
         # Then replace the backup
         sudo rm -r "$package_path"
         sudo mv "${package_path}_back" "$package_path"
     fi
 
-    # Check if the install had work
-    [ $ret -eq 0 ] || { log_error "Initial install failed... upgrade test ignore"; LXC_STOP; continue; }
+    # Check if the install worked
+    [ $ret -eq 0 ] || { log_error "Initial install failed... upgrade test ignore"; LXC_STOP; return 1; }
 
     log_small_title "Upgrade..."
 
@@ -422,83 +388,7 @@ TEST_UPGRADE () {
     RUN_YUNOHOST_CMD "app upgrade $app_id -f ./app_folder/" \
         && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
 
-    if [ $? -eq 0 ]
-    then
-        SET_RESULT_IF_NONE_YET check_upgrade 1
-    else
-        SET_RESULT check_upgrade -1
-    fi
-
-    # Remove the application
-    REMOVE_APP
-}
-
-TEST_PUBLIC_PRIVATE () {
-
-    local install_type=$1
-    [ "$install_type" = "private" ] && start_test "Installation in private mode"
-    [ "$install_type" = "public"  ] && start_test "Installation in public mode"
-
-    at_least_one_install_succeeded || return
-
-    # Set public or private according to type of test requested
-    if [ "$install_type" = "private" ]; then
-        local is_public="0"
-        local test_name_for_result="check_private"
-    elif [ "$install_type" = "public" ]; then
-        local is_public="1"
-        local test_name_for_result="check_private"
-    fi
-
-    # Try in 2 times, first in root and second in sub path.
-    local i=0
-    for i in 0 1
-    do
-        # First, try with a root install
-        if [ $i -eq 0 ]
-        then
-            # Check if root installation worked
-            [ $(GET_RESULT check_root) -eq 1 ] || { log_warning "Root install failed, therefore this test cannot be performed..."; continue; }
-
-            local check_path=/
-
-            # Second, try with a sub path install
-        elif [ $i -eq 1 ]
-        then
-            # Check if sub path installation worked, or if force_install_ok is setted.
-            [ $(GET_RESULT check_subdir) -eq 1 ] || { log_warning "Sub path install failed, therefore this test cannot be performed..."; continue; }
-
-            local check_path=/path
-        fi
-
-        LOAD_LXC_SNAPSHOT snap0
-
-        # Install the application in a LXC container
-        INSTALL_APP "is_public=$is_public" "path=$check_path" \
-            && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path "$install_type"
-
-        local ret=$?
-
-        # Result code = 2 means that we were expecting the app to be public but it's private or viceversa
-        if [ $ret -eq 2 ]
-        then
-            yunohost_result=1
-            [ "$install_type" = "private" ] && log_error "App is not private: it should redirect to the Yunohost portal, but is publicly accessible instead"
-            [ "$install_type" = "public" ]  && log_error "App page is not public: it should be publicly accessible, but redirects to the Yunohost portal instead"
-        fi
-
-        # Check the result and print SUCCESS or FAIL
-        if [ $ret -eq 0 ]
-        then
-            SET_RESULT_IF_NONE_YET $test_name_for_result 1
-        else
-            SET_RESULT $test_name_for_result -1
-        fi
-
-        break_before_continue
-
-        LXC_STOP
-    done
+    return $?
 }
 
 TEST_MULTI_INSTANCE () {
@@ -506,7 +396,7 @@ TEST_MULTI_INSTANCE () {
     start_test "Multi-instance installations"
 
     # Check if an install have previously work
-    at_least_one_install_succeeded || return
+    at_least_one_install_succeeded || return 1
 
     local check_path=$(default_install_path)
 
@@ -519,14 +409,7 @@ TEST_MULTI_INSTANCE () {
         && VALIDATE_THAT_APP_CAN_BE_ACCESSED $DOMAIN $check_path \
         && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path "" ${app_id}__2
 
-    if [ $? -eq 0 ]
-    then
-        SET_RESULT check_multi_instance 1
-    else
-        SET_RESULT check_multi_instance -1
-    fi
-
-    break_before_continue
+    return $?
 }
 
 TEST_PORT_ALREADY_USED () {
@@ -534,11 +417,11 @@ TEST_PORT_ALREADY_USED () {
     start_test "Port already used"
 
     # Check if an install have previously work
-    at_least_one_install_succeeded || return
-    
+    at_least_one_install_succeeded || return 1
+
     local check_port=$1
     local check_path=$(default_install_path)
-    
+
     LOAD_LXC_SNAPSHOT snap0
 
     # Build a service with netcat for use this port before the app.
@@ -554,26 +437,26 @@ TEST_PORT_ALREADY_USED () {
     INSTALL_APP "path=$check_path" "port=$check_port" \
         && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
 
-    [ $? -eq 0 ] && SET_RESULT check_port 1 || SET_RESULT check_port -1
-
-    break_before_continue
+    return $?
 }
-   
+
 TEST_BACKUP_RESTORE () {
-    
+
     # Try to backup then restore the app
 
     start_test "Backup/Restore"
 
     # Check if an install have previously work
-    at_least_one_install_succeeded || return
-    
+    at_least_one_install_succeeded || return 1
+
     local check_path=$(default_install_path)
 
     # Install the application in a LXC container
     LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path"
 
     local ret=$?
+
+    local main_result=0
 
     # Remove the previous residual backups
     sudo rm -rf $LXC_ROOTFS/home/yunohost.backup/archives
@@ -588,23 +471,10 @@ TEST_BACKUP_RESTORE () {
 
         # Made a backup of the application
         RUN_YUNOHOST_CMD "backup create -n Backup_test --apps $app_id"
-
         ret=$?
-
-        if [ $ret -eq 0 ]; then
-            log_debug "Backup successful"
-        else
-            log_error "Backup failed."
-        fi
     fi
 
-    # Check the result and print SUCCESS or FAIL
-    if [ $ret -eq 0 ]
-    then
-        SET_RESULT_IF_NONE_YET check_backup 1
-    else
-        SET_RESULT check_backup -1
-    fi
+    [ $ret -eq 0 ] || main_result=1
 
     # Grab the backup archive into the LXC container, and keep a copy
     sudo cp -a $LXC_ROOTFS/home/yunohost.backup/archives ./
@@ -643,21 +513,15 @@ TEST_BACKUP_RESTORE () {
             && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
 
         local ret=$?
-
-        # Print the result of the backup command
-        if [ $ret -eq 0 ]; then
-            log_debug "Restore successful."
-            SET_RESULT_IF_NONE_YET check_restore 1
-        else
-            log_error "Restore failed."
-            SET_RESULT check_restore -1
-        fi
+        [ $ret -eq 0 ] || main_result=1
 
         break_before_continue
 
         # Stop and restore the LXC container
         LXC_STOP
     done
+
+    return $main_result
 }
 
 TEST_CHANGE_URL () {
@@ -666,12 +530,13 @@ TEST_CHANGE_URL () {
     start_test "Change URL"
 
     # Check if an install have previously work
-    at_least_one_install_succeeded || return
-    this_is_a_web_app || return
+    at_least_one_install_succeeded || return 1
+    this_is_a_web_app || return 0
 
     # Try in 6 times !
     # Without modify the domain, root to path, path to path and path to root.
     # And then, same with a domain change
+    local main_result=0
     local i=0
     for i in $(seq 1 7)
     do
@@ -718,16 +583,6 @@ TEST_CHANGE_URL () {
             local new_domain=$DOMAIN
         fi
 
-        # Validate that install worked in the corresponding configuration previously
-
-        # If any of the begin/end path is /, we need to have root install working
-        ( [ "$check_path" != "/" ] && [ "$new_path" != "/" ] ) || [ $(GET_RESULT check_root)    -eq 1 ] \
-            || { log_warning "Root install failed, therefore this test cannot be performed..."; continue; }
-
-        # If any of the being/end path is not /, we need to have sub_dir install working
-        ( [ "$new_path"   == "/" ] && [ "$new_path" == "/" ] ) || [ $(GET_RESULT check_subdir) -eq 1 ] \
-            || { log_warning "Subpath install failed, therefore this test cannot be performed..."; continue; }
-
         # Install the application in a LXC container
         log_small_title "Preliminary install..." \
             && LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path" \
@@ -735,17 +590,15 @@ TEST_CHANGE_URL () {
             && RUN_YUNOHOST_CMD "app change-url $app_id -d '$new_domain' -p '$new_path'" \
             && VALIDATE_THAT_APP_CAN_BE_ACCESSED $new_domain $new_path
 
-        if [ $ret -eq 0 ]
-        then
-            SET_RESULT_IF_NONE_YET change_url 1
-        else
-            SET_RESULT change_url -1
-        fi
+        local ret=$?
+        [ $ret -eq 0 ] || main_result=1
 
         break_before_continue
 
         LXC_STOP
     done
+
+    return $main_result
 }
 
 # Define a function to split a file in multiple parts. Used for actions and config-panel toml
@@ -812,26 +665,14 @@ ACTIONS_CONFIG_PANEL () {
     fi
 
     # Check if an install have previously work
-    at_least_one_install_succeeded || return
+    at_least_one_install_succeeded || return 1
 
     # Install the application in a LXC container
     log_small_title "Preliminary install..."
     local check_path=$(default_install_path)
     LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path"
 
-    validate_action_config_panel()
-    {
-        local message="$1"
-
-        # Print the result of the command
-        if [ $ret -eq 0 ]; then
-            SET_RESULT_IF_NONE_YET action_config_panel 1    # Actions succeed
-        else
-            SET_RESULT action_config_panel -1    # Actions failed
-        fi
-
-        break_before_continue
-    }
+    local main_result=0
 
     # List first, then execute
     local ret=0
@@ -855,7 +696,9 @@ ACTIONS_CONFIG_PANEL () {
                 RUN_YUNOHOST_CMD "app action list $app_id"
                 local ret=$?
 
-                validate_action_config_panel "yunohost app action list"
+                [ $ret -eq 0 ] || main_result=1
+                break_before_continue
+
             elif [ "$test_type" == "config_panel" ]
             then
                 log_info "> Show the config panel..."
@@ -863,8 +706,9 @@ ACTIONS_CONFIG_PANEL () {
                 # Show the config-panel
                 RUN_YUNOHOST_CMD "app config show-panel $app_id"
                 local ret=$?
+                [ $ret -eq 0 ] || main_result=1
+                break_before_continue
 
-                validate_action_config_panel "yunohost app config show-panel"
             fi
         elif [ $i -eq 2 ]
         then
@@ -955,7 +799,7 @@ ACTIONS_CONFIG_PANEL () {
                             add_arg="${line//\"/}"
                             # Then add this argument and follow it by :
                             check_process_arguments="${check_process_arguments}${add_arg}:"
-                        done < $test_serie_dir/check_process.configpanel_infos
+                        done < $test_serie_dir/check_process.configpanel_infos #FIXME
                     elif [ "$test_type" == "actions" ]
                     then
                         local check_process_arguments=""
@@ -965,7 +809,7 @@ ACTIONS_CONFIG_PANEL () {
                             add_arg="${line//\"/}"
                             # Then add this argument and follow it by :
                             check_process_arguments="${check_process_arguments}${add_arg}:"
-                        done < $test_serie_dir/check_process.actions_infos
+                        done < $test_serie_dir/check_process.actions_infos #FIXME
                     fi
                     # Look for arguments into the check_process
                     if echo "$check_process_arguments" | grep --quiet "$action_config_argument_name"
@@ -1035,13 +879,15 @@ ACTIONS_CONFIG_PANEL () {
                         RUN_YUNOHOST_CMD "app action run $app_id $action_config_action $action_config_argument_built"
                         ret=$?
                     fi
-                    validate_action_config_panel "yunohost action $action_config_action"
+                    [ $ret -eq 0 ] || main_result=1
+                    break_before_continue
                 done
             done
         fi
     done
 
     LXC_STOP
+    return $main_result
 }
 
 PACKAGE_LINTER () {
@@ -1050,61 +896,49 @@ PACKAGE_LINTER () {
     start_test "Package linter"
 
     # Execute package linter and linter_result gets the return code of the package linter
-    "./package_linter/package_linter.py" "$package_path" > "./temp_linter_result.log"
-    "./package_linter/package_linter.py" "$package_path" --json > "./temp_linter_result.json"
+    "./package_linter/package_linter.py" "$package_path" | tee -a "$complete_log"
+    "./package_linter/package_linter.py" "$package_path" --json | tee -a "$complete_log" > $current_test_results
 
-    # Print the results of package linter and copy these result in the complete log
-    cat "./temp_linter_result.log" | tee --append "$complete_log"
-    cat "./temp_linter_result.json" >> "$complete_log"
-
-    SET_RESULT linter_broken  0
-    SET_RESULT linter_level_6 0
-    SET_RESULT linter_level_7 0
-    SET_RESULT linter_level_8 0
-
-    # Check we qualify for level 6, 7, 8
-    # Linter will have a warning called "app_in_github_org" if app ain't in the
-    # yunohost-apps org...
-    if ! cat "./temp_linter_result.json" | jq ".warning" | grep -q "app_in_github_org"
-    then
-        SET_RESULT linter_level_6 1
-    fi
-    if cat "./temp_linter_result.json" | jq ".success" | grep -q "qualify_for_level_7"
-    then
-        SET_RESULT linter_level_7 1
-    fi
-    if cat "./temp_linter_result.json" | jq ".success" | grep -q "qualify_for_level_8"
-    then
-        SET_RESULT linter_level_8 1
-    fi
-
-    # If there are any critical errors, we'll force level 0
-    if [[ -n "$(cat "./temp_linter_result.json" | jq ".critical" | grep -v '\[\]')" ]]
-    then
-        log_report_test_failed
-        SET_RESULT linter_broken 1
-        SET_RESULT linter -1
-        # If there are any regular errors, we'll cap to 4
-    elif [[ -n "$(cat "./temp_linter_result.json" | jq ".error" | grep -v '\[\]')" ]]
-    then
-        log_report_test_failed
-        SET_RESULT linter -1
-        # Otherwise, test pass (we'll display a warning depending on if there are
-        # any remaning warnings or not)
-    else
-        if [[ -n "$(cat "./temp_linter_result.json" | jq ".warning" | grep -v '\[\]')" ]]
-        then
-            log_report_test_warning
-        else
-            log_report_test_success
-        fi
-        SET_RESULT linter 1
-    fi
+#    # Check we qualify for level 6, 7, 8
+#    # Linter will have a warning called "app_in_github_org" if app ain't in the
+#    # yunohost-apps org...
+#    if ! cat "./temp_linter_result.json" | jq ".warning" | grep -q "app_in_github_org"
+#    then
+#        local pass_level_6="true"
+#    fi
+#    if cat "./temp_linter_result.json" | jq ".success" | grep -q "qualify_for_level_7"
+#    then
+#        local pass_level_7="true"
+#    fi
+#    if cat "./temp_linter_result.json" | jq ".success" | grep -q "qualify_for_level_8"
+#    then
+#        local pass_level_8="true"
+#    fi
+#
+#    # If there are any critical errors, we'll force level 0
+#    if [[ -n "$(cat "./temp_linter_result.json" | jq ".critical" | grep -v '\[\]')" ]]
+#    then
+#        local pass_level_0="false"
+#        # If there are any regular errors, we'll cap to 4
+#    elif [[ -n "$(cat "./temp_linter_result.json" | jq ".error" | grep -v '\[\]')" ]]
+#    then
+#        local pass_level_4="false"
+#        # Otherwise, test pass (we'll display a warning depending on if there are
+#        # any remaning warnings or not)
+#    else
+#        if [[ -n "$(cat "./temp_linter_result.json" | jq ".warning" | grep -v '\[\]')" ]]
+#        then
+#            log_report_test_warning
+#        else
+#            log_report_test_success
+#        fi
+#        local pass_level_4="true"
+#    fi
 }
 
 set_witness_files () {
     # Create files to check if the remove script does not remove them accidentally
-    echo "Create witness files..." >> "$complete_log"
+    log_debug "Create witness files..."
 
     create_witness_file () {
         [ "$2" = "file" ] && local action="touch" || local action="mkdir -p"
@@ -1159,7 +993,7 @@ check_witness_files () {
         if sudo test ! -e "${LXC_ROOTFS}${1}"
         then
             log_error "The file $1 is missing ! Something gone wrong !"
-            SET_RESULT witness 1
+            SET_RESULT "failure" witness
         fi
     }
 
@@ -1184,13 +1018,13 @@ check_witness_files () {
 
     # Config fpm
     if [ -d "${LXC_ROOTFS}/etc/php5/fpm" ]; then
-        check_file_exist "/etc/php5/fpm/pool.d/witnessfile.conf" file
+        check_file_exist "/etc/php5/fpm/pool.d/witnessfile.conf"
     fi
     if [ -d "${LXC_ROOTFS}/etc/php/7.0/fpm" ]; then
-        check_file_exist "/etc/php/7.0/fpm/pool.d/witnessfile.conf" file
+        check_file_exist "/etc/php/7.0/fpm/pool.d/witnessfile.conf"
     fi
     if [ -d "${LXC_ROOTFS}/etc/php/7.3/fpm" ]; then
-        check_file_exist "/etc/php/7.3/fpm/pool.d/witnessfile.conf" file
+        check_file_exist "/etc/php/7.3/fpm/pool.d/witnessfile.conf"
     fi
 
     # Config logrotate
@@ -1203,20 +1037,15 @@ check_witness_files () {
     if ! RUN_INSIDE_LXC mysqlshow --user=root --password=$(sudo cat "$LXC_ROOTFS/etc/yunohost/mysql") witnessdb > /dev/null 2>&1
     then
         log_error "The database witnessdb is missing ! Something gone wrong !"
-        SET_RESULT witness 1
+        SET_RESULT "failure" witness
+        return 1
     fi
-
-    [ $(GET_RESULT witness) -eq 1 ] && return 1 || return 0
 }
 
 
-RUN_TEST_SERIE() {
+RUN_ALL_TESTS() {
     # Launch all tests successively
-    test_serie_dir=$1
-
     curl_error=0
-
-    log_title "Tests serie: $(cat $test_serie_dir/test_serie_name)"
 
     # Be sure that the container is running
     LXC_START "true"
@@ -1230,32 +1059,41 @@ RUN_TEST_SERIE() {
     current_test_number=1
 
     # The list of test contains for example "TEST_UPGRADE some_commit_id
-    readarray -t tests < $test_serie_dir/tests_to_perform
-    for test in "${tests[@]}";
+    for testfile in $(ls $TEST_CONTEXT/tests/*.json);
     do
-        TEST_LAUNCHER $test
+        TEST_LAUNCHER $testfile
     done
 
 }
 
 TEST_LAUNCHER () {
-    # Abstract for test execution.
-    # $1 = Name of the function to execute
-    # $2 = Argument for the function
+    local testfile="$1"
 
     # Start the timer for this test
     start_timer
     # And keep this value separately
     local global_start_timer=$starttime
 
+    current_test_id=$(basename $test | cut -d. -f1)
+    current_test_infos="$TEST_CONTEXT/tests/$current_test_id.json"
+    current_test_results="$TEST_CONTEXT/results/$current_test_id.json"
+    echo "{}" > $current_test_results
+
+    local test_type=$(jq '.test_type' $testfile)
+    local test_arg=$(jq '.test_arg' $testfile)
+
     # Execute the test
-    $1 $2
+    $test_type $test_arg
+
+    [ $? -eq 0 ] && SET_RESULT "success" main_result || SET_RESULT "failure" main_result
+
+    break_before_continue
 
     # Restore the started time for the timer
     starttime=$global_start_timer
     # End the timer for the test
     stop_timer 2
-    
+
     LXC_STOP
 
     # Update the lock file with the date of the last finished test.
@@ -1263,4 +1101,25 @@ TEST_LAUNCHER () {
     echo "$1 $2:$(date +%s):$$" > "$lock_file"
 }
 
+SET_RESULT() {
+    local result=$1
+    local name=$2
+    [ $result -eq "success" ] && log_report_test_success || log_report_test_failed
+    local current_results="$(cat $current_test_results)"
+    echo "$current_results" | jq --arg result $result ".$name=\$result" > $current_test_results
+}
+
+at_least_one_install_succeeded () {
+
+    for TEST in $(ls $TEST_CONTEXT/tests/*.json)
+    do
+        local test_id=$(basename $TEST | cut -d. -f1)
+        jq -e '. | select(.test_type == "TEST_INSTALL")' $TEST \
+        && jq -e '. | select(.main_result == "success")' $TEST_CONTEXT/results/$test_id.json \
+        && return 0
+    done
+
+    log_error "All installs failed, therefore the following tests cannot be performed..."
+    return 1
+}
 

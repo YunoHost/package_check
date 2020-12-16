@@ -131,10 +131,8 @@ LXC_START () {
         if ! is_lxc_running; then
             log_debug "Start the LXC container" >> "$complete_log"
             sudo lxc-start --name=$LXC_NAME --daemon --logfile "./lxc_boot.log" | tee --append "$complete_log" 2>&1
-            local avoid_witness=0
         else
             log_debug "A LXC container is already running"
-            local avoid_witness=1
         fi
 
         # Try to connect 5 times
@@ -152,93 +150,6 @@ LXC_START () {
 
         [ "$(uname -m)" == "aarch64" ] && sleep 30
 
-        local failstart=0
-
-        # Check if the container is running
-        if ! is_lxc_running; then
-            log_critical "The LXC container didn't start..."
-            failstart=1
-            if [ $i -ne $max_try ]; then
-                log_info "Rebooting the container..."
-            fi
-            LXC_STOP
-            # Try to ping security.debian.org to check the connectivity from the container
-        elif ! ssh $arg_ssh -o ConnectTimeout=60 $LXC_NAME "sudo ping -q -c 2 security.debian.org > /dev/null 2>&1; exit \$?" >> "$complete_log" 2>&1
-        then
-            log_critical "The container failed to connect to internet..."
-            failstart=1
-            if [ $i -ne $max_try ]; then
-                log_info "Rebooting the container..."
-            fi
-            LXC_STOP
-            # Create files to check if the remove script does not remove them accidentally
-        else
-            [ $avoid_witness -eq 0 ] && set_witness_files
-
-            # Break the for loop if the container is ready.
-            break
-        fi
-
-        # Fail if the container failed to start
-        if [ $i -eq $max_try ] && [ $failstart -eq 1 ]
-        then
-            send_email () {
-                # Send an email only if it's a CI environment
-                if [ $type_exec_env -ne 0 ]
-                then
-                    ci_path=$(grep "CI_URL=" "./../config" | cut -d= -f2)
-                    local subject="[YunoHost] Container in trouble on $ci_path."
-                    local message="The container failed to start $max_try times on $ci_path.
-                    $lxc_check_result
-
-                    Please have a look to the log of lxc_check:
-                    $(cat "./lxc_check.log")"
-                    if [ $lxc_check -eq 2 ]; then
-                        # Add the log of lxc_build
-                        message="$message
-
-                        Here the log of lxc_build:
-                        $(cat "./sub_scripts/Build_lxc.log")"
-                    fi
-
-                    dest=$(grep 'dest=' "./../config" | cut -d= -f2)
-                    mail -s "$subject" "$dest" <<< "$message"
-                fi
-            }
-
-            log_critical "The container failed to start $max_try times..."
-            log_info "Boot log:\n"
-            cat "./lxc_boot.log" | tee --append "$complete_log"
-            log_info "lxc_check will try to fix the container..."
-            ./sub_scripts/lxc_check.sh --no-lock | tee "./lxc_check.log"
-            # PIPESTATUS is an array with the exit code of each command followed by a pipe
-            local lxc_check=${PIPESTATUS[0]}
-            LXC_INIT
-            if [ $lxc_check -eq 0 ]; then
-                local lxc_check_result="The container seems to be ok, according to lxc_check."
-                log_success "$lxc_check_result"
-                send_email
-                i=0
-            elif [ $lxc_check -eq 1 ]; then
-                local lxc_check_result="An error has happened with the host. Please check the configuration."
-                log_critical "$lxc_check_result"
-                send_email
-                stop_timer 1
-                return 1
-            elif [ $lxc_check -eq 2 ]; then
-                local lxc_check_result="The container is broken, it will be rebuilt."
-                log_critical "$lxc_check_result"
-                ./sub_scripts/lxc_build.sh
-                LXC_INIT
-                send_email
-                i=0
-            elif [ $lxc_check -eq 3 ]; then
-                local lxc_check_result="The container has been fixed by lxc_check."
-                log_success "$lxc_check_result"
-                send_email
-                i=0
-            fi
-        fi
     done
     stop_timer 1
     start_timer
@@ -276,26 +187,3 @@ LOAD_LXC_SNAPSHOT () {
     sudo rsync --acls --archive --delete --executability --itemize-changes --xattrs "$LXC_SNAPSHOTS/$snapname/rootfs/" "$LXC_ROOTFS/" > /dev/null 2>> "$complete_log"
 }
 
-LXC_TURNOFF () {
-    # Disable LXC network
-
-    log_debug "Disable iptables rules."
-    if sudo iptables --check FORWARD --in-interface $LXC_BRIDGE --out-interface $MAIN_NETWORK_INTERFACE --jump ACCEPT 2> /dev/null
-    then
-        sudo iptables --delete FORWARD --in-interface $LXC_BRIDGE --out-interface $MAIN_NETWORK_INTERFACE --jump ACCEPT >> "$complete_log" 2>&1
-    fi
-    if sudo iptables --check FORWARD --in-interface $MAIN_NETWORK_INTERFACE --out-interface $LXC_BRIDGE --jump ACCEPT 2> /dev/null
-    then
-        sudo iptables --delete FORWARD --in-interface $MAIN_NETWORK_INTERFACE --out-interface $LXC_BRIDGE --jump ACCEPT | tee --append "$complete_log" 2>&1
-    fi
-    if sudo iptables --table nat --check POSTROUTING --source $LXC_NETWORK.0/24 --jump MASQUERADE 2> /dev/null
-    then
-        sudo iptables --table nat --delete POSTROUTING --source $LXC_NETWORK.0/24 --jump MASQUERADE | tee --append "$complete_log" 2>&1
-    fi
-
-    log_debug "Disable the network bridge."
-    if sudo ifquery $LXC_BRIDGE --state > /dev/null
-    then
-        sudo ifdown --force $LXC_BRIDGE | tee --append "$complete_log" 2>&1
-    fi
-}

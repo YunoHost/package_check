@@ -6,15 +6,12 @@ source "./sub_scripts/launcher.sh"
 source "./sub_scripts/testing_process.sh"
 
 complete_log="./Complete.log"
-test_series=""
 
 # Purge some log files
 > "$complete_log"
 > "./lxc_boot.log"
 
-TEST_CONTEXT="./.tmp_test_context"
-rm -rf $TEST_CONTEXT
-mkdir -p $TEST_CONTEXT
+TEST_CONTEXT=$(mkdtemp -d)
 
 # Redirect fd 3 (=debug steam) to complete log
 exec 3>>$complete_log
@@ -202,6 +199,7 @@ fi
 # Stop and restore the LXC container. In case of previous incomplete execution.
 LXC_STOP
 LXC_TURNOFF
+LXC_PURGE_SNAPSHOTS
 
 #=================================================
 # Pick up the package
@@ -292,8 +290,7 @@ COMPUTE_RESULTS_SUMMARY () {
     print_result "Install (root)" $RESULT_check_root
     print_result "Install (subpath)" $RESULT_check_subdir
     print_result "Install (no url)" $RESULT_check_nourl
-    print_result "Install (private mode)" $RESULT_check_private
-    print_result "Install (public mode)" $RESULT_check_public
+    print_result "Install (private)" $RESULT_check_private
     print_result "Install (multi-instance)" $RESULT_check_multi_instance
     print_result "Upgrade" $RESULT_check_upgrade
     print_result "Backup" $RESULT_check_backup
@@ -335,7 +332,6 @@ COMPUTE_RESULTS_SUMMARY () {
         [ $RESULT_check_subdir -ne -1 ] && \
         [ $RESULT_check_root -ne -1 ] && \
         [ $RESULT_check_private -ne -1 ] && \
-        [ $RESULT_check_public -ne -1 ] && \
         [ $RESULT_check_multi_instance -ne -1 ]
     }
 
@@ -381,7 +377,6 @@ COMPUTE_RESULTS_SUMMARY () {
         [ $RESULT_check_subdir -ne -1 ] && \
         [ $RESULT_check_upgrade -ne -1 ] && \
         [ $RESULT_check_private -ne -1 ] && \
-        [ $RESULT_check_public -ne -1 ] && \
         [ $RESULT_check_multi_instance -ne -1 ] && \
         [ $RESULT_check_port -ne -1 ] && \
         [ $RESULT_check_backup -ne -1 ] && \
@@ -489,37 +484,6 @@ COMPUTE_RESULTS_SUMMARY () {
 }
 
 #=================================================
-# Parsing and performing tests
-#=================================================
-
-
-# Default values for check_process and TESTING_PROCESS
-init_results() {
-    local test_serie_id=$1
-    cat << EOF > $TEST_CONTEXT/$test_serie_id/results
-RESULT_witness=0
-RESULT_alias_traversal=0
-RESULT_linter=0
-RESULT_linter_level_6=0
-RESULT_linter_level_7=0
-RESULT_linter_level_8=0
-RESULT_linter_broken=0
-RESULT_check_subdir=0
-RESULT_check_root=0
-RESULT_check_nourl=0
-RESULT_check_upgrade=0
-RESULT_check_backup=0
-RESULT_check_restore=0
-RESULT_check_private=0
-RESULT_check_public=0
-RESULT_check_multi_instance=0
-RESULT_check_port=0
-RESULT_change_url=0
-RESULT_action_config_panel=0
-EOF
-}
-
-#=================================================
 # Parse the check_process
 #=================================================
 
@@ -563,9 +527,6 @@ parse_check_process() {
     # Remove all spaces at the beginning of the lines
     sed --in-place 's/^[ \t]*//g' "$check_process"
 
-    # Extract the Options section
-    extract_check_process_section "^;;; Options" ";; " > $TEST_CONTEXT/check_process.options
-
     # Extract the Upgrade infos
     extract_check_process_section "^;;; Upgrade options" ";; " > $TEST_CONTEXT/check_process.upgrade_options
     mkdir -p $TEST_CONTEXT/upgrades
@@ -576,74 +537,121 @@ parse_check_process() {
     done
     rm $TEST_CONTEXT/check_process.upgrade_options
 
+    local test_serie_id="0"
+
     # Parse each tests serie
     while read <&3 tests_serie
     do
-        local test_serie_id=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 16)
-        local test_serie_dir=$TEST_CONTEXT/$test_serie_id
-        local test_serie_rawconf=$test_serie_dir/raw_test_serie_config
-
-        test_series+="$test_serie_id "
-
-        mkdir -p $test_serie_dir
-        init_results $test_serie_id
+        test_serie_id=$((test_serie_id+1))
+        local test_id=$((test_serie_id * 100))
+        local test_serie_rawconf=$TEST_CONTEXT/raw_test_serie_config
 
         # Extract the section of the current tests serie
-        echo "$tests_serie" > $test_serie_dir/test_serie_name
         extract_check_process_section "^$tests_serie"   "^;;" > $test_serie_rawconf
-        extract_check_process_section "^; pre-install"  "^; "   $test_serie_rawconf > $test_serie_dir/preinstall.sh.template
         # This is the arg list to be later fed to "yunohost app install"
         # Looking like domain=foo.com&path=/bar&password=stuff
         # "Standard" arguments like domain/path will later be overwritten
         # during tests
-        extract_check_process_section "^; Manifest"     "^; "   $test_serie_rawconf | awk '{print $1}' | tr -d '"' | tr '\n' '&' > $test_serie_dir/install_args
-        extract_check_process_section "^; Actions"      "^; "   $test_serie_rawconf > $test_serie_dir/check_process.actions_infos
-        extract_check_process_section "^; Config_panel" "^; "   $test_serie_rawconf > $test_serie_dir/check_process.configpanel_infos
-        extract_check_process_section "^; Checks"       "^; "   $test_serie_rawconf > $test_serie_dir/check_process.tests_infos
+        local install_args=$(       extract_check_process_section "^; Manifest"     "^; " $test_serie_rawconf | awk '{print $1}' | tr -d '"' | tr '\n' '&')
+        local preinstall_template=$(extract_check_process_section "^; pre-install"  "^; " $test_serie_rawconf)
+        local action_infos=$(       extract_check_process_section "^; Actions"      "^; " $test_serie_rawconf)
+        local configpanel_infos=$(  extract_check_process_section "^; Config_panel" "^; " $test_serie_rawconf)
+
+        extract_check_process_section "^; Checks"       "^; " $test_serie_rawconf > $TEST_CONTEXT/check_process.tests_infos
 
         is_test_enabled () {
             # Find the line for the given check option
-            local value=$(grep -m1 -o "^$1=." "$test_serie_dir/check_process.tests_infos" | awk -F= '{print $2}')
+            local value=$(grep -m1 -o "^$1=." "$TEST_CONTEXT/check_process.tests_infos" | awk -F= '{print $2}')
             # And return this value
             [ "${value:0:1}" = "1" ]
         }
 
-        is_test_enabled pkg_linter     && echo "PACKAGE_LINTER"               >> $test_serie_dir/tests_to_perform
-        is_test_enabled setup_sub_dir  && echo "TEST_INSTALL subdir"          >> $test_serie_dir/tests_to_perform
-        is_test_enabled setup_root     && echo "TEST_INSTALL root"            >> $test_serie_dir/tests_to_perform
-        is_test_enabled setup_nourl    && echo "TEST_INSTALL nourl"           >> $test_serie_dir/tests_to_perform
-        is_test_enabled setup_private  && echo "TEST_PUBLIC_PRIVATE private"  >> $test_serie_dir/tests_to_perform
-        is_test_enabled setup_public   && echo "TEST_PUBLIC_PRIVATE public"   >> $test_serie_dir/tests_to_perform
-        is_test_enabled multi_instance && echo "TEST_MULTI_INSTANCE"          >> $test_serie_dir/tests_to_perform
-        is_test_enabled backup_restore && echo "TEST_BACKUP_RESTORE"          >> $test_serie_dir/tests_to_perform
-       
+        add_test() {
+            local test_type="$1"
+            local test_arg="$2"
+            test_id="$((test_id+1))"
+            local extra="{}"
+            local _install_args="$install_args"
+
+            # Upgrades with a specific commit
+            if [[ "$test_type" == "TEST_UPGRADE" ]] && [[ -n "$test_arg" ]]
+            then
+                local specific_upgrade_install_args="$(grep "^manifest_arg=" "$TEST_CONTEXT/upgrades/$commit" | cut -d'=' -f2-)"
+                [[ -n "$specific_upgrade_install_args" ]] && _install_args="$specific_upgrade_install_args"
+                
+                local upgrade_name="$(grep "^name=" "$TEST_CONTEXT/upgrades/$commit" | cut -d'=' -f2)"
+                extra="$(jq -n --arg upgrade_name "$upgrade_name" '{ $upgrade_name }')"
+            elif [[ "$test_type" == "ACTIONS_CONFIG_PANEL" ]] && [[ "$test_arg" == "actions" ]]
+            then
+                extra="$(jq -n --arg actions "$action_infos" '{ $actions }')"
+            elif [[ "$test_type" == "ACTIONS_CONFIG_PANEL" ]] && [[ "$test_arg" == "actions" ]]
+            then
+                extra="$(jq -n --arg configpanel "$configpanel_infos" '{ $configpanel }')"
+            fi
+
+            jq -n -f "$TEST_CONTEXT/tests/$test_id.json" \
+                --arg test_serie "$test_serie" \
+                --arg test_type "$test_type" \
+                --arg test_arg "$test_arg" \
+                --arg preinstall_template "$preinstall_template" \
+                --arg install_args "$_install_args" \
+                --argjson "$extra" \
+                '{ $test_serie, $test_type, $test_arg, $preinstall_template, $install_args, $extra }'
+        }
+
+        # For not-the-main-test-serie, we only consider testing the install and
+        # upgrade from previous commits
+        if [[ "$test_serie_id" != "1" ]]
+        then
+            is_test_enabled setup_sub_dir  && add_test "TEST_INSTALL" "subdir"
+            is_test_enabled setup_root     && add_test "TEST_INSTALL" "root"
+            is_test_enabled setup_nourl    && add_test "TEST_INSTALL" "nourl"
+            grep "^upgrade=1" "$TEST_CONTEXT/check_process.tests_infos" |
+            while IFS= read -r LINE;
+            do
+                commit=$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')
+                [ -n "$commit" ] || continue
+                add_test "TEST_UPGRADE" "$commit"
+            done
+
+            continue
+        else
+            test_serie="default"
+        fi
+
+        is_test_enabled pkg_linter     && add_test "PACKAGE_LINTER"
+        is_test_enabled setup_sub_dir  && add_test "TEST_INSTALL" "subdir"
+        is_test_enabled setup_root     && add_test "TEST_INSTALL" "root"
+        is_test_enabled setup_nourl    && add_test "TEST_INSTALL" "nourl"
+        is_test_enabled setup_private  && add_test "TEST_INSTALL" "private"
+        is_test_enabled multi_instance && add_test "TEST_MULTI_INSTANCE"
+        is_test_enabled backup_restore && add_test "TEST_BACKUP_RESTORE"
+
         # Upgrades
-        grep "^upgrade=1" "$test_serie_dir/check_process.tests_infos" |
-	while IFS= read -r LINE;
+        grep "^upgrade=1" "$TEST_CONTEXT/check_process.tests_infos" |
+        while IFS= read -r LINE;
         do
             commit=$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')
             [ -n "$commit" ] || commit="current"
-            echo "TEST_UPGRADE $commit" >> $test_serie_dir/tests_to_perform
-        done 
-       
+            add_test "TEST_UPGRADE" "$commit"
+        done
+
         # "Advanced" features
 
-        is_test_enabled change_url       && echo "TEST_CHANGE_URL"                   >> $test_serie_dir/tests_to_perform
-        is_test_enabled actions          && echo "ACTIONS_CONFIG_PANEL actions"      >> $test_serie_dir/tests_to_perform
-        is_test_enabled config_panel     && echo "ACTIONS_CONFIG_PANEL config_panel" >> $test_serie_dir/tests_to_perform
+        is_test_enabled change_url       && add_test "TEST_CHANGE_URL"
+        is_test_enabled actions          && add_test "ACTIONS_CONFIG_PANEL" "actions"
+        is_test_enabled config_panel     && add_test "ACTIONS_CONFIG_PANEL" "config_panel"
 
         # Port already used ... do we really need this ...
 
-        if grep -q -m1 "port_already_use=1" "$test_serie_dir/check_process.tests_infos"
+        if grep -q -m1 "port_already_use=1" "$TEST_CONTEXT/check_process.tests_infos"
         then
-            local check_port=$(grep -m1 "port_already_use=1" "$test_serie_dir/check_process.tests_infos" | grep -o -E "\([0-9]+\)" | tr -d '()')
+            local check_port=$(grep -m1 "port_already_use=1" "$TEST_CONTEXT/check_process.tests_infos" | grep -o -E "\([0-9]+\)" | tr -d '()')
         else
             local check_port=6660
         fi
 
-        is_test_enabled port_already_use && echo "TEST_PORT_ALREADY_USED $check_port" >> $test_serie_dir/tests_to_perform
-
-	cat $test_serie_dir/tests_to_perform
+        is_test_enabled port_already_use && add_test "TEST_PORT_ALREADY_USED" "$check_port"
 
     done 3<<< "$(grep "^;; " "$check_process")"
 
@@ -655,34 +663,37 @@ guess_test_configuration() {
     log_error "Not check_process file found."
     log_warning "Package check will attempt to automatically guess what tests to run."
 
-    local test_serie_id=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 16)
-    local test_serie_dir=$TEST_CONTEXT/$test_serie_id
-        
-    mkdir -p $test_serie_dir
-    init_results $test_serie_id
-    
-    echo "Auto generated test serie" > $test_serie_dir/test_serie_name
+    add_test() {
+        local test_type="$1"
+        local test_arg="$2"
+        test_id="$((test_id+1))"
+        local extra="{}"
 
-    test_series+="$test_serie_id "
+        jq -n -f "$TEST_CONTEXT/tests/$test_id.json"
+            --arg test_serie "default" \
+            --arg test_type "$test_type" \
+            --arg test_arg "$test_arg" \
+            --arg preinstall_template "" \
+            --arg install_args "$install_args" \
+            --argjson "$extra" \
+            '{ $test_serie, $test_type, $test_arg, $preinstall_template, $install_args, $extra }'
+    }
 
+    local install_args=$(python "./sub_scripts/manifest_parsing.py" "$package_path/manifest.json" | cut -d ':' -f1,2 | tr ':' '=' | tr '\n' '&')
 
-    python "./sub_scripts/manifest_parsing.py" "$package_path/manifest.json" \
-        | cut -d ':' -f1,2 | tr ':' '=' | tr '\n' '&' > $test_serie_dir/install_args
-
-    echo "PACKAGE_LINTER"                   >> $test_serie_dir/tests_to_perform
-    echo "TEST_INSTALL subdir"              >> $test_serie_dir/tests_to_perform
-    echo "TEST_INSTALL root"                >> $test_serie_dir/tests_to_perform
-    if grep -q "is_public=" $test_serie_dir/install_args
+    add_test "PACKAGE_LINTER"
+    add_test "TEST_INSTALL subdir"
+    add_test "TEST_INSTALL root"
+    if echo $install_args | grep -q "is_public="
     then
-        echo "TEST_PUBLIC_PRIVATE private"  >> $test_serie_dir/tests_to_perform
-        echo "TEST_PUBLIC_PRIVATE public"   >> $test_serie_dir/tests_to_perform
+        add_test "TEST_INSTALL" "private"
     fi
     if grep multi_instance "$package_path/manifest.json" | grep -q true
     then
-        echo "TEST_MULTI_INSTANCE"          >> $test_serie_dir/tests_to_perform
+        add_test "TEST_MULTI_INSTANCE"
     fi
-    echo "TEST_BACKUP_RESTORE"              >> $test_serie_dir/tests_to_perform
-    echo "TEST_UPGRADE current"             >> $test_serie_dir/tests_to_perform
+    add_test "TEST_BACKUP_RESTORE"
+    add_test "TEST_UPGRADE current"
 }
 
 #=================================================
@@ -696,23 +707,17 @@ run_all_tests() {
 
     LXC_INIT
 
-    for test_serie_id in $test_series
-    do
-        test_serie_dir=$TEST_CONTEXT/$test_serie_id
+    # Break after the first tests serie
+    if [ $interactive -eq 1 ]; then
+        read -p "Press a key to start the tests..." < /dev/tty
+    fi
 
-        # Break after the first tests serie
-        if [ $interactive -eq 1 ]; then
-            read -p "Press a key to start the next tests serie..." < /dev/tty
-        fi
+    # Launch all tests successively
+    cat $TEST_CONTEXT/tests/*.json >&3
+    RUN_ALL_TESTS $TEST_CONTEXT/tests/
 
-        # Launch all tests successively
-        RUN_TEST_SERIE $test_serie_dir
-
-        # Print the final results of the tests
-        COMPUTE_RESULTS_SUMMARY $test_serie_id
-
-        LXC_PURGE_SNAPSHOTS
-    done
+    # Print the final results of the tests
+    COMPUTE_RESULTS_SUMMARY $test_serie_id
 
     # Restore the started time for the timer
     starttime=$complete_start_timer
@@ -721,8 +726,6 @@ run_all_tests() {
 
     echo "You can find the complete log of these tests in $(realpath $complete_log)"
 
-    source "./sub_scripts/notifications.sh"
-
 }
 
 [ -e "$check_process" ] \
@@ -730,5 +733,7 @@ run_all_tests() {
     || guess_test_configuration
 
 run_all_tests
+
+LXC_PURGE_SNAPSHOTS
 
 clean_exit 0
