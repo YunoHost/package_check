@@ -89,7 +89,7 @@ INSTALL_APP () {
     fi
 
     # Install the application in a LXC container
-    RUN_YUNOHOST_CMD "app install --force /app_folder -a '$install_args'"
+    RUN_YUNOHOST_CMD "app install --force /app_folder -a $install_args"
 
     local ret=$?
     [ $ret -eq 0 ] && log_debug "Installation successful." || log_error "Installation failed."
@@ -277,7 +277,7 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
     If you see this page, you have failed the test for alias_traversal issue.</body></html>" \
     > $TEST_CONTEXT/alias_traversal.html
 
-    sudo lxc file push $TEST_CONTEXT $LXC_NAME/var/www/html/alias_traversal.html
+    sudo lxc file push $TEST_CONTEXT/alias_traversal.html $LXC_NAME/var/www/html/alias_traversal.html
 
     curl --location --insecure --silent $check_domain$check_path../html/alias_traversal.html \
         | grep "title" | grep --quiet "alias_traversal test" \
@@ -970,7 +970,7 @@ set_witness_files () {
     # Database
     local mysqlpwd=$(RUN_INSIDE_LXC cat /etc/yunohost/mysql)
     RUN_INSIDE_LXC mysqladmin --user=root --password="$mysqlpwd" --wait status > /dev/null 2>&1
-    RUN_INSIDE_LXC mysql --user=root --password="$mysqlpwd" --wait --execute="CREATE DATABASE witnessdb" > /dev/null 2>&1
+    echo "CREATE DATABASE witnessdb" | RUN_INSIDE_LXC mysql --user=root --password="$mysqlpwd" --wait > /dev/null 2>&1
 }
 
 check_witness_files () {
