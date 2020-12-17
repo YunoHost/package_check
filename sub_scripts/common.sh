@@ -25,11 +25,6 @@ readonly lock_file="./pcheck.lock"
 # LXC helpers
 #=================================================
 
-RUN_INSIDE_LXC() {
-    sudo lxc exec $LXC_NAME -- "$@"
-    sudo lxc-attach -n  -- "$@"
-}
-
 assert_we_are_the_setup_user() {
     [ -e "./.setup_user" ] || return
     local setup_user=$(cat "./.setup_user")

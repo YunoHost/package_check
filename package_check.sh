@@ -47,11 +47,6 @@ clean_exit () {
     # Remove temporary files
     rm -rf "$TEST_CONTEXT"
 
-    # Remove the application which been tested
-    if [ -n "$package_path" ]; then
-        rm -rf "$package_path"
-    fi
-
     # Remove the lock file
     rm -f "$lock_file"
 

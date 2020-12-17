@@ -27,7 +27,7 @@ RUN_YUNOHOST_CMD() {
     log_debug "Running yunohost $1"
 
     # --output-as none is to disable the json-like output for some commands like backup create
-    LXC_START "PACKAGE_CHECK_EXEC=1 yunohost --output-as none --debug $1" \
+    LXC_START "yunohost --output-as none --debug $1" \
         | grep --line-buffered -v --extended-regexp '^[0-9]+\s+.{1,15}DEBUG' \
         | grep --line-buffered -v 'processing action'
 
@@ -454,7 +454,7 @@ TEST_BACKUP_RESTORE () {
 
     # Remove the previous residual backups
     sudo rm -rf ./ynh_backups
-    sudo lxc exec $LXC_NAME -- rm -rf /home/yunohost.backup/archives
+    RUN_INSIDE_LXC rm -rf /home/yunohost.backup/archives
 
     # BACKUP
     # Made a backup if the installation succeed
@@ -495,7 +495,7 @@ TEST_BACKUP_RESTORE () {
             LOAD_LXC_SNAPSHOT snap0
 
             # Remove the previous residual backups
-            lxc exec $LXC_NAME -- rm -f /rootfs/home/yunohost.backup/archives/*
+            RUN_INSIDE_LXC rm -f /rootfs/home/yunohost.backup/archives/*
 
             # Place the copy of the backup archive in the container.
             sudo lxc file push -r ./ynh_backups $LXC_NAME/home/yunohost.backup/archives/
@@ -936,7 +936,7 @@ set_witness_files () {
 
     create_witness_file () {
         [ "$2" = "file" ] && local action="touch" || local action="mkdir -p"
-        sudo lxc exec $LXC_NAME -- $action $1
+        RUN_INSIDE_LXC $action $1
     }
 
     # Nginx conf
@@ -968,7 +968,7 @@ set_witness_files () {
     create_witness_file "/etc/systemd/system/witnessfile.service" file
 
     # Database
-    local mysqlpwd=$(lxc exec $LXC_NAME -- cat /etc/yunohost/mysql)
+    local mysqlpwd=$(RUN_INSIDE_LXC cat /etc/yunohost/mysql)
     RUN_INSIDE_LXC mysqladmin --user=root --password="$mysqlpwd" --wait status > /dev/null 2>&1
     RUN_INSIDE_LXC mysql --user=root --password="$mysqlpwd" --wait --execute="CREATE DATABASE witnessdb" > /dev/null 2>&1
 }
@@ -977,7 +977,7 @@ check_witness_files () {
     # Check all the witness files, to verify if them still here
 
     check_file_exist () {
-        if sudo lxc exec $LXC_NAME -- test ! -e "{1}"
+        if RUN_INSIDE_LXC test ! -e "$1"
         then
             log_error "The file $1 is missing ! Something gone wrong !"
             SET_RESULT "failure" witness
@@ -1013,7 +1013,7 @@ check_witness_files () {
     check_file_exist "/etc/systemd/system/witnessfile.service"
 
     # Database
-    local mysqlpwd=$(lxc exec $LXC_NAME -- cat /etc/yunohost/mysql)
+    local mysqlpwd=$(RUN_INSIDE_LXC cat /etc/yunohost/mysql)
     if ! RUN_INSIDE_LXC mysqlshow --user=root --password="$mysqlpwd" witnessdb > /dev/null 2>&1
     then
         log_error "The database witnessdb is missing ! Something gone wrong !"

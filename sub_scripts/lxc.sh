@@ -1,21 +1,15 @@
 # #!/bin/bash
 
 #=================================================
-# Globals variables
-#=================================================
-
-# -q aims to disable the display of 'Debian GNU/Linux' each time a command is ran
-arg_ssh="-tt -q"
-
-#=================================================
 # RUNNING SNAPSHOT
 #=================================================
 
 LXC_CREATE () {
-    lxc launch $LXC_NAME-base $LXC_NAME || exit 1
-    lxc config set "$LXC_NAME" security.nesting true
+    sudo lxc launch $LXC_NAME-base $LXC_NAME || exit 1
+    sudo lxc config set "$LXC_NAME" security.nesting true
     _LXC_START_AND_WAIT $LXC_NAME
-    CREATE_LXC_SNAPSHOT snap0
+    set_witness_files
+    sudo lxc snapshot $LXC_NAME snap0
 }
 
 LXC_SNAPSHOT_EXISTS() {
@@ -30,12 +24,12 @@ CREATE_LXC_SNAPSHOT () {
     start_timer
 
     # Check all the witness files, to verify if them still here
-    [ $snapname != "snap0" ] && check_witness_files >&2
+    check_witness_files >&2
 
     # Remove swap files to avoid killing the CI with huge snapshots.
     sudo lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done'
     sudo lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do rm -f $swapfile; done'
-
+    
     sudo lxc stop --timeout 15 $LXC_NAME 2>/dev/null
 
     # Check if the snapshot already exist
@@ -52,6 +46,7 @@ LOAD_LXC_SNAPSHOT () {
     snapname=$1
     sudo lxc stop --timeout 15 $LXC_NAME 2>/dev/null
     sudo lxc restore $LXC_NAME $snapname
+    sudo lxc start $LXC_NAME
     _LXC_START_AND_WAIT $LXC_NAME
 }
 
@@ -67,10 +62,10 @@ LXC_START () {
 
     # Copy the package into the container.
     lxc exec $LXC_NAME -- rm -rf /app_folder
-    lxc file push -r "$package_path" $LXC_NAME/app_folder
+    lxc file push -p -r "$package_path" $LXC_NAME/app_folder --quiet
 
     # Execute the command given in argument in the container and log its results.
-    lxc exec $LXC_NAME -- $cmd | tee -a "$complete_log"
+    lxc exec $LXC_NAME --env PACKAGE_CHECK_EXEC=1 -t -- $cmd | tee -a "$complete_log"
 
     # Store the return code of the command
     local returncode=${PIPESTATUS[0]}
@@ -117,7 +112,7 @@ _LXC_START_AND_WAIT() {
 
 			if [ "$j" == "10" ]; then
 				log_error 'Failed to start the container'
-                lxc info $1
+                lxc info --show-log $1
 				failstart=1
 
 				restart_container "$1"
@@ -128,7 +123,7 @@ _LXC_START_AND_WAIT() {
 
 		# Wait for container to access the internet
 		for j in $(seq 1 10); do
-			if lxc exec "$1" -- /bin/bash -c "! which wget > /dev/null 2>&1 || wget -q --spider http://github.com"; then
+			if lxc exec "$1" -- /bin/bash -c "! which wget > /dev/null 2>&1 || wget -q --spider http://debian.org"; then
 				break
 			fi
 
@@ -157,3 +152,10 @@ _LXC_START_AND_WAIT() {
 
     LXC_IP=$(lxc exec $1 -- hostname -I | grep -E -o "\<[0-9.]{8,}\>")
 }
+
+
+RUN_INSIDE_LXC() {
+    sudo lxc exec $LXC_NAME -- $@
+}
+
+
