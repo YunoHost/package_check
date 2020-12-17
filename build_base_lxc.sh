@@ -1,7 +1,7 @@
 #!/bin/bash
 
-cd $(dirname $(realpath $0) | sed 's@/sub_scripts$@@g')
-source "./sub_scripts/common.sh"
+cd $(dirname $(realpath $0))
+source "./lib/common.sh"
 
 function rebuild_base_lxc()
 {

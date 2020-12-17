@@ -17,11 +17,21 @@ SUBDOMAIN="sub.$DOMAIN"
 TEST_USER="package_checker"
 
 LXC_BASE="ynh-appci-$DIST-$ARCH-base"
-LXC_NAME="ynh-appci-$DIST"
+LXC_NAME="ynh-appci-test"
 
 [[ -e "./config" ]] && source "./config"
 
 readonly lock_file="./pcheck.lock"
+
+clean_exit () {
+
+    LXC_RESET
+
+    [ -n "$TEST_CONTEXT" ] rm -rf "$TEST_CONTEXT"
+    rm -f "$lock_file"
+
+    exit $1
+}
 
 #=================================================
 # LXC helpers

@@ -5,7 +5,8 @@
 #=================================================
 
 LXC_CREATE () {
-    sudo lxc launch $LXC_NAME-base $LXC_NAME || exit 1
+    sudo lxc image list $LXC_BASE | grep -q -w $LXC_BASE || log_critical "The base image $LXC_BASE doesn't exist yet. Consider using the build_base_lxc.sh to create it first" 
+    sudo lxc launch $LXC_BASE $LXC_NAME || clean_exit 1
     sudo lxc config set "$LXC_NAME" security.nesting true
     _LXC_START_AND_WAIT $LXC_NAME
     set_witness_files
@@ -87,7 +88,7 @@ _LXC_START_AND_WAIT() {
 
 	restart_container()
 	{
-		sudo lxc stop "$1"
+		sudo lxc stop "$1" --timeout 15 &>/dev/null
 		sudo lxc start "$1"
 	}
 
@@ -107,8 +108,7 @@ _LXC_START_AND_WAIT() {
 			fi
 
 			if [ "$j" == "10" ]; then
-				log_error 'Failed to start the container'
-                lxc info --show-log $1
+				log_debug 'Failed to start the container ... restarting ...'
 				failstart=1
 
 				restart_container "$1"
@@ -124,7 +124,7 @@ _LXC_START_AND_WAIT() {
 			fi
 
 			if [ "$j" == "10" ]; then
-				log_error 'Failed to access the internet'
+				log_debug 'Failed to access the internet ... restarting'
 				failstart=1
 
 				restart_container "$1"
@@ -142,6 +142,8 @@ _LXC_START_AND_WAIT() {
 		# Fail if the container failed to start
 		if [ $i -eq $max_try ] && [ $failstart -eq 1 ]
 		then
+            log_error "The container miserably failed to start or to connect to the internet"
+            lxc info --show-log $1
 			return 1
 		fi
 	done
