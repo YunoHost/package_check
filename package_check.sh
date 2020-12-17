@@ -40,14 +40,9 @@ exit 0
 
 clean_exit () {
 
-    # Exit and remove all temp files
-    # $1 = exit code
     LXC_RESET
 
-    # Remove temporary files
     rm -rf "$TEST_CONTEXT"
-
-    # Remove the lock file
     rm -f "$lock_file"
 
     exit $1
@@ -64,71 +59,77 @@ clean_exit () {
 gitbranch=""
 force_install_ok=0
 interactive=0
-arguments=("$@")
-getopts_built_arg=()
 
-# Read the array value per value
-for i in `seq 0 $(( ${#arguments[@]} -1 ))`
-do
-    if [[ "${arguments[$i]}" =~ "--branch=" ]]
-    then
-        getopts_built_arg+=(-b)
-        arguments[$i]=${arguments[$i]//--branch=/}
-    fi
-    # For each argument in the array, reduce to short argument for getopts
-    arguments[$i]=${arguments[$i]//--interactive/-i}
-    arguments[$i]=${arguments[$i]//--help/-h}
-    getopts_built_arg+=("${arguments[$i]}")
-done
+function parse_args() {
 
-# Read and parse all the arguments
-# Use a function here, to use standart arguments $@ and be able to use shift.
-parse_arg () {
-    while [ $# -ne 0 ]
+    local getopts_built_arg=()
+
+    # Read the array value per value
+    for i in `seq 0 $(( ${#arguments[@]} -1 ))`
     do
-        # If the paramater begins by -, treat it with getopts
-        if [ "${1:0:1}" == "-" ]
+        if [[ "${arguments[$i]}" =~ "--branch=" ]]
         then
-            # Initialize the index of getopts
-            OPTIND=1
-            # Parse with getopts only if the argument begin by -
-            getopts ":b:fihlyr" parameter || true
-            case $parameter in
-                b)
-                    # --branch=branch-name
-                    gitbranch="-b $OPTARG"
-                    shift_value=2
-                    ;;
-                i)
-                    # --interactive
-                    interactive=1
-                    shift_value=1
-                    ;;
-                h)
-                    # --help
-                    print_help
-                    ;;
-                \?)
-                    echo "Invalid argument: -${OPTARG:-}"
-                    print_help
-                    ;;
-                :)
-                    echo "-$OPTARG parameter requires an argument."
-                    print_help
-                    ;;
-            esac
-            # Otherwise, it's not an option, it's an operand
-        else
-            path_to_package_to_test="$1"
-            shift_value=1
+            getopts_built_arg+=(-b)
+            arguments[$i]=${arguments[$i]//--branch=/}
         fi
-        # Shift the parameter and its argument
-        shift $shift_value
+        # For each argument in the array, reduce to short argument for getopts
+        arguments[$i]=${arguments[$i]//--interactive/-i}
+        arguments[$i]=${arguments[$i]//--help/-h}
+        getopts_built_arg+=("${arguments[$i]}")
     done
+
+    # Read and parse all the arguments
+    # Use a function here, to use standart arguments $@ and be able to use shift.
+    parse_arg () {
+        while [ $# -ne 0 ]
+        do
+            # If the paramater begins by -, treat it with getopts
+            if [ "${1:0:1}" == "-" ]
+            then
+                # Initialize the index of getopts
+                OPTIND=1
+                # Parse with getopts only if the argument begin by -
+                getopts ":b:fihlyr" parameter || true
+                case $parameter in
+                    b)
+                        # --branch=branch-name
+                        gitbranch="-b $OPTARG"
+                        shift_value=2
+                        ;;
+                    i)
+                        # --interactive
+                        interactive=1
+                        shift_value=1
+                        ;;
+                    h)
+                        # --help
+                        print_help
+                        ;;
+                    \?)
+                        echo "Invalid argument: -${OPTARG:-}"
+                        print_help
+                        ;;
+                    :)
+                        echo "-$OPTARG parameter requires an argument."
+                        print_help
+                        ;;
+                esac
+                # Otherwise, it's not an option, it's an operand
+            else
+                path_to_package_to_test="$1"
+                shift_value=1
+            fi
+            # Shift the parameter and its argument
+            shift $shift_value
+        done
+    }
+
+    # Call parse_arg and pass the modified list of args as a array of arguments.
+    parse_arg "${getopts_built_arg[@]}"
 }
 
-# Call parse_arg and pass the modified list of args as a array of arguments.
-parse_arg "${getopts_built_arg[@]}"
+arguments=("$@")
+parse_args
 
 #=================================================
 # Check if the lock file exist
@@ -158,12 +159,14 @@ echo "start:$(date +%s):$$" > "$lock_file"
 # Various logistic checks and upgrades...
 #=================================================
 
-assert_we_are_the_setup_user
 assert_we_are_connected_to_the_internets
-#self_upgrade
+
+#self_upgrade # FIXME renenable this later
 fetch_or_upgrade_package_linter
 
 # Reset and create a fresh container to work with
+check_lxd_setup
+lxc image list $LXC_BASE | grep -q -w $LXC_BASE || log_critical "The base image $LXC_BASE doesn't exist yet. Consider using the build_base_lxc.sh to create it first" 
 LXC_RESET
 LXC_CREATE
 

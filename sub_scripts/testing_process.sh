@@ -1,6 +1,91 @@
 #!/bin/bash
 
+source sub_scripts/witness.sh
+
 #=================================================
+# Misc test helpers & coordination
+#=================================================
+
+RUN_ALL_TESTS() {
+    # Launch all tests successively
+    curl_error=0
+
+    # Be sure that the container is running
+    LXC_START "true"
+
+    # Print the version of YunoHost from the LXC container
+    log_small_title "YunoHost versions"
+    LXC_START "sudo yunohost --version"
+
+    # Init the value for the current test
+    current_test_number=1
+
+    # The list of test contains for example "TEST_UPGRADE some_commit_id
+    for testfile in $(ls $TEST_CONTEXT/tests/*.json);
+    do
+        TEST_LAUNCHER $testfile
+    done
+
+}
+
+TEST_LAUNCHER () {
+    local testfile="$1"
+
+    # Start the timer for this test
+    start_timer
+    # And keep this value separately
+    local global_start_timer=$starttime
+
+    current_test_id=$(basename $testfile | cut -d. -f1)
+    current_test_infos="$TEST_CONTEXT/tests/$current_test_id.json"
+    current_test_results="$TEST_CONTEXT/results/$current_test_id.json"
+    echo "{}" > $current_test_results
+
+    local test_type=$(jq -r '.test_type' $testfile)
+    local test_arg=$(jq -r '.test_arg' $testfile)
+
+    # Execute the test
+    $test_type $test_arg
+
+    [ $? -eq 0 ] && SET_RESULT "success" main_result || SET_RESULT "failure" main_result
+
+    break_before_continue
+
+    # Restore the started time for the timer
+    starttime=$global_start_timer
+    # End the timer for the test
+    stop_timer 2
+
+    LXC_STOP
+
+    # Update the lock file with the date of the last finished test.
+    # $$ is the PID of package_check itself.
+    echo "$1 $2:$(date +%s):$$" > "$lock_file"
+}
+
+SET_RESULT() {
+    local result=$1
+    local name=$2
+    [ "$result" == "success" ] && log_report_test_success || log_report_test_failed
+    local current_results="$(cat $current_test_results)"
+    echo "$current_results" | jq --arg result $result ".$name=\$result" > $current_test_results
+}
+
+#=================================================
+
+at_least_one_install_succeeded () {
+
+    for TEST in $(ls $TEST_CONTEXT/tests/*.json)
+    do
+        local test_id=$(basename $TEST | cut -d. -f1)
+        jq -e '. | select(.test_type == "TEST_INSTALL")' $TEST >/dev/null \
+        && jq -e '. | select(.main_result == "success")' $TEST_CONTEXT/results/$test_id.json >/dev/null \
+        && return 0
+    done
+
+    log_error "All installs failed, therefore the following tests cannot be performed..."
+    return 1
+}
 
 break_before_continue () {
 
@@ -25,6 +110,10 @@ start_test () {
 RUN_YUNOHOST_CMD() {
 
     log_debug "Running yunohost $1"
+
+    # Copy the package into the container.
+    lxc exec $LXC_NAME -- rm -rf /app_folder
+    lxc file push -p -r "$package_path" $LXC_NAME/app_folder --quiet
 
     # --output-as none is to disable the json-like output for some commands like backup create
     LXC_START "yunohost --output-as none --debug $1" \
@@ -51,6 +140,15 @@ this_is_a_web_app () {
 default_install_path() {
     # All webapps should be installable at the root of a domain ?
     this_is_a_web_app && echo "/" || echo ""
+}
+
+path_to_install_type() {
+    local check_path="$1"
+
+    [ -z "$check_path" ] && echo "nourl" \
+    || [ "$check_path" == "/" ] && echo "root" \
+    || echo "subdir"
+
 }
 
 #=================================================
@@ -94,15 +192,6 @@ INSTALL_APP () {
     local ret=$?
     [ $ret -eq 0 ] && log_debug "Installation successful." || log_error "Installation failed."
     return $ret
-}
-
-path_to_install_type() {
-    local check_path="$1"
-
-    [ -z "$check_path" ] && echo "nourl" \
-    || [ "$check_path" == "/" ] && echo "root" \
-    || echo "subdir"
-
 }
 
 LOAD_SNAPSHOT_OR_INSTALL_APP () {
@@ -285,14 +374,69 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
         && SET_RESULT "failure" alias_traversal
 
     [ "$curl_error" -eq 0 ] || return 1
-    [ "$install_type" != "private" ] && [ $fell_on_sso_portal -eq 0 ] || return 2
-    [ "$install_type" == "private" ] && [ $fell_on_sso_portal -eq 1 ] || return 2
-    return 0
+    local expected_to_fell_on_portal=""
+    [ "$install_type" == "private" ] && expected_to_fell_on_portal=1 || expected_to_fell_on_portal=0
+    [ $fell_on_sso_portal -eq $expected_to_fell_on_portal ] && return 0 || return 0
 }
 
+
+
+
 #=================================================
-# Unit tests
+# The
+# Actual
+# Tests
 #=================================================
+
+
+
+
+
+PACKAGE_LINTER () {
+    # Package linter
+
+    start_test "Package linter"
+
+    # Execute package linter and linter_result gets the return code of the package linter
+    ./package_linter/package_linter.py "$package_path" | tee -a "$complete_log"
+    ./package_linter/package_linter.py "$package_path" --json | tee -a "$complete_log" > $current_test_results
+
+#    # Check we qualify for level 6, 7, 8
+#    # Linter will have a warning called "app_in_github_org" if app ain't in the
+#    # yunohost-apps org...
+#    if ! cat "./temp_linter_result.json" | jq ".warning" | grep -q "app_in_github_org"
+#    then
+#        local pass_level_6="true"
+#    fi
+#    if cat "./temp_linter_result.json" | jq ".success" | grep -q "qualify_for_level_7"
+#    then
+#        local pass_level_7="true"
+#    fi
+#    if cat "./temp_linter_result.json" | jq ".success" | grep -q "qualify_for_level_8"
+#    then
+#        local pass_level_8="true"
+#    fi
+#
+#    # If there are any critical errors, we'll force level 0
+#    if [[ -n "$(cat "./temp_linter_result.json" | jq ".critical" | grep -v '\[\]')" ]]
+#    then
+#        local pass_level_0="false"
+#        # If there are any regular errors, we'll cap to 4
+#    elif [[ -n "$(cat "./temp_linter_result.json" | jq ".error" | grep -v '\[\]')" ]]
+#    then
+#        local pass_level_4="false"
+#        # Otherwise, test pass (we'll display a warning depending on if there are
+#        # any remaning warnings or not)
+#    else
+#        if [[ -n "$(cat "./temp_linter_result.json" | jq ".warning" | grep -v '\[\]')" ]]
+#        then
+#            log_report_test_warning
+#        else
+#            log_report_test_success
+#        fi
+#        local pass_level_4="true"
+#    fi
+}
 
 TEST_INSTALL () {
     # Try to install in a sub path, on root or without url access
@@ -595,46 +739,47 @@ TEST_CHANGE_URL () {
     return $main_result
 }
 
-# Define a function to split a file in multiple parts. Used for actions and config-panel toml
-splitterAA()
-{
-    local bound="$1"
-    local file="$2"
-
-    # If $2 is a real file
-    if [ -e "$file" ]
-    then
-        # Replace name of the file by its content
-        file="$(cat "$file")"
-    fi
-
-    local file_lenght=$(echo "$file" | wc --lines | awk '{print $1}')
-
-    bounds=($(echo "$file" | grep --line-number --extended-regexp "$bound" | cut -d':' -f1))
-
-    # Go for each line number (boundary) into the array
-    for line_number in $(seq 0 $(( ${#bounds[@]} -1 )))
-    do
-        # The first bound is the next line number in the array
-        # That the low bound on which we cut
-        first_bound=$(( ${bounds[$line_number+1]} - 1 ))
-        # If there's no next cell in the array, we got -1, in such case, use the lenght of the file.
-        # We cut at the end of the file
-        test $first_bound -lt 0 && first_bound=$file_lenght
-        # The second bound is the current line number in the array minus the next one.
-        # The the upper bound in the file.
-        second_bound=$(( ${bounds[$line_number]} - $first_bound - 1 ))
-        # Cut the file a first time from the beginning to the first bound
-        # And a second time from the end, back to the second bound.
-        parts[line_number]="$(echo "$file" | head --lines=$first_bound \
-            | tail --lines=$second_bound)"
-    done
-}
 
 ACTIONS_CONFIG_PANEL () {
-    # Try the actions and config-panel features
-
+    
     test_type=$1
+
+    # Define a function to split a file in multiple parts. Used for actions and config-panel toml
+    splitterAA()
+    {
+        local bound="$1"
+        local file="$2"
+
+        # If $2 is a real file
+        if [ -e "$file" ]
+        then
+            # Replace name of the file by its content
+            file="$(cat "$file")"
+        fi
+
+        local file_lenght=$(echo "$file" | wc --lines | awk '{print $1}')
+
+        bounds=($(echo "$file" | grep --line-number --extended-regexp "$bound" | cut -d':' -f1))
+
+        # Go for each line number (boundary) into the array
+        for line_number in $(seq 0 $(( ${#bounds[@]} -1 )))
+        do
+            # The first bound is the next line number in the array
+            # That the low bound on which we cut
+            first_bound=$(( ${bounds[$line_number+1]} - 1 ))
+            # If there's no next cell in the array, we got -1, in such case, use the lenght of the file.
+            # We cut at the end of the file
+            test $first_bound -lt 0 && first_bound=$file_lenght
+            # The second bound is the current line number in the array minus the next one.
+            # The the upper bound in the file.
+            second_bound=$(( ${bounds[$line_number]} - $first_bound - 1 ))
+            # Cut the file a first time from the beginning to the first bound
+            # And a second time from the end, back to the second bound.
+            parts[line_number]="$(echo "$file" | head --lines=$first_bound \
+                | tail --lines=$second_bound)"
+        done
+    }
+
     if [ "$test_type" == "actions" ]
     then
         start_test "Actions"
@@ -882,224 +1027,5 @@ ACTIONS_CONFIG_PANEL () {
 
     LXC_STOP
     return $main_result
-}
-
-PACKAGE_LINTER () {
-    # Package linter
-
-    start_test "Package linter"
-
-    # Execute package linter and linter_result gets the return code of the package linter
-    "./package_linter/package_linter.py" "$package_path" | tee -a "$complete_log"
-    "./package_linter/package_linter.py" "$package_path" --json | tee -a "$complete_log" > $current_test_results
-
-#    # Check we qualify for level 6, 7, 8
-#    # Linter will have a warning called "app_in_github_org" if app ain't in the
-#    # yunohost-apps org...
-#    if ! cat "./temp_linter_result.json" | jq ".warning" | grep -q "app_in_github_org"
-#    then
-#        local pass_level_6="true"
-#    fi
-#    if cat "./temp_linter_result.json" | jq ".success" | grep -q "qualify_for_level_7"
-#    then
-#        local pass_level_7="true"
-#    fi
-#    if cat "./temp_linter_result.json" | jq ".success" | grep -q "qualify_for_level_8"
-#    then
-#        local pass_level_8="true"
-#    fi
-#
-#    # If there are any critical errors, we'll force level 0
-#    if [[ -n "$(cat "./temp_linter_result.json" | jq ".critical" | grep -v '\[\]')" ]]
-#    then
-#        local pass_level_0="false"
-#        # If there are any regular errors, we'll cap to 4
-#    elif [[ -n "$(cat "./temp_linter_result.json" | jq ".error" | grep -v '\[\]')" ]]
-#    then
-#        local pass_level_4="false"
-#        # Otherwise, test pass (we'll display a warning depending on if there are
-#        # any remaning warnings or not)
-#    else
-#        if [[ -n "$(cat "./temp_linter_result.json" | jq ".warning" | grep -v '\[\]')" ]]
-#        then
-#            log_report_test_warning
-#        else
-#            log_report_test_success
-#        fi
-#        local pass_level_4="true"
-#    fi
-}
-
-set_witness_files () {
-    # Create files to check if the remove script does not remove them accidentally
-    log_debug "Create witness files..."
-
-    create_witness_file () {
-        [ "$2" = "file" ] && local action="touch" || local action="mkdir -p"
-        RUN_INSIDE_LXC $action $1
-    }
-
-    # Nginx conf
-    create_witness_file "/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf" file
-    create_witness_file "/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf" file
-
-    # /etc
-    create_witness_file "/etc/witnessfile" file
-
-    # /opt directory
-    create_witness_file "/opt/witnessdir" directory
-
-    # /var/www directory
-    create_witness_file "/var/www/witnessdir" directory
-
-    # /home/yunohost.app/
-    create_witness_file "/home/yunohost.app/witnessdir" directory
-
-    # /var/log
-    create_witness_file "/var/log/witnessfile" file
-
-    # Config fpm
-    create_witness_file "/etc/php/7.3/fpm/pool.d/witnessfile.conf" file
-
-    # Config logrotate
-    create_witness_file "/etc/logrotate.d/witnessfile" file
-
-    # Config systemd
-    create_witness_file "/etc/systemd/system/witnessfile.service" file
-
-    # Database
-    local mysqlpwd=$(RUN_INSIDE_LXC cat /etc/yunohost/mysql)
-    RUN_INSIDE_LXC mysqladmin --user=root --password="$mysqlpwd" --wait status > /dev/null 2>&1
-    echo "CREATE DATABASE witnessdb" | RUN_INSIDE_LXC mysql --user=root --password="$mysqlpwd" --wait > /dev/null 2>&1
-}
-
-check_witness_files () {
-    # Check all the witness files, to verify if them still here
-
-    check_file_exist () {
-        if RUN_INSIDE_LXC test ! -e "$1"
-        then
-            log_error "The file $1 is missing ! Something gone wrong !"
-            SET_RESULT "failure" witness
-        fi
-    }
-
-    # Nginx conf
-    check_file_exist "/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf"
-    check_file_exist "/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf"
-
-    # /etc
-    check_file_exist "/etc/witnessfile"
-
-    # /opt directory
-    check_file_exist "/opt/witnessdir"
-
-    # /var/www directory
-    check_file_exist "/var/www/witnessdir"
-
-    # /home/yunohost.app/
-    check_file_exist "/home/yunohost.app/witnessdir"
-
-    # /var/log
-    check_file_exist "/var/log/witnessfile"
-
-    # Config fpm
-    check_file_exist "/etc/php/7.3/fpm/pool.d/witnessfile.conf"
-
-    # Config logrotate
-    check_file_exist "/etc/logrotate.d/witnessfile"
-
-    # Config systemd
-    check_file_exist "/etc/systemd/system/witnessfile.service"
-
-    # Database
-    local mysqlpwd=$(RUN_INSIDE_LXC cat /etc/yunohost/mysql)
-    if ! RUN_INSIDE_LXC mysqlshow --user=root --password="$mysqlpwd" witnessdb > /dev/null 2>&1
-    then
-        log_error "The database witnessdb is missing ! Something gone wrong !"
-        SET_RESULT "failure" witness
-        return 1
-    fi
-}
-
-
-RUN_ALL_TESTS() {
-    # Launch all tests successively
-    curl_error=0
-
-    # Be sure that the container is running
-    LXC_START "true"
-
-    log_small_title "YunoHost versions"
-
-    # Print the version of YunoHost from the LXC container
-    LXC_START "sudo yunohost --version"
-
-    # Init the value for the current test
-    current_test_number=1
-
-    # The list of test contains for example "TEST_UPGRADE some_commit_id
-    for testfile in $(ls $TEST_CONTEXT/tests/*.json);
-    do
-        TEST_LAUNCHER $testfile
-    done
-
-}
-
-TEST_LAUNCHER () {
-    local testfile="$1"
-
-    # Start the timer for this test
-    start_timer
-    # And keep this value separately
-    local global_start_timer=$starttime
-
-    current_test_id=$(basename $testfile | cut -d. -f1)
-    current_test_infos="$TEST_CONTEXT/tests/$current_test_id.json"
-    current_test_results="$TEST_CONTEXT/results/$current_test_id.json"
-    echo "{}" > $current_test_results
-
-    local test_type=$(jq -r '.test_type' $testfile)
-    local test_arg=$(jq -r '.test_arg' $testfile)
-
-    # Execute the test
-    $test_type $test_arg
-
-    [ $? -eq 0 ] && SET_RESULT "success" main_result || SET_RESULT "failure" main_result
-
-    break_before_continue
-
-    # Restore the started time for the timer
-    starttime=$global_start_timer
-    # End the timer for the test
-    stop_timer 2
-
-    LXC_STOP
-
-    # Update the lock file with the date of the last finished test.
-    # $$ is the PID of package_check itself.
-    echo "$1 $2:$(date +%s):$$" > "$lock_file"
-}
-
-SET_RESULT() {
-    local result=$1
-    local name=$2
-    [ "$result" == "success" ] && log_report_test_success || log_report_test_failed
-    local current_results="$(cat $current_test_results)"
-    echo "$current_results" | jq --arg result $result ".$name=\$result" > $current_test_results
-}
-
-at_least_one_install_succeeded () {
-
-    for TEST in $(ls $TEST_CONTEXT/tests/*.json)
-    do
-        local test_id=$(basename $TEST | cut -d. -f1)
-        jq -e '. | select(.test_type == "TEST_INSTALL")' $TEST >/dev/null \
-        && jq -e '. | select(.main_result == "success")' $TEST_CONTEXT/results/$test_id.json >/dev/null \
-        && return 0
-    done
-
-    log_error "All installs failed, therefore the following tests cannot be performed..."
-    return 1
 }
 

@@ -60,10 +60,6 @@ LXC_START () {
 
     start_timer
 
-    # Copy the package into the container.
-    lxc exec $LXC_NAME -- rm -rf /app_folder
-    lxc file push -p -r "$package_path" $LXC_NAME/app_folder --quiet
-
     # Execute the command given in argument in the container and log its results.
     lxc exec $LXC_NAME --env PACKAGE_CHECK_EXEC=1 -t -- $cmd | tee -a "$complete_log"
 

@@ -1,6 +1,7 @@
 #!/bin/bash
 
-DEFAULT_DIST="buster"
+ARCH="amd64"
+DIST="buster"
 
 # By default we'll install Yunohost with the default branch
 YNH_INSTALL_SCRIPT_BRANCH=""
@@ -15,7 +16,8 @@ SUBDOMAIN="sub.$DOMAIN"
 # User de test
 TEST_USER="package_checker"
 
-LXC_NAME="ynh-appci-$DEFAULT_DIST"
+LXC_BASE="ynh-appci-$DIST-$ARCH-base"
+LXC_NAME="ynh-appci-$DIST"
 
 [[ -e "./config" ]] && source "./config"
 
@@ -25,18 +27,27 @@ readonly lock_file="./pcheck.lock"
 # LXC helpers
 #=================================================
 
-assert_we_are_the_setup_user() {
-    [ -e "./.setup_user" ] || return
-    local setup_user=$(cat "./.setup_user")
-
-    [ "$(whoami)" == $setup_user ] \
-    || log_critical "Ce script doit être exécuté avec l'utilisateur $setup_user !\nL'utilisateur actuel est $(whoami)."
-}
-
 assert_we_are_connected_to_the_internets() {
     ping -q -c 2 yunohost.org > /dev/null 2>&1 \
     || ping -q -c 2 framasoft.org > /dev/null 2>&1 \
     || log_critical "Unable to connect to internet."
+}
+
+function check_lxd_setup()
+{
+    # Check lxd is installed somehow
+    [[ -e /snap/bin/lxd ]] || which lxd &>/dev/null \
+        || critical "You need to have LXD installed. Refer to the README to know how to install it."
+
+    # Check that we'll be able to use lxc/lxd using sudo (for which the PATH is defined in /etc/sudoers and probably doesn't include /snap/bin)
+    if [[ ! -e /usr/bin/lxc ]] && [[ ! -e /usr/bin/lxd ]]
+    then
+        [[ -e /usr/local/bin/lxc ]] && [[ -e /usr/local/bin/lxd ]] \
+            || critical "You might want to add lxc and lxd inside /usr/local/bin so that there's no tricky PATH issue with sudo. If you installed lxd/lxc with snapd, this should do the trick: sudo ln -s /snap/bin/lxc /usr/local/bin/lxc && sudo ln -s /snap/bin/lxd /usr/local/bin/lxd"
+    fi
+
+    ip a | grep -q lxdbr0 \
+        || critical "There is no 'lxdbr0' interface... Did you ran 'lxd init' ?"
 }
 
 #=================================================
