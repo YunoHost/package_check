@@ -15,7 +15,7 @@ SUBDOMAIN="sub.$DOMAIN"
 # User de test
 TEST_USER="package_checker"
 
-LXC_NAME="ynh-appci"
+LXC_NAME="ynh-appci-$DEFAULT_DIST"
 
 [[ -e "./config" ]] && source "./config"
 

@@ -19,7 +19,7 @@ LXC_CREATE () {
 }
 
 LXC_SNAPSHOT_EXISTS() {
-    lxc info $LXC_NAME | grep -A10 Snapshots | tail -n -1 | awk '{print $1}' | greq -q -w "$1"
+    lxc info $LXC_NAME 2>/dev/null | grep -A10 Snapshots | tail -n -1 | awk '{print $1}' | grep -q -w "$1"
 }
 
 CREATE_LXC_SNAPSHOT () {
@@ -33,26 +33,25 @@ CREATE_LXC_SNAPSHOT () {
     [ $snapname != "snap0" ] && check_witness_files >&2
 
     # Remove swap files to avoid killing the CI with huge snapshots.
-    sudo lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_*); do swapoff $swapfile; done'
-    sudo lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_*); do rm -f $swapfile; done'
-    
-    # Stop the container, before its snapshot
+    sudo lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done'
+    sudo lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do rm -f $swapfile; done'
+
     sudo lxc stop --timeout 15 $LXC_NAME 2>/dev/null
 
     # Check if the snapshot already exist
     if ! LXC_SNAPSHOT_EXISTS "$snapname"
     then
         log_debug "$snapname doesn't exist, its first creation can takes a little while." >&2
-        sudo lxc snapshot $LXC_NAME $snapname --stateful
+        sudo lxc snapshot $LXC_NAME $snapname
     fi
-    
+
     stop_timer 1
 }
 
 LOAD_LXC_SNAPSHOT () {
     snapname=$1
     sudo lxc stop --timeout 15 $LXC_NAME 2>/dev/null
-    sudo lxc restore $LXC_NAME $snapname --stateful
+    sudo lxc restore $LXC_NAME $snapname
     _LXC_START_AND_WAIT $LXC_NAME
 }
 
@@ -62,7 +61,6 @@ LXC_START () {
     # Start the lxc container and execute the given command in it
     local cmd=$1
 
-    sudo lxc start $LXC_NAME
     _LXC_START_AND_WAIT $LXC_NAME
 
     start_timer
@@ -90,7 +88,7 @@ LXC_STOP () {
 
 LXC_RESET () {
     sudo lxc stop --timeout 15 $LXC_NAME 2>/dev/null
-    sudo lxc delete $LXC_NAME 
+    sudo lxc delete $LXC_NAME 2>/dev/null
 }
 
 
@@ -98,8 +96,8 @@ _LXC_START_AND_WAIT() {
 
 	restart_container()
 	{
-		lxc stop "$1"
-		lxc start "$1"
+		sudo lxc stop "$1"
+		sudo lxc start "$1"
 	}
 
 	# Try to start the container 3 times.
@@ -118,7 +116,8 @@ _LXC_START_AND_WAIT() {
 			fi
 
 			if [ "$j" == "10" ]; then
-				error 'Failed to start the container'
+				log_error 'Failed to start the container'
+                lxc info $1
 				failstart=1
 
 				restart_container "$1"
@@ -134,7 +133,7 @@ _LXC_START_AND_WAIT() {
 			fi
 
 			if [ "$j" == "10" ]; then
-				error 'Failed to access the internet'
+				log_error 'Failed to access the internet'
 				failstart=1
 
 				restart_container "$1"

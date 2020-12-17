@@ -58,8 +58,8 @@ default_install_path() {
 #=================================================
 
 INSTALL_APP () {
-    local install_args="$(jq '.install_args' $current_test_infos)"
-    local preinstall_template="$(jq '.preinstall_template' $current_test_infos)"
+    local install_args="$(jq -r '.install_args' $current_test_infos)"
+    local preinstall_template="$(jq -r '.preinstall_template' $current_test_infos)"
 
     # We have default values for domain, user and is_public, but these
     # may still be overwritten by the args ($@)
@@ -319,7 +319,7 @@ TEST_INSTALL () {
 
     # Create the snapshot that'll be used by other tests later
     [ "$install_type" != "private" ] \
-        && ! LXC_SNAPSHOT_EXISTS $snapname
+        && ! LXC_SNAPSHOT_EXISTS $snapname \
         && log_debug "Create a snapshot after app install" \
         && CREATE_LXC_SNAPSHOT $snapname
 
@@ -340,7 +340,7 @@ TEST_UPGRADE () {
     then
         start_test "Upgrade from the same version"
     else
-        upgrade_name="$(jq '.extra.upgrade_name' $current_test_infos)"
+        upgrade_name="$(jq -r '.extra.upgrade_name' $current_test_infos)"
         [ -n "$upgrade_name" ] || upgrade_name="commit $commit"
         start_test "Upgrade from $upgrade_name"
     fi
@@ -1054,13 +1054,13 @@ TEST_LAUNCHER () {
     # And keep this value separately
     local global_start_timer=$starttime
 
-    current_test_id=$(basename $test | cut -d. -f1)
+    current_test_id=$(basename $testfile | cut -d. -f1)
     current_test_infos="$TEST_CONTEXT/tests/$current_test_id.json"
     current_test_results="$TEST_CONTEXT/results/$current_test_id.json"
     echo "{}" > $current_test_results
 
-    local test_type=$(jq '.test_type' $testfile)
-    local test_arg=$(jq '.test_arg' $testfile)
+    local test_type=$(jq -r '.test_type' $testfile)
+    local test_arg=$(jq -r '.test_arg' $testfile)
 
     # Execute the test
     $test_type $test_arg
@@ -1084,7 +1084,7 @@ TEST_LAUNCHER () {
 SET_RESULT() {
     local result=$1
     local name=$2
-    [ $result -eq "success" ] && log_report_test_success || log_report_test_failed
+    [ "$result" == "success" ] && log_report_test_success || log_report_test_failed
     local current_results="$(cat $current_test_results)"
     echo "$current_results" | jq --arg result $result ".$name=\$result" > $current_test_results
 }
@@ -1094,8 +1094,8 @@ at_least_one_install_succeeded () {
     for TEST in $(ls $TEST_CONTEXT/tests/*.json)
     do
         local test_id=$(basename $TEST | cut -d. -f1)
-        jq -e '. | select(.test_type == "TEST_INSTALL")' $TEST \
-        && jq -e '. | select(.main_result == "success")' $TEST_CONTEXT/results/$test_id.json \
+        jq -e '. | select(.test_type == "TEST_INSTALL")' $TEST >/dev/null \
+        && jq -e '. | select(.main_result == "success")' $TEST_CONTEXT/results/$test_id.json >/dev/null \
         && return 0
     done
 
