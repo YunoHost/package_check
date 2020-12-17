@@ -80,7 +80,7 @@ echo -e "# Branche à utiliser pour le script d'install de cette distribution (s
 
 echo -e "\e[1m> Update et install lxc lxctl\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo apt-get update >> "$LOG_BUILD_LXC" 2>&1
-sudo apt-get install -y lxc lxctl >> "$LOG_BUILD_LXC" 2>&1
+sudo apt-get install -y lsb-release lxc lxctl >> "$LOG_BUILD_LXC" 2>&1
 
 echo -e "\e[1m> Install git, curl and lynx\e[0m" | tee -a "$LOG_BUILD_LXC"
 sudo apt-get install -y git curl lynx jq python3-pip >> "$LOG_BUILD_LXC" 2>&1
