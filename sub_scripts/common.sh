@@ -1,6 +1,22 @@
 #!/bin/bash
 
-[[ -e "./config.defaults" ]] && source "./config.defaults"
+DEFAULT_DIST="buster"
+
+# By default we'll install Yunohost with the default branch
+YNH_INSTALL_SCRIPT_BRANCH=""
+
+# Admin password
+YUNO_PWD="admin"
+
+# Domaines de test
+DOMAIN="domain.tld"
+SUBDOMAIN="sub.$DOMAIN"
+
+# User de test
+TEST_USER="package_checker"
+
+LXC_NAME="ynh-appci"
+
 [[ -e "./config" ]] && source "./config"
 
 readonly lock_file="./pcheck.lock"
@@ -10,11 +26,8 @@ readonly lock_file="./pcheck.lock"
 #=================================================
 
 RUN_INSIDE_LXC() {
-    sudo lxc-attach -n $LXC_NAME -- "$@"
-}
-
-RUN_THROUGH_SSH() {
-    ssh -tt -q $LXC_NAME "sudo $@"
+    sudo lxc exec $LXC_NAME -- "$@"
+    sudo lxc-attach -n  -- "$@"
 }
 
 assert_we_are_the_setup_user() {
@@ -240,5 +253,4 @@ function fetch_or_upgrade_package_linter()
     # Update the version file
     echo "$check_version" > "$version_file"
 }
-
 

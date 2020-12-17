@@ -6,11 +6,8 @@ break_before_continue () {
 
     if [ $interactive -eq 1 ]
     then
-        echo "To execute one command:"
-        echo "     sudo lxc-attach -n $LXC_NAME -- command"
-        echo "To establish a ssh connection:"
-        echo "     ssh -t $LXC_NAME"
-
+        echo "To enter a shell on the lxc:"
+        echo "     sudo lxc exec $LXC_NAME bash"
         read -p "Press a key to delete the application and continue...." < /dev/tty
     fi
 }
@@ -30,7 +27,7 @@ RUN_YUNOHOST_CMD() {
     log_debug "Running yunohost $1"
 
     # --output-as none is to disable the json-like output for some commands like backup create
-    LXC_START "sudo PACKAGE_CHECK_EXEC=1 yunohost --output-as none --debug $1" \
+    LXC_START "PACKAGE_CHECK_EXEC=1 yunohost --output-as none --debug $1" \
         | grep --line-buffered -v --extended-regexp '^[0-9]+\s+.{1,15}DEBUG' \
         | grep --line-buffered -v 'processing action'
 
@@ -77,25 +74,22 @@ INSTALL_APP () {
     if [ -n "$preinstall_template" ]
     then
         log_small_title "Pre installation request"
-        # Start the lxc container
-        LXC_START "true"
         # Copy all the instructions into a script
         local preinstall_script="$TEST_CONTEXT/preinstall.sh"
         echo "$preinstall_template" > "$preinstall_script"
-        chmod +x "$preinstall_script"
         # Hydrate the template with variables
         sed -i "s/\$USER/$TEST_USER/" "$preinstall_script"
         sed -i "s/\$DOMAIN/$DOMAIN/" "$preinstall_script"
         sed -i "s/\$SUBDOMAIN/$SUBDOMAIN/" "$preinstall_script"
         sed -i "s/\$PASSWORD/$YUNO_PWD/" "$preinstall_script"
         # Copy the pre-install script into the container.
-        scp -rq "$preinstall_script" "$LXC_NAME":
+        sudo lxc file push "$preinstall_script" "$LXC_NAME":/preinstall.sh
         # Then execute the script to execute the pre-install commands.
-        LXC_START "./preinstall.sh >&2"
+        LXC_START "bash /preinstall.sh"
     fi
 
     # Install the application in a LXC container
-    RUN_YUNOHOST_CMD "app install --force ./app_folder/ -a '$install_args'"
+    RUN_YUNOHOST_CMD "app install --force /app_folder -a '$install_args'"
 
     local ret=$?
     [ $ret -eq 0 ] && log_debug "Installation successful." || log_error "Installation failed."
@@ -204,8 +198,8 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
             # Call curl to try to access to the url of the app
             curl --location --insecure --silent --show-error \
                 --header "Host: $check_domain" \
-                --resolve $check_domain:80:$LXC_NETWORK.2 \
-                --resolve $check_domain:443:$LXC_NETWORK.2 \
+                --resolve $check_domain:80:$LXC_IP \
+                --resolve $check_domain:443:$LXC_IP \
                 --write-out "%{http_code};%{url_effective}\n" \
                 --output "$curl_output" \
                 $check_domain$curl_check_path \
@@ -281,7 +275,9 @@ VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
     <title>alias_traversal test</title>
     </head><body><h1>alias_traversal test</h1>
     If you see this page, you have failed the test for alias_traversal issue.</body></html>" \
-        | sudo tee $LXC_ROOTFS/var/www/html/alias_traversal.html > /dev/null
+    > $TEST_CONTEXT/alias_traversal.html
+
+    sudo lxc file push $TEST_CONTEXT $LXC_NAME/var/www/html/alias_traversal.html
 
     curl --location --insecure --silent $check_domain$check_path../html/alias_traversal.html \
         | grep "title" | grep --quiet "alias_traversal test" \
@@ -323,7 +319,7 @@ TEST_INSTALL () {
 
     # Create the snapshot that'll be used by other tests later
     [ "$install_type" != "private" ] \
-        && [ ! -e "$LXC_SNAPSHOTS/$snapname" ] \
+        && ! LXC_SNAPSHOT_EXISTS $snapname
         && log_debug "Create a snapshot after app install" \
         && CREATE_LXC_SNAPSHOT $snapname
 
@@ -339,8 +335,6 @@ TEST_INSTALL () {
 TEST_UPGRADE () {
 
     local commit=$1
-
-    # FIXME FIXME FIXME FIXME : fetch upgrade name, specific upgrade args
 
     if [ "$commit" == "" ]
     then
@@ -385,7 +379,7 @@ TEST_UPGRADE () {
     log_small_title "Upgrade..."
 
     # Upgrade the application in a LXC container
-    RUN_YUNOHOST_CMD "app upgrade $app_id -f ./app_folder/" \
+    RUN_YUNOHOST_CMD "app upgrade $app_id -f /app_folder" \
         && VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
 
     return $?
@@ -426,9 +420,9 @@ TEST_PORT_ALREADY_USED () {
 
     # Build a service with netcat for use this port before the app.
     echo -e "[Service]\nExecStart=/bin/netcat -l -k -p $check_port\n
-    [Install]\nWantedBy=multi-user.target" | \
-        sudo tee "$LXC_ROOTFS/etc/systemd/system/netcat.service" \
-        > /dev/null
+    [Install]\nWantedBy=multi-user.target" > $TEST_CONTEXT/netcat.service
+
+    sudo lxc file push $TEST_CONTEXT/netcat.service $LXC_NAME/etc/systemd/system/netcat.service
 
     # Then start this service to block this port.
     LXC_START "sudo systemctl enable netcat & sudo systemctl start netcat"
@@ -459,7 +453,8 @@ TEST_BACKUP_RESTORE () {
     local main_result=0
 
     # Remove the previous residual backups
-    sudo rm -rf $LXC_ROOTFS/home/yunohost.backup/archives
+    sudo rm -rf ./ynh_backups
+    sudo lxc exec $LXC_NAME -- rm -rf /home/yunohost.backup/archives
 
     # BACKUP
     # Made a backup if the installation succeed
@@ -477,7 +472,7 @@ TEST_BACKUP_RESTORE () {
     [ $ret -eq 0 ] || main_result=1
 
     # Grab the backup archive into the LXC container, and keep a copy
-    sudo cp -a $LXC_ROOTFS/home/yunohost.backup/archives ./
+    sudo lxc file pull -r $LXC_NAME/home/yunohost.backup/archives ./ynh_backups
 
     # RESTORE
     # Try the restore process in 2 times, first after removing the app, second after a restore of the container.
@@ -496,14 +491,14 @@ TEST_BACKUP_RESTORE () {
         elif [ $j -eq 1 ]
         then
 
-            # Remove the previous residual backups
-            sudo rm -rf $LXC_SNAPSHOTS/snap0/rootfs/home/yunohost.backup/archives
-
-            # Place the copy of the backup archive in the container.
-            sudo mv -f ./archives $LXC_SNAPSHOTS/snap0/rootfs/home/yunohost.backup/
-
             LXC_STOP
             LOAD_LXC_SNAPSHOT snap0
+
+            # Remove the previous residual backups
+            lxc exec $LXC_NAME -- rm -f /rootfs/home/yunohost.backup/archives/*
+
+            # Place the copy of the backup archive in the container.
+            sudo lxc file push -r ./ynh_backups $LXC_NAME/home/yunohost.backup/archives/
 
             log_small_title "Restore on a clean YunoHost system..."
         fi
@@ -517,7 +512,6 @@ TEST_BACKUP_RESTORE () {
 
         break_before_continue
 
-        # Stop and restore the LXC container
         LXC_STOP
     done
 
@@ -942,7 +936,7 @@ set_witness_files () {
 
     create_witness_file () {
         [ "$2" = "file" ] && local action="touch" || local action="mkdir -p"
-        sudo $action "${LXC_ROOTFS}${1}"
+        sudo lxc exec $LXC_NAME -- $action $1
     }
 
     # Nginx conf
@@ -965,15 +959,7 @@ set_witness_files () {
     create_witness_file "/var/log/witnessfile" file
 
     # Config fpm
-    if [ -d "${LXC_ROOTFS}/etc/php5/fpm" ]; then
-        create_witness_file "/etc/php5/fpm/pool.d/witnessfile.conf" file
-    fi
-    if [ -d "${LXC_ROOTFS}/etc/php/7.0/fpm" ]; then
-        create_witness_file "/etc/php/7.0/fpm/pool.d/witnessfile.conf" file
-    fi
-    if [ -d "${LXC_ROOTFS}/etc/php/7.3/fpm" ]; then
-        create_witness_file "/etc/php/7.3/fpm/pool.d/witnessfile.conf" file
-    fi
+    create_witness_file "/etc/php/7.3/fpm/pool.d/witnessfile.conf" file
 
     # Config logrotate
     create_witness_file "/etc/logrotate.d/witnessfile" file
@@ -982,15 +968,16 @@ set_witness_files () {
     create_witness_file "/etc/systemd/system/witnessfile.service" file
 
     # Database
-    RUN_INSIDE_LXC mysqladmin --user=root --password=$(sudo cat "$LXC_ROOTFS/etc/yunohost/mysql") --wait status > /dev/null 2>&1
-    RUN_INSIDE_LXC mysql --user=root --password=$(sudo cat "$LXC_ROOTFS/etc/yunohost/mysql") --wait --execute="CREATE DATABASE witnessdb" > /dev/null 2>&1
+    local mysqlpwd=$(lxc exec $LXC_NAME -- cat /etc/yunohost/mysql)
+    RUN_INSIDE_LXC mysqladmin --user=root --password="$mysqlpwd" --wait status > /dev/null 2>&1
+    RUN_INSIDE_LXC mysql --user=root --password="$mysqlpwd" --wait --execute="CREATE DATABASE witnessdb" > /dev/null 2>&1
 }
 
 check_witness_files () {
     # Check all the witness files, to verify if them still here
 
     check_file_exist () {
-        if sudo test ! -e "${LXC_ROOTFS}${1}"
+        if sudo lxc exec $LXC_NAME -- test ! -e "{1}"
         then
             log_error "The file $1 is missing ! Something gone wrong !"
             SET_RESULT "failure" witness
@@ -1017,15 +1004,7 @@ check_witness_files () {
     check_file_exist "/var/log/witnessfile"
 
     # Config fpm
-    if [ -d "${LXC_ROOTFS}/etc/php5/fpm" ]; then
-        check_file_exist "/etc/php5/fpm/pool.d/witnessfile.conf"
-    fi
-    if [ -d "${LXC_ROOTFS}/etc/php/7.0/fpm" ]; then
-        check_file_exist "/etc/php/7.0/fpm/pool.d/witnessfile.conf"
-    fi
-    if [ -d "${LXC_ROOTFS}/etc/php/7.3/fpm" ]; then
-        check_file_exist "/etc/php/7.3/fpm/pool.d/witnessfile.conf"
-    fi
+    check_file_exist "/etc/php/7.3/fpm/pool.d/witnessfile.conf"
 
     # Config logrotate
     check_file_exist "/etc/logrotate.d/witnessfile"
@@ -1034,7 +1013,8 @@ check_witness_files () {
     check_file_exist "/etc/systemd/system/witnessfile.service"
 
     # Database
-    if ! RUN_INSIDE_LXC mysqlshow --user=root --password=$(sudo cat "$LXC_ROOTFS/etc/yunohost/mysql") witnessdb > /dev/null 2>&1
+    local mysqlpwd=$(lxc exec $LXC_NAME -- cat /etc/yunohost/mysql)
+    if ! RUN_INSIDE_LXC mysqlshow --user=root --password="$mysqlpwd" witnessdb > /dev/null 2>&1
     then
         log_error "The database witnessdb is missing ! Something gone wrong !"
         SET_RESULT "failure" witness

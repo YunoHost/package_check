@@ -2,7 +2,7 @@
 
 cd $(dirname $(realpath $0) | sed 's@/sub_scripts$@@g')
 source "./sub_scripts/common.sh"
-source "./sub_scripts/launcher.sh"
+source "./sub_scripts/lxc.sh"
 source "./sub_scripts/testing_process.sh"
 
 complete_log="./Complete.log"
@@ -11,7 +11,7 @@ complete_log="./Complete.log"
 > "$complete_log"
 > "./lxc_boot.log"
 
-TEST_CONTEXT=$(mkdtemp -d)
+TEST_CONTEXT=$(mktemp -d)
 
 # Redirect fd 3 (=debug steam) to complete log
 exec 3>>$complete_log
@@ -33,23 +33,18 @@ package_check.sh [OPTION]... PACKAGE_TO_CHECK
         Wait for the user to continue before each remove.
     -h, --help
         Display this help
-    -l, --build-lxc
-        Install LXC and build the container if necessary.
 EOF
 exit 0
 }
 
 
 clean_exit () {
+
     # Exit and remove all temp files
     # $1 = exit code
-
-    # Deactivate LXC network
-    LXC_TURNOFF
+    LXC_RESET
 
     # Remove temporary files
-    rm -f "./url_output"
-    rm -f "./curl_print"
     rm -rf "$TEST_CONTEXT"
 
     # Remove the application which been tested
@@ -74,7 +69,6 @@ clean_exit () {
 gitbranch=""
 force_install_ok=0
 interactive=0
-build_lxc=0
 arguments=("$@")
 getopts_built_arg=()
 
@@ -89,7 +83,6 @@ do
     # For each argument in the array, reduce to short argument for getopts
     arguments[$i]=${arguments[$i]//--interactive/-i}
     arguments[$i]=${arguments[$i]//--help/-h}
-    arguments[$i]=${arguments[$i]//--build-lxc/-l}
     getopts_built_arg+=("${arguments[$i]}")
 done
 
@@ -119,11 +112,6 @@ parse_arg () {
                 h)
                     # --help
                     print_help
-                    ;;
-                l)
-                    # --build-lxc
-                    build_lxc=1
-                    shift_value=1
                     ;;
                 \?)
                     echo "Invalid argument: -${OPTARG:-}"
@@ -180,26 +168,9 @@ assert_we_are_connected_to_the_internets
 self_upgrade
 fetch_or_upgrade_package_linter
 
-# Check if lxc is already installed
-if dpkg-query -W -f '${Status}' "lxc" 2>/dev/null | grep -q "ok installed"
-then
-    # If lxc is installed, check if the container is already built.
-    if ! sudo lxc-ls | grep -q "$LXC_NAME"
-    then
-        # If lxc's not installed and build_lxc set. Asks to build the container.
-        [ $build_lxc -eq 1 ] || log_critical "LXC is not installed or the container $LXC_NAME doesn't exist.\nYou should build it with 'lxc_build.sh'."
-        ./sub_scripts/lxc_build.sh
-    fi
-elif [ $build_lxc -eq 1 ]
-then
-    # If lxc's not installed and build_lxc set. Asks to build the container.
-    ./sub_scripts/lxc_build.sh
-fi
-
-# Stop and restore the LXC container. In case of previous incomplete execution.
-LXC_STOP
-LXC_TURNOFF
-LXC_PURGE_SNAPSHOTS
+# Reset and create a fresh container to work with
+LXC_RESET
+LXC_CREATE
 
 #=================================================
 # Pick up the package
@@ -705,8 +676,6 @@ run_all_tests() {
     # And keep this value separately
     complete_start_timer=$starttime
 
-    LXC_INIT
-
     # Break after the first tests serie
     if [ $interactive -eq 1 ]; then
         read -p "Press a key to start the tests..." < /dev/tty
@@ -733,7 +702,5 @@ run_all_tests() {
     || guess_test_configuration
 
 run_all_tests
-
-LXC_PURGE_SNAPSHOTS
 
 clean_exit 0
