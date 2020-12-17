@@ -695,7 +695,7 @@ TEST_RESULTS () {
         [ $RESULT_action_config_panel -ne -1 ] && \
         ([ $RESULT_linter_level_7 -ge 1 ] ||
         ([ $RESULT_linter_level_7 -eq 0 ] && \
-        [ "${level[8]}" == "2" ] ))
+        [ "${level[7]}" == "2" ] ))
     }
 
     pass_level_8() {
