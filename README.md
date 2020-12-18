@@ -34,17 +34,58 @@ For a package on GitHub: `./package_check.sh https://github.com/YunoHost-Apps/AP
 You need to provide, at the root of the package, a `check_process` file to help the script to test the package with the correct arguments.  
 If this file is not present, package_check will be used in downgraded mode. It will try to retrieve domain, path and admin user arguments in the manifest and execute some tests, based on the arguments it can find.
 
----
 ## Deploying package_check
+
+First you need to install the system dependencies.
+
+Package check is based on the LXD/LXC ecosystem. Be careful that 
+**LXD can conflict with other installed virtualization technologies such as 
+libvirt or vanilla LXCs**, especially because they all require a daemon based 
+on DNSmasq which may list on port 53.
+
+On a Debian-based system (regular Debian, Ubuntu, Mint ...), LXD can be
+installed using `snapd`. On other systems like Archlinux, you will probably also
+be able to install `snapd` using the system package manager (or even
+`lxd` directly).
+
+```bash
+apt install git snapd
+sudo snap install core
+sudo snap install lxd
+
+# Adding lxc/lxd to /usr/local/bin to make sure we can use them easily even
+# with sudo for which the PATH is defined in /etc/sudoers and probably doesn't
+# include /snap/bin
+sudo ln -s /snap/bin/lxc /usr/local/bin/lxc
+sudo ln -s /snap/bin/lxd /usr/local/bin/lxd
+```
+
+Then you shall initialize LXD which will ask you a bunch of question. Usually
+answering the default (just pressing enter) to all questions is fine.
+
+```bash
+sudo lxd init
+```
+
+You can keep the default answer to all question EXCEPT the size of the default
+storage it'll create (default is 5G but you probably want 10 instead ...  or 20 for heavy usage)
+
+Then you can : 
 
 ```
 git clone https://github.com/YunoHost/package_check
 cd package_check
+
+# Build the base image with pre-installed yunohost (this will take some time!)
 ./build_base_lxc.sh
+```
+
+Then test your packages : 
+
+```
 ./package_check.sh your_app_ynh
 ```
 
----
 ## Syntax of `check_process`
 > Except spaces, the syntax of this file must be respected.
 
