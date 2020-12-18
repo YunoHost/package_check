@@ -2,3 +2,12 @@
 *~
 Notes
 config
+
+.apps_git_clone_cache
+.plinter_version
+.spdx_licenses
+
+*.log
+curl_print
+
+*.lock
