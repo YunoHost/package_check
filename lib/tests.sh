@@ -375,7 +375,7 @@ TEST_UPGRADE () {
         local ret=$?
 
         # Then replace the backup
-        rm -r "$package_path"
+        rm -rf "$package_path"
         mv "${package_path}_back" "$package_path"
     fi
 
