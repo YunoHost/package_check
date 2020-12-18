@@ -52,6 +52,11 @@ _INSTALL_APP () {
         LXC_START "bash /preinstall.sh"
     fi
 
+    for ARG in $(jq -r '.arguments.install[].name' $package_path/manifest.json)
+    do
+        echo "$install_args" | grep -q -E "\<$ARG=" || { log_error "Missing install arg $ARG ?"; return 1; }
+    done
+
     # Install the application in a LXC container
     log_info "Running: yunohost app install --force /app_folder -a $install_args"
     _RUN_YUNOHOST_CMD "app install --force /app_folder -a $install_args"
