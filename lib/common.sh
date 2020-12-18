@@ -172,7 +172,7 @@ stop_timer () {
     # Add a 's' for plural values
     [ $hours -eq 1 ] && phours="${phours}, " || test -z "$phours" || phours="${phours}s, "
     [ $minutes -eq 1 ] && pminutes="${pminutes}, " || test -z "$pminutes" || pminutes="${pminutes}s, "
-    [ $seconds -gt 1 ] && pseconds="${pseconds}s"
+    [ $seconds -gt 1 ] && pseconds="${pseconds}s" || pseconds="0s"
 
     time="${phours}${pminutes}${pseconds} ($(date '+%T'))"
     if [ $1 -eq 2 ]; then
