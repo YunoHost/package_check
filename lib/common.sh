@@ -27,7 +27,7 @@ clean_exit () {
 
     LXC_RESET
 
-    [ -n "$TEST_CONTEXT" ] rm -rf "$TEST_CONTEXT"
+    [ -n "$TEST_CONTEXT" ] && rm -rf "$TEST_CONTEXT"
     rm -f "$lock_file"
 
     exit $1
@@ -78,7 +78,7 @@ readonly WHITE=$(printf '\033[39m')
 
 function log_title()
 {
-    cat << EOF
+    cat << EOF | tee -a /proc/self/fd/3
 ${BOLD}
  ===================================
  $1
@@ -89,51 +89,51 @@ EOF
 
 function log_small_title()
 {
-    echo -e "\n${BOLD} > ${1}${NORMAL}\n"
+    echo -e "\n${BOLD} > ${1}${NORMAL}\n" | tee -a /proc/self/fd/3
 }
 
 
 function log_debug()
 {
-    echo "$1" >&3
+    echo "$1" >> /proc/self/fd/3
 }
 
 function log_info()
 {
-    echo "${1}"
+    echo "${1}" | tee -a /proc/self/fd/3
 }
 
 function log_success()
 {
-    echo "${BOLD}${GREEN}Success: ${1}${NORMAL}"
+    echo "${BOLD}${GREEN}Success: ${1}${NORMAL}" | tee -a /proc/self/fd/3
 }
 
 function log_warning()
 {
-    echo "${BOLD}${ORANGE}Warning: ${1}${NORMAL}"
+    echo "${BOLD}${ORANGE}Warning: ${1}${NORMAL}" | tee -a /proc/self/fd/3
 }
 
 function log_error()
 {
-    echo "${BOLD}${RED}Error: ${1}${NORMAL}"
+    echo "${BOLD}${RED}Error: ${1}${NORMAL}" | tee -a /proc/self/fd/3
 }
 
 function log_critical()
 {
-    echo "${BOLD}${RED}Critical: ${1}${NORMAL}"
+    echo "${BOLD}${RED}Critical: ${1}${NORMAL}" | tee -a /proc/self/fd/3
     clean_exit 1
 }
 
 function log_report_test_success () {
-    echo -e "\n${BOLD}${GREEN}--- SUCCESS ---${NORMAL}\n"
+    echo -e "\n${BOLD}${GREEN}--- SUCCESS ---${NORMAL}\n" | tee -a /proc/self/fd/3
 }
 
 function log_report_test_warning () {
-    echo -e "\n${BOLD}${ORANGE}--- WARNING ---${NORMAL}\n"
+    echo -e "\n${BOLD}${ORANGE}--- WARNING ---${NORMAL}\n" | tee -a /proc/self/fd/3
 }
 
 function log_report_test_failed () {
-    echo -e "\n${BOLD}${RED}--- FAIL ---${NORMAL}\n"
+    echo -e "\n${BOLD}${RED}--- FAIL ---${NORMAL}\n" | tee -a /proc/self/fd/3
 }
 
 #=================================================

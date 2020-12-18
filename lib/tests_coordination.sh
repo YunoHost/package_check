@@ -7,7 +7,7 @@ source lib/witness.sh
 complete_log="./Complete.log"
 
 # Purge some log files
-> "$complete_log"
+rm -f "$complete_log" && touch "$complete_log"
 
 # Redirect fd 3 (=debug steam) to complete log
 exec 3>>$complete_log
@@ -15,9 +15,6 @@ exec 3>>$complete_log
 #=======================================================================
 # Parse the check_process and generate jsons that describe tests to run
 #=======================================================================
-
-# Parse the check_process only if it's exist
-check_process="$package_path/check_process"
 
 # Extract a section found between $1 and $2 from the file $3
 extract_check_process_section () {
@@ -156,11 +153,11 @@ parse_check_process() {
         fi
 
         is_test_enabled pkg_linter     && add_test "PACKAGE_LINTER"
-        is_test_enabled setup_sub_dir  && add_test "TEST_INSTALL" "subdir"
         is_test_enabled setup_root     && add_test "TEST_INSTALL" "root"
+        is_test_enabled setup_sub_dir  && add_test "TEST_INSTALL" "subdir"
         is_test_enabled setup_nourl    && add_test "TEST_INSTALL" "nourl"
         is_test_enabled setup_private  && add_test "TEST_INSTALL" "private"
-        is_test_enabled multi_instance && add_test "TEST_MULTI_INSTANCE"
+        is_test_enabled multi_instance && add_test "TEST_INSTALL" "multi"
         is_test_enabled backup_restore && add_test "TEST_BACKUP_RESTORE"
 
         # Upgrades
@@ -220,15 +217,15 @@ guess_test_configuration() {
     local install_args=$(python "./lib/manifest_parsing.py" "$package_path/manifest.json" | cut -d ':' -f1,2 | tr ':' '=' | tr '\n' '&')
 
     add_test "PACKAGE_LINTER"
-    add_test "TEST_INSTALL subdir"
-    add_test "TEST_INSTALL root"
+    add_test "TEST_INSTALL" "root"
+    add_test "TEST_INSTALL" "subdir"
     if echo $install_args | grep -q "is_public="
     then
         add_test "TEST_INSTALL" "private"
     fi
     if grep multi_instance "$package_path/manifest.json" | grep -q true
     then
-        add_test "TEST_MULTI_INSTANCE"
+        add_test "TEST_INSTALL" "multi"
     fi
     add_test "TEST_BACKUP_RESTORE"
     add_test "TEST_UPGRADE"
@@ -242,6 +239,9 @@ run_all_tests() {
 
     mkdir -p $TEST_CONTEXT/tests
     mkdir -p $TEST_CONTEXT/results
+
+    # Parse the check_process only if it's exist
+    check_process="$package_path/check_process"
 
     [ -e "$check_process" ] \
         && parse_check_process \
@@ -281,7 +281,7 @@ run_all_tests() {
     done
 
     # Print the final results of the tests
-    # FIXME COMPUTE_RESULTS_SUMMARY $test_serie_id
+    python3 lib/analyze_test_results.py $TEST_CONTEXT 2>$TEST_CONTEXT/summary.json
 
     # Restore the started time for the timer
     starttime=$complete_start_timer

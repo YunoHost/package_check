@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #=================================================
-# Logistic helpers
+# "Low-level" logistic helpers
 #=================================================
 
 _RUN_YUNOHOST_CMD() {
@@ -258,19 +258,24 @@ PACKAGE_LINTER () {
     # Execute package linter and linter_result gets the return code of the package linter
     ./package_linter/package_linter.py "$package_path" | tee -a "$complete_log"
     ./package_linter/package_linter.py "$package_path" --json | tee -a "$complete_log" > $current_test_results
+
+    return $?
 }
 
 TEST_INSTALL () {
-    # Try to install in a sub path, on root or without url access
-    # $1 = install type
 
     local install_type=$1
+
+    # This is a separate case ... at least from an hystorical point of view ...
+    # but it helpers for semantic that the test is a "TEST_INSTALL" ...
+    [ "$install_type" = "multi"   ] && { _TEST_MULTI_INSTANCE; return $?; }
+
     local check_path="/"
     local is_public="1"
-    [ "$install_type" = "subdir"   ] && { start_test "Installation in a sub path";      local check_path=/path; }
-    [ "$install_type" = "root"     ] && { start_test "Installation on the root";                                }
-    [ "$install_type" = "nourl"    ] && { start_test "Installation without url access"; local check_path="";    }
-    [ "$install_type" = "private"  ] && { start_test "Installation in private mode";    local is_public="0";    }
+    [ "$install_type" = "subdir"  ] && { start_test "Installation in a sub path";      local check_path=/path; }
+    [ "$install_type" = "root"    ] && { start_test "Installation on the root";                                }
+    [ "$install_type" = "nourl"   ] && { start_test "Installation without url access"; local check_path="";    }
+    [ "$install_type" = "private" ] && { start_test "Installation in private mode";    local is_public="0";    }
     local snapname=snap_${install_type}install
 
     LOAD_LXC_SNAPSHOT snap0
@@ -294,6 +299,29 @@ TEST_INSTALL () {
         && log_small_title "Reinstalling after removal." \
         &&_INSTALL_APP "path=$check_path" "is_public=$is_public" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path $install_type
+
+    return $?
+}
+
+_TEST_MULTI_INSTANCE () {
+
+    start_test "Multi-instance installations"
+
+    # Check if an install have previously work
+    at_least_one_install_succeeded || return 1
+
+    local check_path=$(default_install_path)
+
+    LOAD_LXC_SNAPSHOT snap0
+
+    log_small_title "First installation: path=$DOMAIN$check_path" \
+        &&_INSTALL_APP "domain=$DOMAIN" "path=$check_path" \
+        && log_small_title "Second installation: path=$SUBDOMAIN$check_path" \
+        && _INSTALL_APP "path=$check_path" \
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $DOMAIN $check_path \
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path "" ${app_id}__2 \
+        && _REMOVE_APP \
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path "" ${app_id}__2
 
     return $?
 }
@@ -347,27 +375,6 @@ TEST_UPGRADE () {
     # Upgrade the application in a LXC container
     _RUN_YUNOHOST_CMD "app upgrade $app_id -f /app_folder" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
-
-    return $?
-}
-
-TEST_MULTI_INSTANCE () {
-
-    start_test "Multi-instance installations"
-
-    # Check if an install have previously work
-    at_least_one_install_succeeded || return 1
-
-    local check_path=$(default_install_path)
-
-    LOAD_LXC_SNAPSHOT snap0
-
-    log_small_title "First installation: path=$DOMAIN$check_path" \
-        &&_INSTALL_APP "domain=$DOMAIN" "path=$check_path" \
-        && log_small_title "Second installation: path=$SUBDOMAIN$check_path" \
-        &&_INSTALL_APP "path=$check_path" \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $DOMAIN $check_path \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path "" ${app_id}__2
 
     return $?
 }
@@ -464,6 +471,7 @@ TEST_BACKUP_RESTORE () {
 
             # Place the copy of the backup archive in the container.
             sudo lxc file push -r ./ynh_backups $LXC_NAME/home/yunohost.backup/archives/
+            RUN_INSIDE_LXC ls -l /home/yunohost.backup/archives/
 
             log_small_title "Restore on a clean YunoHost system..."
         fi
@@ -489,10 +497,10 @@ TEST_CHANGE_URL () {
     # Check if an install have previously work
     at_least_one_install_succeeded || return 1
     this_is_a_web_app || return 0
-        
+
     log_small_title "Preliminary install..." \
         && _LOAD_SNAPSHOT_OR_INSTALL_APP "/"
-    
+
     local ret=$?
     [ $ret -eq 0 ] || { return 1; }
 
@@ -548,7 +556,7 @@ TEST_CHANGE_URL () {
 
 
 ACTIONS_CONFIG_PANEL () {
-    
+
     test_type=$1
 
     # Define a function to split a file in multiple parts. Used for actions and config-panel toml
