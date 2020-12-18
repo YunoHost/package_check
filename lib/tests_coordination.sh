@@ -126,7 +126,7 @@ parse_check_process() {
                 --arg test_type "$test_type" \
                 --arg test_arg "$test_arg" \
                 --arg preinstall_template "$preinstall_template" \
-                --arg install_args "$_install_args" \
+                --arg install_args "${_install_args//\"}" \
                 --argjson extra "$extra" \
                 '{ $test_serie, $test_type, $test_arg, $preinstall_template, $install_args, $extra }' \
                 > "$TEST_CONTEXT/tests/$test_id.json"
