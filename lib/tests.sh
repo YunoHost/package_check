@@ -427,7 +427,6 @@ TEST_BACKUP_RESTORE () {
     local main_result=0
 
     # Remove the previous residual backups
-    sudo rm -rf ./ynh_backups
     RUN_INSIDE_LXC rm -rf /home/yunohost.backup/archives
 
     # BACKUP
@@ -446,7 +445,7 @@ TEST_BACKUP_RESTORE () {
     [ $ret -eq 0 ] || main_result=1
 
     # Grab the backup archive into the LXC container, and keep a copy
-    sudo lxc file pull -r $LXC_NAME/home/yunohost.backup/archives ./ynh_backups
+    sudo lxc file pull -r $LXC_NAME/home/yunohost.backup/archives $TEST_CONTEXT/ynh_backups
 
     # RESTORE
     # Try the restore process in 2 times, first after removing the app, second after a restore of the container.
@@ -468,10 +467,10 @@ TEST_BACKUP_RESTORE () {
             LOAD_LXC_SNAPSHOT snap0
 
             # Remove the previous residual backups
-            RUN_INSIDE_LXC rm -f /rootfs/home/yunohost.backup/archives/*
+            RUN_INSIDE_LXC rm -rf /home/yunohost.backup/archives
 
             # Place the copy of the backup archive in the container.
-            sudo lxc file push -r ./ynh_backups/archives/* $LXC_NAME/home/yunohost.backup/archives/
+            sudo lxc file push -r $TEST_CONTEXT/ynh_backups/archives $LXC_NAME/home/yunohost.backup/
 
             log_small_title "Restore on a fresh YunoHost system..."
         fi
