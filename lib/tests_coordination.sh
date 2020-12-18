@@ -363,9 +363,14 @@ break_before_continue () {
 
 start_test () {
 
+    local current_test_serie=$(jq -r '.test_serie' $testfile)
+    [[ "$current_test_serie" != "default" ]] \
+        && current_test_serie="($current_test_serie)"
+        || current_test_serie=""
+
     total_number_of_test=$(ls $TEST_CONTEXT/tests/*.json | wc -l)
 
-    log_title "$1 [Test $current_test_number/$total_number_of_test]"
+    log_title "$current_test_serie $1 [Test $current_test_number/$total_number_of_test]"
 
     # Increment the value of the current test
     current_test_number=$((current_test_number+1))

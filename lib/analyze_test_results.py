@@ -174,9 +174,11 @@ for test in tests:
     if test["test_arg"]:
         test_display_name += " (%s)" % test["test_arg"][:8]
     test_display_name += ":"
+    if test["test_serie"] != "default":
+        test_display_name = "(%s)" % test["test_serie"][:15]
 
     result = OK if test["results"]["main_result"] == "success" else FAIL
-    print("{test: <25}{result}".format(test=test_display_name, result=result))
+    print("{test: <30}{result}".format(test=test_display_name, result=result))
 
 print()
 print("Level results")
@@ -210,6 +212,7 @@ summary = {
     "tests": [{
         "test_type": t["test_type"],
         "test_arg": t["test_arg"],
+        "test_serie": t["test_serie"],
         "main_result": t["results"]["main_result"]
     } for t in tests],
     "levels": {level.level: level.passed for level in levels[1:]},
