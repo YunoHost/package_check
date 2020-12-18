@@ -44,6 +44,8 @@ CREATE_LXC_SNAPSHOT () {
         sudo lxc snapshot $LXC_NAME $snapname
     fi
 
+    sudo lxc start --timeout 15 $LXC_NAME 2>/dev/null
+
     stop_timer 1
 }
 
