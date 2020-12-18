@@ -365,7 +365,7 @@ start_test () {
 
     local current_test_serie=$(jq -r '.test_serie' $testfile)
     [[ "$current_test_serie" != "default" ]] \
-        && current_test_serie="($current_test_serie)"
+        && current_test_serie="($current_test_serie)" \
         || current_test_serie=""
 
     total_number_of_test=$(ls $TEST_CONTEXT/tests/*.json | wc -l)
