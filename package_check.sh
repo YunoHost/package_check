@@ -184,6 +184,7 @@ FETCH_PACKAGE_TO_TEST() {
 ###################################
 
 assert_we_are_connected_to_the_internets
+assert_we_have_all_dependencies
 #self_upgrade # FIXME renenable this later
 fetch_or_upgrade_package_linter
 

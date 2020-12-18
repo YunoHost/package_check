@@ -43,6 +43,13 @@ assert_we_are_connected_to_the_internets() {
     || log_critical "Unable to connect to internet."
 }
 
+assert_we_have_all_dependencies() {
+    for dep in "lxc" "lynx"
+    do
+        which $dep 2>&1 > /dev/null || log_critical "Please install $dep"
+    done
+}
+
 function check_lxd_setup()
 {
     # Check lxd is installed somehow
