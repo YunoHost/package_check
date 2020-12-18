@@ -79,7 +79,7 @@ def level_4(tests):
     All backup/restore tests succeded (and at least one test was made)
     """
 
-    backup_tests = [t for t in tests if t["test_type"] == "TEST_BACKUP"]
+    backup_tests = [t for t in tests if t["test_type"] == "TEST_BACKUP_RESTORE"]
 
     return backup_tests != [] \
         and all(t["results"]["main_result"] == "success" for t in backup_tests)
