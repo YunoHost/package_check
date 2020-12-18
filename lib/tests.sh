@@ -31,6 +31,12 @@ _INSTALL_APP () {
     do
         key="$(echo $arg_override | cut -d '=' -f 1)"
         value="$(echo $arg_override | cut -d '=' -f 2-)"
+
+        # (Legacy stuff ... We don't override is_public if its type is not boolean)
+        [[ "$key" == "is_public" ]] \
+            && [[ "$(jq -r '.arguments.install[] | select(.name=="is_public") | .type' manifest.json)" != "boolean" ]] \
+            && continue
+
         install_args=$(echo $install_args | sed "s@$key=[^&]*\&@$key=$value\&@")
     done
 
