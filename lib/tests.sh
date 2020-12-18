@@ -106,7 +106,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
     local curl_error=0
     local fell_on_sso_portal=0
-    local curl_output=$test_serie_dir/curl_output
+    local curl_output=$TEST_CONTEXT/curl_output
 
     # Not checking this if this ain't relevant for the current app
     this_is_a_web_app || return 0
