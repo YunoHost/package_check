@@ -47,7 +47,7 @@ _INSTALL_APP () {
         sed -i "s/\$SUBDOMAIN/$SUBDOMAIN/" "$preinstall_script"
         sed -i "s/\$PASSWORD/$YUNO_PWD/" "$preinstall_script"
         # Copy the pre-install script into the container.
-        sudo lxc file push "$preinstall_script" "$LXC_NAME":/preinstall.sh
+        lxc file push "$preinstall_script" "$LXC_NAME":/preinstall.sh
         # Then execute the script to execute the pre-install commands.
         LXC_START "bash /preinstall.sh"
     fi
@@ -237,7 +237,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
     If you see this page, you have failed the test for alias_traversal issue.</body></html>" \
     > $TEST_CONTEXT/alias_traversal.html
 
-    sudo lxc file push $TEST_CONTEXT/alias_traversal.html $LXC_NAME/var/www/html/alias_traversal.html
+    lxc file push $TEST_CONTEXT/alias_traversal.html $LXC_NAME/var/www/html/alias_traversal.html
 
     curl --location --insecure --silent $check_domain$check_path../html/alias_traversal.html \
         | grep "title" | grep --quiet "alias_traversal test" \
@@ -359,7 +359,7 @@ TEST_UPGRADE () {
     else
         # Make a backup of the directory
         # and Change to the specified commit
-        sudo cp -a "$package_path" "${package_path}_back"
+        cp -a "$package_path" "${package_path}_back"
         (cd "$package_path"; git checkout --force --quiet "$commit")
 
         LOAD_LXC_SNAPSHOT snap0
@@ -369,8 +369,8 @@ TEST_UPGRADE () {
         local ret=$?
 
         # Then replace the backup
-        sudo rm -r "$package_path"
-        sudo mv "${package_path}_back" "$package_path"
+        rm -r "$package_path"
+        mv "${package_path}_back" "$package_path"
     fi
 
     # Check if the install worked
@@ -401,10 +401,10 @@ TEST_PORT_ALREADY_USED () {
     echo -e "[Service]\nExecStart=/bin/netcat -l -k -p $check_port\n
     [Install]\nWantedBy=multi-user.target" > $TEST_CONTEXT/netcat.service
 
-    sudo lxc file push $TEST_CONTEXT/netcat.service $LXC_NAME/etc/systemd/system/netcat.service
+    lxc file push $TEST_CONTEXT/netcat.service $LXC_NAME/etc/systemd/system/netcat.service
 
     # Then start this service to block this port.
-    LXC_START "sudo systemctl enable netcat & sudo systemctl start netcat"
+    LXC_START "systemctl enable netcat & systemctl start netcat"
 
     # Install the application in a LXC container
    _INSTALL_APP "path=$check_path" "port=$check_port" \
@@ -450,7 +450,7 @@ TEST_BACKUP_RESTORE () {
     [ $ret -eq 0 ] || main_result=1
 
     # Grab the backup archive into the LXC container, and keep a copy
-    sudo lxc file pull -r $LXC_NAME/home/yunohost.backup/archives $TEST_CONTEXT/ynh_backups
+    lxc file pull -r $LXC_NAME/home/yunohost.backup/archives $TEST_CONTEXT/ynh_backups
 
     # RESTORE
     # Try the restore process in 2 times, first after removing the app, second after a restore of the container.
@@ -475,7 +475,7 @@ TEST_BACKUP_RESTORE () {
             RUN_INSIDE_LXC rm -rf /home/yunohost.backup/archives
 
             # Place the copy of the backup archive in the container.
-            sudo lxc file push -r $TEST_CONTEXT/ynh_backups/archives $LXC_NAME/home/yunohost.backup/
+            lxc file push -r $TEST_CONTEXT/ynh_backups/archives $LXC_NAME/home/yunohost.backup/
 
             log_small_title "Restore on a fresh YunoHost system..."
         fi

@@ -60,6 +60,12 @@ sudo ln -s /snap/bin/lxc /usr/local/bin/lxc
 sudo ln -s /snap/bin/lxd /usr/local/bin/lxd
 ```
 
+NB. : you should **make sure that your user is in the `lxd` group** so that it's
+able to run `lxc` commands without sudo... You can check this with the command
+`groups` where you should see `lxd`. Otherwise, add your user to this group
+(don't forget that you may need to reload your entire graphical session for this
+to propagate (sigh))
+
 Then you shall initialize LXD which will ask you a bunch of question. Usually
 answering the default (just pressing enter) to all questions is fine.
 

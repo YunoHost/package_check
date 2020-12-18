@@ -8,14 +8,14 @@ function rebuild_base_lxc()
     check_lxd_setup
 
     set -x
-    sudo lxc info $LXC_BASE >/dev/null && sudo lxc delete $LXC_BASE --force
-    sudo lxc launch images:debian/$DIST/$ARCH $LXC_BASE
-    sudo lxc config set $LXC_BASE security.privileged true
-    sudo lxc config set $LXC_BASE security.nesting true # Need this for apparmor for some reason
-    sudo lxc restart $LXC_BASE
+    lxc info $LXC_BASE >/dev/null && lxc delete $LXC_BASE --force
+    lxc launch images:debian/$DIST/$ARCH $LXC_BASE
+    lxc config set $LXC_BASE security.privileged true
+    lxc config set $LXC_BASE security.nesting true # Need this for apparmor for some reason
+    lxc restart $LXC_BASE
     sleep 5
     
-    IN_LXC="sudo lxc exec $LXC_BASE --"
+    IN_LXC="lxc exec $LXC_BASE --"
     
     INSTALL_SCRIPT="https://install.yunohost.org/$DIST"
     $IN_LXC apt install curl -y
@@ -44,9 +44,9 @@ function rebuild_base_lxc()
 
     $IN_LXC yunohost --version
 
-    sudo lxc stop $LXC_BASE
-    sudo lxc image delete $LXC_BASE
-    sudo lxc publish $LXC_BASE --alias $LXC_BASE
+    lxc stop $LXC_BASE
+    lxc image delete $LXC_BASE
+    lxc publish $LXC_BASE --alias $LXC_BASE
     set +x
 }
 

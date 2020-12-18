@@ -267,7 +267,7 @@ run_all_tests() {
 
     # Print the version of YunoHost from the LXC container
     log_small_title "YunoHost versions"
-    LXC_START "sudo yunohost --version"
+    LXC_START "yunohost --version"
 
     # Init the value for the current test
     current_test_number=1
@@ -356,7 +356,7 @@ break_before_continue () {
     if [ $interactive -eq 1 ]
     then
         echo "To enter a shell on the lxc:"
-        echo "     sudo lxc exec $LXC_NAME bash"
+        echo "     lxc exec $LXC_NAME bash"
         read -p "Press a key to delete the application and continue...." < /dev/tty
     fi
 }

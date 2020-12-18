@@ -219,7 +219,7 @@ function self_upgrade()
 # Clone in another directory
 git clone --quiet $git_repository "./upgrade"
 cp -a "./upgrade/." "./."
-sudo rm -r "./upgrade"
+rm -r "./upgrade"
 # Update the version file
 echo "$check_version" > "$version_file"
 rm "./pcheck.lock"
@@ -265,7 +265,7 @@ function fetch_or_upgrade_package_linter()
 
             # And replace
             cp -a "./package_linter_tmp/." "./package_linter/."
-            sudo rm -r "./package_linter_tmp"
+            rm -r "./package_linter_tmp"
         fi
     else
         log_info "Installing Package linter"

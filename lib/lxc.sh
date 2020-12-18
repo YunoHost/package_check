@@ -5,17 +5,17 @@
 #=================================================
 
 LXC_CREATE () {
-    sudo lxc image list $LXC_BASE | grep -q -w $LXC_BASE || log_critical "The base image $LXC_BASE doesn't exist yet. Consider using the build_base_lxc.sh to create it first" 
-    sudo lxc launch $LXC_BASE $LXC_NAME || clean_exit 1
-    sudo lxc config set "$LXC_NAME" security.nesting true
+    lxc image list $LXC_BASE | grep -q -w $LXC_BASE || log_critical "The base image $LXC_BASE doesn't exist yet. Consider using the build_base_lxc.sh to create it first" 
+    lxc launch $LXC_BASE $LXC_NAME || clean_exit 1
+    lxc config set "$LXC_NAME" security.nesting true
     _LXC_START_AND_WAIT $LXC_NAME
     set_witness_files
-    sudo lxc snapshot $LXC_NAME snap0
+    lxc snapshot $LXC_NAME snap0
 }
 
 LXC_SNAPSHOT_EXISTS() {
     local snapname=$1
-    sudo lxc list --format json \
+    lxc list --format json \
         | jq -e --arg LXC_NAME $LXC_NAME --arg snapname $snapname \
         '.[] | select(.name==$LXC_NAME) | .snapshots[] | select(.name==$snapname)' \
             >/dev/null
@@ -32,16 +32,16 @@ CREATE_LXC_SNAPSHOT () {
     check_witness_files >&2
 
     # Remove swap files to avoid killing the CI with huge snapshots.
-    sudo lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done'
-    sudo lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do rm -f $swapfile; done'
+    lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done'
+    lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do rm -f $swapfile; done'
     
-    sudo lxc stop --timeout 15 $LXC_NAME 2>/dev/null
+    lxc stop --timeout 15 $LXC_NAME 2>/dev/null
 
     # Check if the snapshot already exist
     if ! LXC_SNAPSHOT_EXISTS "$snapname"
     then
         log_debug "Creating snapshot $snapname ..."
-        sudo lxc snapshot $LXC_NAME $snapname
+        lxc snapshot $LXC_NAME $snapname
     fi
 
     _LXC_START_AND_WAIT $LXC_NAME
@@ -52,9 +52,9 @@ CREATE_LXC_SNAPSHOT () {
 LOAD_LXC_SNAPSHOT () {
     local snapname=$1
     log_debug "Loading snapshot $snapname ..."
-    sudo lxc stop --timeout 15 $LXC_NAME 2>/dev/null
-    sudo lxc restore $LXC_NAME $snapname
-    sudo lxc start $LXC_NAME
+    lxc stop --timeout 15 $LXC_NAME 2>/dev/null
+    lxc restore $LXC_NAME $snapname
+    lxc start $LXC_NAME
     _LXC_START_AND_WAIT $LXC_NAME
 }
 
@@ -82,12 +82,12 @@ LXC_START () {
 }
 
 LXC_STOP () {
-    sudo lxc stop --timeout 15 $LXC_NAME 2>/dev/null
+    lxc stop --timeout 15 $LXC_NAME 2>/dev/null
 }
 
 LXC_RESET () {
-    sudo lxc stop --timeout 15 $LXC_NAME 2>/dev/null
-    sudo lxc delete $LXC_NAME 2>/dev/null
+    lxc stop --timeout 15 $LXC_NAME 2>/dev/null
+    lxc delete $LXC_NAME 2>/dev/null
 }
 
 
@@ -95,8 +95,8 @@ _LXC_START_AND_WAIT() {
 
 	restart_container()
 	{
-		sudo lxc stop "$1" --timeout 15 &>/dev/null
-		sudo lxc start "$1"
+		lxc stop "$1" --timeout 15 &>/dev/null
+		lxc start "$1"
 	}
 
 	# Try to start the container 3 times.
@@ -160,7 +160,7 @@ _LXC_START_AND_WAIT() {
 
 
 RUN_INSIDE_LXC() {
-    sudo lxc exec $LXC_NAME -- $@
+    lxc exec $LXC_NAME -- $@
 }
 
 
