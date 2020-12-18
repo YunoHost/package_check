@@ -168,8 +168,7 @@ test_types = {
 OK = ' \033[1m\033[92mOK\033[0m '
 FAIL = '\033[91mfail\033[0m'
 
-print("Tests summary")
-print("=============")
+print()
 for test in tests:
     test_display_name = test_types[test["test_type"]]
     if test["test_arg"]:

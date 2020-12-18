@@ -84,10 +84,10 @@ parse_check_process() {
         local configpanel_infos=$(  extract_check_process_section "^; Config_panel" "^; " $test_serie_rawconf)
 
         # Add (empty) special args if they ain't provided in check_process
-        echo "$install_args" | tr '&' '\n' | grep -q "^domain="    ||install_args+="&domain="
-        echo "$install_args" | tr '&' '\n' | grep -q "^path="      ||install_args+="&path="
-        echo "$install_args" | tr '&' '\n' | grep -q "^admin="     ||install_args+="&admin="
-        echo "$install_args" | tr '&' '\n' | grep -q "^is_public=" ||install_args+="&is_public="
+        echo "$install_args" | tr '&' '\n' | grep -q "^domain="    ||install_args+="domain=&"
+        echo "$install_args" | tr '&' '\n' | grep -q "^path="      ||install_args+="path=&"
+        echo "$install_args" | tr '&' '\n' | grep -q "^admin="     ||install_args+="admin=&"
+        echo "$install_args" | tr '&' '\n' | grep -q "^is_public=" ||install_args+="is_public=&"
 
         extract_check_process_section "^; Checks"       "^; " $test_serie_rawconf > $TEST_CONTEXT/check_process.tests_infos
 
@@ -142,7 +142,7 @@ parse_check_process() {
             grep "^upgrade=1" "$TEST_CONTEXT/check_process.tests_infos" |
             while IFS= read -r LINE;
             do
-                commit=$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')
+                commit="$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')"
                 [ -n "$commit" ] || continue
                 add_test "TEST_UPGRADE" "$commit"
             done
@@ -164,7 +164,7 @@ parse_check_process() {
         grep "^upgrade=1" "$TEST_CONTEXT/check_process.tests_infos" |
         while IFS= read -r LINE;
         do
-            commit=$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')
+            commit="$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')"
             add_test "TEST_UPGRADE" "$commit"
         done
 
@@ -281,6 +281,8 @@ run_all_tests() {
     done
 
     # Print the final results of the tests
+    log_title "Tests summary"
+    
     python3 lib/analyze_test_results.py $TEST_CONTEXT 2>$TEST_CONTEXT/summary.json
 
     # Restore the started time for the timer

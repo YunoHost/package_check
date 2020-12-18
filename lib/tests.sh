@@ -67,15 +67,15 @@ _LOAD_SNAPSHOT_OR_INSTALL_APP () {
     local _install_type=$(path_to_install_type $check_path)
     local snapname="snap_${_install_type}install"
 
-    if [ ! -e "$LXC_SNAPSHOTS/$snapname" ]
+    if ! LXC_SNAPSHOT_EXISTS $snapname
     then
         LOAD_LXC_SNAPSHOT snap0 \
             &&_INSTALL_APP "path=$check_path" \
-            && log_debug "Creating a snapshot for $_install_type installation." \
+            && log_debug "(Creating a snapshot for $_install_type installation.)" \
             && CREATE_LXC_SNAPSHOT $snapname
     else
         # Or uses an existing snapshot
-        log_debug "Reusing an existing snapshot for $_install_type installation." \
+        log_debug "(Reusing an existing snapshot for $_install_type installation.)" \
             && LOAD_LXC_SNAPSHOT $snapname
     fi
 }
@@ -315,7 +315,7 @@ _TEST_MULTI_INSTANCE () {
     LOAD_LXC_SNAPSHOT snap0
 
     log_small_title "First installation: path=$DOMAIN$check_path" \
-        &&_INSTALL_APP "domain=$DOMAIN" "path=$check_path" \
+        && _LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path" \
         && log_small_title "Second installation: path=$SUBDOMAIN$check_path" \
         && _INSTALL_APP "path=$check_path" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $DOMAIN $check_path \
@@ -470,7 +470,7 @@ TEST_BACKUP_RESTORE () {
             RUN_INSIDE_LXC rm -f /rootfs/home/yunohost.backup/archives/*
 
             # Place the copy of the backup archive in the container.
-            sudo lxc file push -r ./ynh_backups $LXC_NAME/home/yunohost.backup/archives/
+            sudo lxc file push -r ./ynh_backups/archives/* $LXC_NAME/home/yunohost.backup/archives/
             RUN_INSIDE_LXC ls -l /home/yunohost.backup/archives/
 
             log_small_title "Restore on a clean YunoHost system..."

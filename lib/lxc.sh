@@ -14,7 +14,7 @@ LXC_CREATE () {
 }
 
 LXC_SNAPSHOT_EXISTS() {
-    lxc info $LXC_NAME 2>/dev/null | grep -A10 Snapshots | tail -n -1 | awk '{print $1}' | grep -q -w "$1"
+    sudo lxc info $LXC_NAME 2>/dev/null | grep -A10 Snapshots | tail -n -1 | awk '{print $1}' | grep -q -w "$1"
 }
 
 CREATE_LXC_SNAPSHOT () {
@@ -36,7 +36,7 @@ CREATE_LXC_SNAPSHOT () {
     # Check if the snapshot already exist
     if ! LXC_SNAPSHOT_EXISTS "$snapname"
     then
-        log_debug "$snapname doesn't exist, its first creation can takes a little while." >&2
+        log_debug "Creating snapshot $snapname ..."
         sudo lxc snapshot $LXC_NAME $snapname
     fi
 
@@ -45,6 +45,7 @@ CREATE_LXC_SNAPSHOT () {
 
 LOAD_LXC_SNAPSHOT () {
     snapname=$1
+    log_debug "Loading snapshot $snapname ..."
     sudo lxc stop --timeout 15 $LXC_NAME 2>/dev/null
     sudo lxc restore $LXC_NAME $snapname
     sudo lxc start $LXC_NAME
