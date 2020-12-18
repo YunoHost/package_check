@@ -69,6 +69,7 @@ _LOAD_SNAPSHOT_OR_INSTALL_APP () {
 
     if ! LXC_SNAPSHOT_EXISTS $snapname
     then
+        log_warning "Expected to find an existing snapshot $snapname but it doesn't exist yet .. will attempt to create it"
         LOAD_LXC_SNAPSHOT snap0 \
             &&_INSTALL_APP "path=$check_path" \
             && log_debug "(Creating a snapshot for $_install_type installation.)" \
@@ -314,14 +315,14 @@ _TEST_MULTI_INSTANCE () {
 
     LOAD_LXC_SNAPSHOT snap0
 
-    log_small_title "First installation: path=$DOMAIN$check_path" \
+    log_small_title "First installation: path=$SUBDOMAIN$check_path" \
         && _LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path" \
-        && log_small_title "Second installation: path=$SUBDOMAIN$check_path" \
-        && _INSTALL_APP "path=$check_path" \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $DOMAIN $check_path \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path "" ${app_id}__2 \
+        && log_small_title "Second installation: path=$DOMAIN$check_path" \
+        && _INSTALL_APP "domain=$DOMAIN" "path=$check_path" \
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path \
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $DOMAIN $check_path "" ${app_id}__2 \
         && _REMOVE_APP \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path "" ${app_id}__2
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $DOMAIN $check_path "" ${app_id}__2
 
     return $?
 }
@@ -471,9 +472,8 @@ TEST_BACKUP_RESTORE () {
 
             # Place the copy of the backup archive in the container.
             sudo lxc file push -r ./ynh_backups/archives/* $LXC_NAME/home/yunohost.backup/archives/
-            RUN_INSIDE_LXC ls -l /home/yunohost.backup/archives/
 
-            log_small_title "Restore on a clean YunoHost system..."
+            log_small_title "Restore on a fresh YunoHost system..."
         fi
 
         # Restore the application from the previous backup

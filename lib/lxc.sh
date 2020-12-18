@@ -44,7 +44,7 @@ CREATE_LXC_SNAPSHOT () {
 }
 
 LOAD_LXC_SNAPSHOT () {
-    snapname=$1
+    local snapname=$1
     log_debug "Loading snapshot $snapname ..."
     sudo lxc stop --timeout 15 $LXC_NAME 2>/dev/null
     sudo lxc restore $LXC_NAME $snapname

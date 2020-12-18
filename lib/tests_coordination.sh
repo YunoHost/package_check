@@ -59,7 +59,7 @@ parse_check_process() {
     local commit
     for commit in $(cat $TEST_CONTEXT/check_process.upgrade_options | grep "^; commit=.*" | awk -F= '{print $2}')
     do
-        cat $TEST_CONTEXT/check_process.upgrade_options | sed -n -e "/^;; $commit/,/^;;/ p" | grep -v "^;;" > $TEST_CONTEXT/upgrades/$commit
+        cat $TEST_CONTEXT/check_process.upgrade_options | sed -n -e "/^; commit=$commit/,/^;/ p" | grep -v "^;;" > $TEST_CONTEXT/upgrades/$commit
     done
     rm $TEST_CONTEXT/check_process.upgrade_options
 
@@ -108,10 +108,10 @@ parse_check_process() {
             # Upgrades with a specific commit
             if [[ "$test_type" == "TEST_UPGRADE" ]] && [[ -n "$test_arg" ]]
             then
-                local specific_upgrade_install_args="$(grep "^manifest_arg=" "$TEST_CONTEXT/upgrades/$commit" | cut -d'=' -f2-)"
+                local specific_upgrade_install_args="$(grep "^manifest_arg=" "$TEST_CONTEXT/upgrades/$test_arg" | cut -d'=' -f2-)"
                 [[ -n "$specific_upgrade_install_args" ]] && _install_args="$specific_upgrade_install_args"
 
-                local upgrade_name="$(grep "^name=" "$TEST_CONTEXT/upgrades/$commit" | cut -d'=' -f2)"
+                local upgrade_name="$(grep "^name=" "$TEST_CONTEXT/upgrades/$test_arg" | cut -d'=' -f2)"
                 extra="$(jq -n --arg upgrade_name "$upgrade_name" '{ $upgrade_name }')"
             elif [[ "$test_type" == "ACTIONS_CONFIG_PANEL" ]] && [[ "$test_arg" == "actions" ]]
             then
@@ -139,13 +139,12 @@ parse_check_process() {
             is_test_enabled setup_root     && add_test "TEST_INSTALL" "root"
             is_test_enabled setup_sub_dir  && add_test "TEST_INSTALL" "subdir"
             is_test_enabled setup_nourl    && add_test "TEST_INSTALL" "nourl"
-            grep "^upgrade=1" "$TEST_CONTEXT/check_process.tests_infos" |
             while IFS= read -r LINE;
             do
                 commit="$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')"
                 [ -n "$commit" ] || continue
                 add_test "TEST_UPGRADE" "$commit"
-            done
+            done <<<$(grep "^upgrade=1" "$TEST_CONTEXT/check_process.tests_infos")
 
             continue
         else
@@ -161,12 +160,11 @@ parse_check_process() {
         is_test_enabled backup_restore && add_test "TEST_BACKUP_RESTORE"
 
         # Upgrades
-        grep "^upgrade=1" "$TEST_CONTEXT/check_process.tests_infos" |
         while IFS= read -r LINE;
         do
             commit="$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')"
             add_test "TEST_UPGRADE" "$commit"
-        done
+        done <<<$(grep "^upgrade=1" "$TEST_CONTEXT/check_process.tests_infos")
 
         # "Advanced" features
 
