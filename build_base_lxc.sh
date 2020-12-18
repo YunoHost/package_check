@@ -15,7 +15,7 @@ function rebuild_base_lxc()
     sudo lxc restart $LXC_BASE
     sleep 5
     
-    IN_LXC="sudo lxc exec $LXC_BASE"
+    IN_LXC="sudo lxc exec $LXC_BASE --"
     
     INSTALL_SCRIPT="https://install.yunohost.org/$DIST"
     $IN_LXC apt install curl -y
