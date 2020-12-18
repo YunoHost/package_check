@@ -44,7 +44,7 @@ assert_we_are_connected_to_the_internets() {
 }
 
 assert_we_have_all_dependencies() {
-    for dep in "lxc" "lynx"
+    for dep in "lxc" "lxd" "lynx" "jq" "python3"
     do
         which $dep 2>&1 > /dev/null || log_critical "Please install $dep"
     done
