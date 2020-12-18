@@ -14,7 +14,11 @@ LXC_CREATE () {
 }
 
 LXC_SNAPSHOT_EXISTS() {
-    sudo lxc info $LXC_NAME 2>/dev/null | grep -A10 Snapshots | tail -n -1 | awk '{print $1}' | grep -q -w "$1"
+    local snapname=$1
+    sudo lxc list --format json \
+        | jq -e --arg LXC_NAME $LXC_NAME --arg snapname $snapname \
+        '.[] | select(.name==$LXC_NAME) | .snapshots[] | select(.name==$snapname)' \
+            >/dev/null
 }
 
 CREATE_LXC_SNAPSHOT () {
