@@ -47,17 +47,17 @@ function check_lxd_setup()
 {
     # Check lxd is installed somehow
     [[ -e /snap/bin/lxd ]] || which lxd &>/dev/null \
-        || critical "You need to have LXD installed. Refer to the README to know how to install it."
+        || log_critical "You need to have LXD installed. Refer to the README to know how to install it."
 
     # Check that we'll be able to use lxc/lxd using sudo (for which the PATH is defined in /etc/sudoers and probably doesn't include /snap/bin)
     if [[ ! -e /usr/bin/lxc ]] && [[ ! -e /usr/bin/lxd ]]
     then
         [[ -e /usr/local/bin/lxc ]] && [[ -e /usr/local/bin/lxd ]] \
-            || critical "You might want to add lxc and lxd inside /usr/local/bin so that there's no tricky PATH issue with sudo. If you installed lxd/lxc with snapd, this should do the trick: sudo ln -s /snap/bin/lxc /usr/local/bin/lxc && sudo ln -s /snap/bin/lxd /usr/local/bin/lxd"
+            || log_critical "You might want to add lxc and lxd inside /usr/local/bin so that there's no tricky PATH issue with sudo. If you installed lxd/lxc with snapd, this should do the trick: sudo ln -s /snap/bin/lxc /usr/local/bin/lxc && sudo ln -s /snap/bin/lxd /usr/local/bin/lxd"
     fi
 
     ip a | grep -q lxdbr0 \
-        || critical "There is no 'lxdbr0' interface... Did you ran 'lxd init' ?"
+        || log_critical "There is no 'lxdbr0' interface... Did you ran 'lxd init' ?"
 }
 
 #=================================================
