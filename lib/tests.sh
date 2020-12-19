@@ -58,9 +58,18 @@ _INSTALL_APP () {
         LXC_START "bash /preinstall.sh"
     fi
 
+    # Note : we do this at this stage and not during the parsing of check_process
+    # because this also applies to upgrades ...
+    # For all manifest arg
     for ARG in $(jq -r '.arguments.install[].name' $package_path/manifest.json)
     do
-        echo "$install_args" | grep -q -E "\<$ARG=" || { log_error "Missing install arg $ARG ?"; return 1; }
+        # If the argument is not yet in install args, add its default value
+        if ! echo "$install_args" | grep -q -E "\<$ARG="
+        then
+            local default_value=$(jq -e -r --arg ARG $ARG '.arguments.install[] | select(.name==$ARG) | .default' $package_path/manifest.json)
+            [[ $? -eq 0 ]] || { log_error "Missing install arg $ARG ?"; return 1; }
+            install_args+="&$ARG=$default_value"
+        fi
     done
 
     # Install the application in a LXC container
