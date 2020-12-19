@@ -40,7 +40,7 @@ CREATE_LXC_SNAPSHOT () {
     # Check if the snapshot already exist
     if ! LXC_SNAPSHOT_EXISTS "$snapname"
     then
-        log_debug "Creating snapshot $snapname ..."
+        log_info "(Creating snapshot $snapname ...)"
         lxc snapshot $LXC_NAME $snapname
     fi
 

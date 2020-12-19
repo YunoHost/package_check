@@ -83,11 +83,10 @@ _LOAD_SNAPSHOT_OR_INSTALL_APP () {
         log_warning "Expected to find an existing snapshot $snapname but it doesn't exist yet .. will attempt to create it"
         LOAD_LXC_SNAPSHOT snap0 \
             &&_INSTALL_APP "path=$check_path" \
-            && log_debug "(Creating a snapshot for $_install_type installation.)" \
             && CREATE_LXC_SNAPSHOT $snapname
     else
         # Or uses an existing snapshot
-        log_debug "(Reusing an existing snapshot for $_install_type installation.)" \
+        log_info "(Reusing an existing snapshot $snapname.)" \
             && LOAD_LXC_SNAPSHOT $snapname
     fi
 }
@@ -217,22 +216,16 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
             fi
         fi
 
-        log_debug "Test url: $check_domain$curl_check_path"
-        log_debug "Real url: $(cat "./curl_print" | cut --delimiter=';' --fields=2)"
-        log_debug "HTTP code: $http_code"
-        log_debug "$test_url_details"
-        log_debug "Page title: $page_title"
-        log_debug "Page extract:\n$page_extract"
+        echo -e "
+\nTest url: $check_domain$curl_check_path
+Real url: $(cat "./curl_print" | cut --delimiter=';' --fields=2)
+HTTP code: $http_code
+Page title: $page_title
+Page extract:\n$page_extract" > $TEST_CONTEXT/curl_result
 
-        if [[ $curl_error -ne 0 ]]
-        then
-            log_warning "Test url: $check_domain$curl_check_path"
-            log_warning "Real url: $(cat "./curl_print" | cut --delimiter=';' --fields=2)"
-            log_warning "HTTP code: $http_code"
-            log_warning "$test_url_details"
-            log_warning "Page title: $page_title"
-            log_warning "Page extract:\n$page_extract"
-        fi
+        [[ $curl_error -eq 0 ]] \
+            && log_debug "$(cat $TEST_CONTEXT/curl_result)" \
+            || log_warning "$(cat $TEST_CONTEXT/curl_result)"
     done
 
     # Detect the issue alias_traversal, https://github.com/yandex/gixy/blob/master/docs/en/plugins/aliastraversal.md
@@ -294,7 +287,8 @@ TEST_INSTALL () {
 
     # Install the application in a LXC container
    _INSTALL_APP "path=$check_path" "is_public=$is_public" \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path $install_type
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path $install_type \
+        && log_info "$(cat $TEST_CONTEXT/curl_result)"
 
     local install=$?
 
@@ -371,8 +365,14 @@ TEST_UPGRADE () {
         LOAD_LXC_SNAPSHOT snap0
 
         # Install the application
-       _INSTALL_APP "path=$check_path"
+        _INSTALL_APP "path=$check_path"
+
         local ret=$?
+
+        # Test if the app can be accessed (though we don't want to report an
+        # error if it's not, in that context)
+        _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" \
+            && log_info "$(cat $TEST_CONTEXT/curl_result)"
 
         # Then replace the backup
         rm -rf "$package_path"
@@ -386,7 +386,8 @@ TEST_UPGRADE () {
 
     # Upgrade the application in a LXC container
     _RUN_YUNOHOST_CMD "app upgrade $app_id -f /app_folder" \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path \
+        && log_info "$(cat $TEST_CONTEXT/curl_result)"
 
     return $?
 }
