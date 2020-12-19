@@ -68,7 +68,7 @@ _INSTALL_APP () {
         then
             local default_value=$(jq -e -r --arg ARG $ARG '.arguments.install[] | select(.name==$ARG) | .default' $package_path/manifest.json)
             [[ $? -eq 0 ]] || { log_error "Missing install arg $ARG ?"; return 1; }
-            install_args+="&$ARG=$default_value"
+            install_args+="$ARG=$default_value&"
         fi
     done
 
