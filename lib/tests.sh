@@ -217,13 +217,12 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
             fi
         fi
 
-        cat << EOF > $TEST_CONTEXT/curl_result
-\nTest url: $check_domain$curl_check_path"
-Real url: $(cat "./curl_print" | cut --delimiter=';' --fields=2)"
-HTTP code: $http_code"
-Page title: $page_title"
-Page extract:\n$page_extract"
-EOF
+        echo -e "
+\nTest url: $check_domain$curl_check_path
+Real url: $(cat "./curl_print" | cut --delimiter=';' --fields=2)
+HTTP code: $http_code
+Page title: $page_title
+Page extract:\n$page_extract" > $TEST_CONTEXT/curl_result
 
         [[ $curl_error -eq 0 ]] \
             && log_debug "$(cat $TEST_CONTEXT/curl_result)" \
@@ -290,7 +289,7 @@ TEST_INSTALL () {
     # Install the application in a LXC container
    _INSTALL_APP "path=$check_path" "is_public=$is_public" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path $install_type \
-        && log_info "$($TEST_CONTEXT/curl_result)"
+        && log_info "$(cat $TEST_CONTEXT/curl_result)"
 
     local install=$?
 
@@ -374,7 +373,7 @@ TEST_UPGRADE () {
         # Test if the app can be accessed (though we don't want to report an
         # error if it's not, in that context)
         _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" \
-            && log_info "$($TEST_CONTEXT/curl_result)"
+            && log_info "$(cat $TEST_CONTEXT/curl_result)"
 
         # Then replace the backup
         rm -rf "$package_path"
@@ -389,7 +388,7 @@ TEST_UPGRADE () {
     # Upgrade the application in a LXC container
     _RUN_YUNOHOST_CMD "app upgrade $app_id -f /app_folder" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path \
-        && log_info "$($TEST_CONTEXT/curl_result)"
+        && log_info "$(cat $TEST_CONTEXT/curl_result)"
 
     return $?
 }
