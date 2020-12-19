@@ -114,7 +114,7 @@ We need to change the architecture of the metadata:
 
 ```
 tar xJf lxd.tar.xz
-sed '0,/architecture: armhf/architecture: amd64/' metadata.yaml
+sed -i '0,/architecture: armhf/s//architecture: amd64/' metadata.yaml
 tar cJf lxd.tar.xz metadata.yaml templates
 ```
 
