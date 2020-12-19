@@ -226,7 +226,7 @@ Page extract:\n$page_extract"
 EOF
 
         [[ $curl_error -eq 0 ]] \
-            && log_debug "$(cat $TEST_CONTEXT/curl_result)"
+            && log_debug "$(cat $TEST_CONTEXT/curl_result)" \
             || log_warning "$(cat $TEST_CONTEXT/curl_result)"
     done
 
@@ -289,7 +289,7 @@ TEST_INSTALL () {
 
     # Install the application in a LXC container
    _INSTALL_APP "path=$check_path" "is_public=$is_public" \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path $install_type
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path $install_type \
         && log_info "$($TEST_CONTEXT/curl_result)"
 
     local install=$?
