@@ -92,6 +92,47 @@ Then test your packages :
 ./package_check.sh your_app_ynh
 ```
 
+## You can start a container on a different architecture with some hacks
+
+Install the package `binfmt-support`, then list of all available images :
+
+```
+lxc image list images:debian/buster
+```
+
+Export the image of the architecture you want to run (for example armhf):
+
+```
+lxc image export images:debian/buster/armhf
+```
+
+This command will create two files.
+- rootfs.squashfs
+- lxd.tar.xz
+
+We need to change the architecture of the metadata:
+
+```
+tar xJf lxd.tar.xz
+sed '0,/architecture: armhf/architecture: amd64/' metadata.yaml
+tar cJf lxd.tar.xz metadata.yaml templates
+```
+
+And reimport the image:
+
+```
+lxc image import lxd.tar.xz rootfs.squashfs --alias test-arm
+```
+
+You can now start an armhf image with:
+
+```
+lxc launch test-arm
+lxc exec inspired-lamprey -- dpkg --print-architecture
+```
+
+We must add this feature to the package_check in the future
+
 ## Syntax of `check_process`
 > Except spaces, the syntax of this file must be respected.
 
