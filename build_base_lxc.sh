@@ -9,10 +9,7 @@ function rebuild_base_lxc()
 
     set -x
     lxc info $LXC_BASE >/dev/null && lxc delete $LXC_BASE --force
-    lxc launch images:debian/$DIST/$ARCH $LXC_BASE
-    lxc config set $LXC_BASE security.privileged true
-    lxc config set $LXC_BASE security.nesting true # Need this for apparmor for some reason
-    lxc restart $LXC_BASE
+    lxc launch images:debian/$DIST/$ARCH $LXC_BASE -c security.privileged=true -c security.nesting=true
     sleep 5
     
     IN_LXC="lxc exec $LXC_BASE --"
