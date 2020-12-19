@@ -83,11 +83,10 @@ _LOAD_SNAPSHOT_OR_INSTALL_APP () {
         log_warning "Expected to find an existing snapshot $snapname but it doesn't exist yet .. will attempt to create it"
         LOAD_LXC_SNAPSHOT snap0 \
             &&_INSTALL_APP "path=$check_path" \
-            && log_debug "(Creating a snapshot for $_install_type installation.)" \
             && CREATE_LXC_SNAPSHOT $snapname
     else
         # Or uses an existing snapshot
-        log_debug "(Reusing an existing snapshot for $_install_type installation.)" \
+        log_info "(Reusing an existing snapshot $snapname.)" \
             && LOAD_LXC_SNAPSHOT $snapname
     fi
 }
