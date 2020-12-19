@@ -3,13 +3,39 @@
 cd $(dirname $(realpath $0))
 source "./lib/common.sh"
 
+function launch_new_lxc()
+{
+    lxc info $LXC_BASE >/dev/null && lxc delete $LXC_BASE --force
+
+    if [ $(get_arch) = $ARCH ];
+    then
+        lxc launch images:debian/$DIST/$ARCH $LXC_BASE -c security.privileged=true -c security.nesting=true
+    else
+        lxc image info $LXC_BASE >/dev/null && lxc image delete $LXC_BASE
+
+        tmp_dir=$(mktemp -d)
+        pushd $tmp_dir
+
+        lxc image export images:debian/$DIST/$ARCH
+
+        tar xJf lxd.tar.xz
+        local current_arch=$(get_arch)
+        sed -i "0,/architecture: $ARCH/s//architecture: $current_arch/" metadata.yaml
+        tar cJf lxd.tar.xz metadata.yaml templates
+        lxc image import lxd.tar.xz rootfs.squashfs --alias $LXC_BASE
+        popd
+        rm -rf "$tmp_dir"
+
+        lxc launch $LXC_BASE $LXC_BASE -c security.privileged=true -c security.nesting=true
+    fi
+}
+
 function rebuild_base_lxc()
 {
     check_lxd_setup
 
     set -x
-    lxc info $LXC_BASE >/dev/null && lxc delete $LXC_BASE --force
-    lxc launch images:debian/$DIST/$ARCH $LXC_BASE -c security.privileged=true -c security.nesting=true
+    launch_new_lxc
     sleep 5
     
     IN_LXC="lxc exec $LXC_BASE --"
