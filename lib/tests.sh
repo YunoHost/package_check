@@ -118,10 +118,10 @@ _REMOVE_APP () {
 
 _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
-    local check_domain=$1
-    local check_path=$2
-    local install_type=${3}      # Can be anything or 'private', later used to check if it's okay to end up on the portal
-    local app_id_to_check=${4:-$app_id}
+    local check_domain="$1"
+    local check_path="$2"
+    local install_type="$3"      # Can be anything or 'private', later used to check if it's okay to end up on the portal
+    local app_id_to_check="${4:-$app_id}"
 
     local curl_error=0
     local fell_on_sso_portal=0
@@ -304,7 +304,7 @@ TEST_INSTALL () {
 
     # Install the application in a LXC container
    _INSTALL_APP "path=$check_path" "is_public=$is_public" \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path $install_type \
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "$install_type" \
 
     local install=$?
 
@@ -320,7 +320,7 @@ TEST_INSTALL () {
     _REMOVE_APP \
         && log_small_title "Reinstalling after removal." \
         &&_INSTALL_APP "path=$check_path" "is_public=$is_public" \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path $install_type
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "$install_type"
 
     return $?
 }
@@ -332,7 +332,7 @@ _TEST_MULTI_INSTANCE () {
     # Check if an install have previously work
     at_least_one_install_succeeded || return 1
 
-    local check_path=$(default_install_path)
+    local check_path="$(default_install_path)"
 
     LOAD_LXC_SNAPSHOT snap0
 
@@ -340,10 +340,10 @@ _TEST_MULTI_INSTANCE () {
         && _LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path" \
         && log_small_title "Second installation: path=$DOMAIN$check_path" \
         && _INSTALL_APP "domain=$DOMAIN" "path=$check_path" \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $DOMAIN $check_path "" ${app_id}__2 \
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN "$check_path" \
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $DOMAIN "$check_path" "" ${app_id}__2 \
         && _REMOVE_APP \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $DOMAIN $check_path "" ${app_id}__2
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $DOMAIN "$check_path" "" ${app_id}__2
 
     return $?
 }
@@ -363,7 +363,7 @@ TEST_UPGRADE () {
 
     at_least_one_install_succeeded || return 1
 
-    local check_path=$(default_install_path)
+    local check_path="$(default_install_path)"
 
     # Install the application in a LXC container
     log_small_title "Preliminary install..."
@@ -402,7 +402,7 @@ TEST_UPGRADE () {
 
     # Upgrade the application in a LXC container
     _RUN_YUNOHOST_CMD "app upgrade $app_id -f /app_folder" \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path "upgrade"
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "upgrade"
 
     return $?
 }
@@ -414,8 +414,8 @@ TEST_PORT_ALREADY_USED () {
     # Check if an install have previously work
     at_least_one_install_succeeded || return 1
 
-    local check_port=$1
-    local check_path=$(default_install_path)
+    local check_port="$1"
+    local check_path="$(default_install_path)"
 
     LOAD_LXC_SNAPSHOT snap0
 
@@ -430,7 +430,7 @@ TEST_PORT_ALREADY_USED () {
 
     # Install the application in a LXC container
    _INSTALL_APP "path=$check_path" "port=$check_port" \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN "$check_path"
 
     return $?
 }
@@ -444,7 +444,7 @@ TEST_BACKUP_RESTORE () {
     # Check if an install have previously work
     at_least_one_install_succeeded || return 1
 
-    local check_path=$(default_install_path)
+    local check_path="$(default_install_path)"
 
     # Install the application in a LXC container
     _LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path"
@@ -504,7 +504,7 @@ TEST_BACKUP_RESTORE () {
 
         # Restore the application from the previous backup
         _RUN_YUNOHOST_CMD "backup restore Backup_test --force --apps $app_id" \
-            && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path
+            && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path"
 
         local ret=$?
         [ $ret -eq 0 ] || main_result=1
@@ -649,7 +649,7 @@ ACTIONS_CONFIG_PANEL () {
 
     # Install the application in a LXC container
     log_small_title "Preliminary install..."
-    local check_path=$(default_install_path)
+    local check_path="$(default_install_path)"
     _LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path"
 
     local main_result=0
