@@ -70,6 +70,7 @@ function rebuild_base_lxc()
     lxc stop $LXC_BASE
     lxc image delete $LXC_BASE
     lxc publish $LXC_BASE --alias $LXC_BASE
+    lxc delete $LXC_BASE
     set +x
 }
 
