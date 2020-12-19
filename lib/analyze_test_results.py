@@ -125,7 +125,7 @@ def level_7(tests):
 
     return all(t["results"]["main_result"] == "success" for t in tests) \
         and linter_tests != [] \
-        and "qualify_for_level_7" in linter_tests[0]["results"]["success"]
+        and "App.qualify_for_level_7" in linter_tests[0]["results"]["success"]
 
 
 @level(8, "Maintained and long-term good quality")
@@ -138,7 +138,7 @@ def level_8(tests):
     linter_tests = [t for t in tests if t["test_type"] == "PACKAGE_LINTER"]
 
     return linter_tests != [] \
-        and "qualify_for_level_8" in linter_tests[0]["results"]["success"]
+        and "App.qualify_for_level_8" in linter_tests[0]["results"]["success"]
 
 
 @level(9, "Flagged high-quality in app catalog")
@@ -150,7 +150,7 @@ def level_9(tests):
     linter_tests = [t for t in tests if t["test_type"] == "PACKAGE_LINTER"]
 
     return linter_tests != [] \
-        and "qualify_for_level_9" in linter_tests[0]["results"]["success"]
+        and "App.qualify_for_level_9" in linter_tests[0]["results"]["success"]
 
 
 tests = list(load_tests(sys.argv[1]))
