@@ -94,7 +94,7 @@ Then test your packages :
 
 ## You can start a container on a different architecture with some hacks
 
-Install the package `binfmt-support`, then list of all available images :
+Install the package `qemu-user-static` and `binfmt-support`, then list of all available images :
 
 ```
 lxc image list images:debian/buster
@@ -131,7 +131,7 @@ lxc launch test-arm
 lxc exec inspired-lamprey -- dpkg --print-architecture
 ```
 
-We must add this feature to the package_check in the future
+If the `build_base_lxc.sh` script detects that you are trying a cross container architecture, it will try to perform this hack
 
 ## Syntax of `check_process`
 > Except spaces, the syntax of this file must be respected.

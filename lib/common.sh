@@ -3,8 +3,8 @@
 ARCH="amd64"
 DIST="buster"
 
-# By default we'll install Yunohost with the default branch
-YNH_INSTALL_SCRIPT_BRANCH=""
+# Yunohost version: stable, testing or unstable
+YNH_BRANCH="stable"
 
 # Admin password
 YUNO_PWD="admin"
@@ -16,10 +16,10 @@ SUBDOMAIN="sub.$DOMAIN"
 # User de test
 TEST_USER="package_checker"
 
-LXC_BASE="ynh-appci-$DIST-$ARCH-base"
-LXC_NAME="ynh-appci-test"
-
 [[ -e "./config" ]] && source "./config"
+
+LXC_BASE="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-base"
+LXC_NAME="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-test"
 
 readonly lock_file="./pcheck.lock"
 
@@ -277,3 +277,23 @@ function fetch_or_upgrade_package_linter()
     echo "$check_version" > "$version_file"
 }
 
+#=================================================
+# GET HOST ARCHITECTURE
+#=================================================
+
+function get_arch()
+{
+    local architecture
+    if uname -m | grep -q "arm64" || uname -m | grep -q "aarch64"; then
+        architecture="aarch64"
+    elif uname -m | grep -q "64"; then
+        architecture="amd64"
+    elif uname -m | grep -q "86"; then
+        architecture="i386"
+    elif uname -m | grep -q "arm"; then
+        architecture="armhf"
+    else
+        architecture="unknown"
+    fi
+    echo $architecture
+}
