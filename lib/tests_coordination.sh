@@ -382,7 +382,7 @@ this_is_a_web_app () {
     # installs should be a good indicator for the fact that it's not a webapp
     for TEST in $(ls $TEST_CONTEXT/tests/*.json)
     do
-        jq -e '. | select(.test_type == "TEST_INSTALL") | select(.test_arg == "nourl")' $TEST \
+        jq -e '. | select(.test_type == "TEST_INSTALL") | select(.test_arg == "nourl")' $TEST > /dev/null \
         && return 1
     done
 
