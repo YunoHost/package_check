@@ -169,8 +169,8 @@ parse_check_process() {
         # "Advanced" features
 
         is_test_enabled change_url       && add_test "TEST_CHANGE_URL"
-        is_test_enabled actions          && add_test "ACTIONS_CONFIG_PANEL" "actions"
-        is_test_enabled config_panel     && add_test "ACTIONS_CONFIG_PANEL" "config_panel"
+        #is_test_enabled actions          && add_test "ACTIONS_CONFIG_PANEL" "actions"
+        #is_test_enabled config_panel     && add_test "ACTIONS_CONFIG_PANEL" "config_panel"
 
         # Port already used ... do we really need this ...
 
