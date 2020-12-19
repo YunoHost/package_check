@@ -255,7 +255,15 @@ Page extract:\n$page_extract" > $TEST_CONTEXT/curl_result
     [ "$curl_error" -eq 0 ] || return 1
     local expected_to_fell_on_portal=""
     [ "$install_type" == "private" ] && expected_to_fell_on_portal=1 || expected_to_fell_on_portal=0
-    [ $fell_on_sso_portal -eq $expected_to_fell_on_portal ] && return 0 || return 0
+
+    if [ "$install_type" == "root" ] || [ "$install_type" == "subdir" ] || [ "$install_type" == "upgrade" ];
+    then
+        log_info "$(cat $TEST_CONTEXT/curl_result)"
+    fi
+
+    [ $fell_on_sso_portal -eq $expected_to_fell_on_portal ] || return 1
+
+    return 0
 }
 
 
@@ -297,7 +305,6 @@ TEST_INSTALL () {
     # Install the application in a LXC container
    _INSTALL_APP "path=$check_path" "is_public=$is_public" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path $install_type \
-        && log_info "$(cat $TEST_CONTEXT/curl_result)"
 
     local install=$?
 
@@ -379,9 +386,9 @@ TEST_UPGRADE () {
         local ret=$?
 
         # Test if the app can be accessed (though we don't want to report an
-        # error if it's not, in that context)
-        _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" \
-            && log_info "$(cat $TEST_CONTEXT/curl_result)"
+        # error if it's not, in that context) ... but the point
+        # is to display the curl page
+        _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "upgrade"
 
         # Then replace the backup
         rm -rf "$package_path"
@@ -395,8 +402,7 @@ TEST_UPGRADE () {
 
     # Upgrade the application in a LXC container
     _RUN_YUNOHOST_CMD "app upgrade $app_id -f /app_folder" \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path \
-        && log_info "$(cat $TEST_CONTEXT/curl_result)"
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path "upgrade"
 
     return $?
 }
