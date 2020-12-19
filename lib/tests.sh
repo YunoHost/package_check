@@ -84,7 +84,7 @@ _INSTALL_APP () {
 _LOAD_SNAPSHOT_OR_INSTALL_APP () {
 
     local check_path="$1"
-    local _install_type=$(path_to_install_type $check_path)
+    local _install_type="$(path_to_install_type $check_path)"
     local snapname="snap_${_install_type}install"
 
     if ! LXC_SNAPSHOT_EXISTS $snapname

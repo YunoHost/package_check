@@ -397,9 +397,8 @@ default_install_path() {
 path_to_install_type() {
     local check_path="$1"
 
-    [ -z "$check_path" ] && echo "nourl" \
-    || [ "$check_path" == "/" ] && echo "root" \
-    || echo "subdir"
-
+    [ -z "$check_path" ] && { echo "nourl"; return; }
+    [ "$check_path" == "/" ] && { echo "root"; return; }
+    echo "subdir"
 }
 
