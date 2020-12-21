@@ -168,14 +168,16 @@ test_types = {
 OK = ' \033[1m\033[92mOK\033[0m '
 FAIL = '\033[91mfail\033[0m'
 
+latest_test_serie = "default"
 print()
 for test in tests:
     test_display_name = test_types[test["test_type"]]
     if test["test_arg"]:
         test_display_name += " (%s)" % test["test_arg"][:8]
     test_display_name += ":"
-    if test["test_serie"] != "default":
-        test_display_name = "(%s)" % test["test_serie"][:15]
+    if test["test_serie"] != latest_test_serie:
+        latest_test_serie = test["test_serie"]
+        print("------------- %s -------------" % latest_test_serie)
 
     result = OK if test["results"]["main_result"] == "success" else FAIL
     print("{test: <30}{result}".format(test=test_display_name, result=result))

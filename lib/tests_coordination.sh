@@ -136,6 +136,8 @@ parse_check_process() {
         # upgrade from previous commits
         if [[ "$test_serie_id" != "1" ]]
         then
+            test_serie=${tests_serie//;; }
+
             is_test_enabled setup_root     && add_test "TEST_INSTALL" "root"
             is_test_enabled setup_sub_dir  && add_test "TEST_INSTALL" "subdir"
             is_test_enabled setup_nourl    && add_test "TEST_INSTALL" "nourl"
