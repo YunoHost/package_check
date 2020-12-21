@@ -146,7 +146,7 @@ parse_check_process() {
                 commit="$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')"
                 [ -n "$commit" ] || continue
                 add_test "TEST_UPGRADE" "$commit"
-            done <<<$(grep "^upgrade=1" "$TEST_CONTEXT/check_process.tests_infos")
+            done < <(grep "^upgrade=1" "$TEST_CONTEXT/check_process.tests_infos")
 
             continue
         else
@@ -166,7 +166,7 @@ parse_check_process() {
         do
             commit="$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')"
             add_test "TEST_UPGRADE" "$commit"
-        done <<<$(grep "^upgrade=1" "$TEST_CONTEXT/check_process.tests_infos")
+        done < <(grep "^upgrade=1" "$TEST_CONTEXT/check_process.tests_infos")
 
         # "Advanced" features
 
