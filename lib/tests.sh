@@ -21,24 +21,8 @@ _RUN_YUNOHOST_CMD() {
     check_witness_files && return $returncode || return 2
 }
 
-_INSTALL_APP () {
-    local install_args="$(jq -r '.install_args' $current_test_infos)"
+_PREINSTALL () {
     local preinstall_template="$(jq -r '.preinstall_template' $current_test_infos)"
-
-    # We have default values for domain, user and is_public, but these
-    # may still be overwritten by the args ($@)
-    for arg_override in "domain=$SUBDOMAIN" "admin=$TEST_USER" "user=$TEST_USER" "is_public=1" "$@"
-    do
-        key="$(echo $arg_override | cut -d '=' -f 1)"
-        value="$(echo $arg_override | cut -d '=' -f 2-)"
-
-        # (Legacy stuff ... We don't override is_public if its type is not boolean)
-        [[ "$key" == "is_public" ]] \
-            && [[ "$(jq -r '.arguments.install[] | select(.name=="is_public") | .type' $package_path/manifest.json)" != "boolean" ]] \
-            && continue
-
-        install_args=$(echo $install_args | sed "s@$key=[^&]*\&@$key=$value\&@")
-    done
 
     # Exec the pre-install instruction, if there one
     if [ -n "$preinstall_template" ]
@@ -57,6 +41,25 @@ _INSTALL_APP () {
         # Then execute the script to execute the pre-install commands.
         LXC_START "bash /preinstall.sh"
     fi
+}
+
+_INSTALL_APP () {
+    local install_args="$(jq -r '.install_args' $current_test_infos)"
+
+    # We have default values for domain, user and is_public, but these
+    # may still be overwritten by the args ($@)
+    for arg_override in "domain=$SUBDOMAIN" "admin=$TEST_USER" "user=$TEST_USER" "is_public=1" "$@"
+    do
+        key="$(echo $arg_override | cut -d '=' -f 1)"
+        value="$(echo $arg_override | cut -d '=' -f 2-)"
+
+        # (Legacy stuff ... We don't override is_public if its type is not boolean)
+        [[ "$key" == "is_public" ]] \
+            && [[ "$(jq -r '.arguments.install[] | select(.name=="is_public") | .type' $package_path/manifest.json)" != "boolean" ]] \
+            && continue
+
+        install_args=$(echo $install_args | sed "s@$key=[^&]*\&@$key=$value\&@")
+    done
 
     # Note : we do this at this stage and not during the parsing of check_process
     # because this also applies to upgrades ...
@@ -91,7 +94,8 @@ _LOAD_SNAPSHOT_OR_INSTALL_APP () {
     then
         log_warning "Expected to find an existing snapshot $snapname but it doesn't exist yet .. will attempt to create it"
         LOAD_LXC_SNAPSHOT snap0 \
-            &&_INSTALL_APP "path=$check_path" \
+            && _PREINSTALL \
+            && _INSTALL_APP "path=$check_path" \
             && CREATE_LXC_SNAPSHOT $snapname
     else
         # Or uses an existing snapshot
@@ -302,6 +306,8 @@ TEST_INSTALL () {
 
     LOAD_LXC_SNAPSHOT snap0
 
+    _PREINSTALL
+
     # Install the application in a LXC container
    _INSTALL_APP "path=$check_path" "is_public=$is_public" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "$install_type" \
@@ -428,6 +434,8 @@ TEST_PORT_ALREADY_USED () {
     # Then start this service to block this port.
     LXC_START "systemctl enable netcat & systemctl start netcat"
 
+    _PREINSTALL
+
     # Install the application in a LXC container
    _INSTALL_APP "path=$check_path" "port=$check_port" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN "$check_path"
@@ -498,6 +506,8 @@ TEST_BACKUP_RESTORE () {
 
             # Place the copy of the backup archive in the container.
             lxc file push -r $TEST_CONTEXT/ynh_backups/archives $LXC_NAME/home/yunohost.backup/
+        
+            _PREINSTALL
 
             log_small_title "Restore on a fresh YunoHost system..."
         fi
