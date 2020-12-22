@@ -203,23 +203,20 @@ function self_upgrade()
 
     local check_version="$(git ls-remote $git_repository | cut -f 1 | head -n1)"
 
-    # If the version file exist, check for an upgrade
-    if [ -e "$version_file" ]
+    # Check if the last commit on the repository match with the current version
+    if [ ! -e "$version_file" ] || [ "$check_version" != "$(cat "$version_file")" ]
     then
-        # Check if the last commit on the repository match with the current version
-        if [ "$check_version" != "$(cat "$version_file")" ]
-        then
-            # If the versions don't matches. Do an upgrade
-            log_info "Upgrading Package check"
+        # If the versions don't matches. Do an upgrade
+        log_info "Upgrading Package check"
 
-            # Build the upgrade script
-            cat > "./upgrade_script.sh" << EOF
+        # Build the upgrade script
+        cat > "./upgrade_script.sh" << EOF
 
 #!/bin/bash
 # Clone in another directory
 git clone --quiet $git_repository "./upgrade"
 cp -a "./upgrade/." "./."
-rm -r "./upgrade"
+rm -rf "./upgrade"
 # Update the version file
 echo "$check_version" > "$version_file"
 rm "./pcheck.lock"
@@ -227,12 +224,11 @@ rm "./pcheck.lock"
 exec "./package_check.sh" "${arguments[@]}"
 EOF
 
-            # Give the execution right
-            chmod +x "./upgrade_script.sh"
+        # Give the execution right
+        chmod +x "./upgrade_script.sh"
 
-            # Start the upgrade script by replacement of this process
-            exec "./upgrade_script.sh"
-        fi
+        # Start the upgrade script by replacement of this process
+        exec "./upgrade_script.sh"
     fi
 
     # Update the version file
