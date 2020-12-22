@@ -53,7 +53,7 @@ _INSTALL_APP () {
         sed -i "s/\$SUBDOMAIN/$SUBDOMAIN/" "$preinstall_script"
         sed -i "s/\$PASSWORD/$YUNO_PWD/" "$preinstall_script"
         # Copy the pre-install script into the container.
-        lxc file push "$preinstall_script" "$LXC_NAME":/preinstall.sh
+        lxc file push "$preinstall_script" "$LXC_NAME/preinstall.sh"
         # Then execute the script to execute the pre-install commands.
         LXC_START "bash /preinstall.sh"
     fi
