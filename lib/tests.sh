@@ -631,7 +631,6 @@ ACTIONS_CONFIG_PANEL () {
             log_error "No actions.toml found !"
             return 1
         fi
-
     elif [ "$test_type" == "config_panel" ]
     then
         start_test "Config-panel"
@@ -657,7 +656,7 @@ ACTIONS_CONFIG_PANEL () {
     # List first, then execute
     local ret=0
     local i=0
-    for i in `seq 1 2`
+    for i in $(seq 1 2)
     do
         # Do a test if the installation succeed
         if [ $ret -ne 0 ]
@@ -779,7 +778,7 @@ ACTIONS_CONFIG_PANEL () {
                             add_arg="${line//\"/}"
                             # Then add this argument and follow it by :
                             check_process_arguments="${check_process_arguments}${add_arg}:"
-                        done < $test_serie_dir/check_process.configpanel_infos #FIXME
+                        done < <(jq -r '.extra.configpanel' $current_test_infos)
                     elif [ "$test_type" == "actions" ]
                     then
                         local check_process_arguments=""
@@ -789,7 +788,7 @@ ACTIONS_CONFIG_PANEL () {
                             add_arg="${line//\"/}"
                             # Then add this argument and follow it by :
                             check_process_arguments="${check_process_arguments}${add_arg}:"
-                        done < $test_serie_dir/check_process.actions_infos #FIXME
+                        done < <(jq -r '.extra.actions' $current_test_infos)
                     fi
                     # Look for arguments into the check_process
                     if echo "$check_process_arguments" | grep --quiet "$action_config_argument_name"
@@ -816,7 +815,7 @@ ACTIONS_CONFIG_PANEL () {
 
                 # Loop on the number of values into the check_process.
                 # Or loop once for the default value
-                for j in `seq 1 $nb_actions_config_arguments_specifics`
+                for j in $(seq 1 $nb_actions_config_arguments_specifics)
                 do
                     local action_config_argument_built=""
                     if [ $action_config_has_arguments -eq 1 ]
@@ -826,12 +825,12 @@ ACTIONS_CONFIG_PANEL () {
                         then
                             # Build the argument from a value from the check_process
                             local action_config_actual_argument="$(echo "$actions_config_arguments_specifics" | cut -d'|' -f $j)"
-                            action_config_argument_built="--args $action_config_argument_name=\"$action_config_actual_argument\""
+                            action_config_argument_built="--args $action_config_argument_name=$action_config_actual_argument"
                         elif [ -n "$action_config_argument_default" ]
                         then
                             # Build the argument from the default value
                             local action_config_actual_argument="$action_config_argument_default"
-                            action_config_argument_built="--args $action_config_argument_name=\"$action_config_actual_argument\""
+                            action_config_argument_built="--args $action_config_argument_name=$action_config_actual_argument"
                         else
                             log_warning "> No argument into the check_process to use or default argument for \"$action_config_name\"..."
                             action_config_actual_argument=""

@@ -116,7 +116,7 @@ parse_check_process() {
             elif [[ "$test_type" == "ACTIONS_CONFIG_PANEL" ]] && [[ "$test_arg" == "actions" ]]
             then
                 extra="$(jq -n --arg actions "$action_infos" '{ $actions }')"
-            elif [[ "$test_type" == "ACTIONS_CONFIG_PANEL" ]] && [[ "$test_arg" == "actions" ]]
+            elif [[ "$test_type" == "ACTIONS_CONFIG_PANEL" ]] && [[ "$test_arg" == "config_panel" ]]
             then
                 extra="$(jq -n --arg configpanel "$configpanel_infos" '{ $configpanel }')"
             fi
@@ -171,8 +171,8 @@ parse_check_process() {
         # "Advanced" features
 
         is_test_enabled change_url       && add_test "TEST_CHANGE_URL"
-        #is_test_enabled actions          && add_test "ACTIONS_CONFIG_PANEL" "actions"
-        #is_test_enabled config_panel     && add_test "ACTIONS_CONFIG_PANEL" "config_panel"
+        is_test_enabled actions          && add_test "ACTIONS_CONFIG_PANEL" "actions"
+        is_test_enabled config_panel     && add_test "ACTIONS_CONFIG_PANEL" "config_panel"
 
         # Port already used ... do we really need this ...
 
