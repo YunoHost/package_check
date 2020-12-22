@@ -378,22 +378,40 @@ start_test () {
     current_test_number=$((current_test_number+1))
 }
 
-this_is_a_web_app () {
+there_is_an_install_type() {
+    local install_type=$1
 
-    # Usually the fact that we test "nourl"
-    # installs should be a good indicator for the fact that it's not a webapp
-    for TEST in $(ls $TEST_CONTEXT/tests/*.json)
+    for TEST in $TEST_CONTEXT/tests/*.json
     do
-        jq -e '. | select(.test_type == "TEST_INSTALL") | select(.test_arg == "nourl")' $TEST > /dev/null \
-        && return 1
+        jq --arg install_type "$install_type" -e '. | select(.test_type == "TEST_INSTALL") | select(.test_arg == $install_type)' $TEST > /dev/null \
+        && return 0
     done
 
-    return 0
+    return 1
+}
+
+there_is_a_root_install_test() {
+    return $(there_is_an_install_type "root")
+}
+
+there_is_a_subdir_install_test() {
+    return $(there_is_an_install_type "subdir")
+}
+
+this_is_a_web_app () {
+    # An app is considered to be a webapp if there is a root or a subdir test
+    return $(there_is_a_root_install_test) || $(there_is_a_subdir_install_test)
 }
 
 default_install_path() {
-    # All webapps should be installable at the root of a domain ?
-    this_is_a_web_app && echo "/" || echo ""
+    # All webapps should be installable at the root or in a subpath of a domain
+    if there_is_a_root_install_test; then
+        echo "/"
+    elif there_is_a_subdir_install_test; then
+        echo "/path"
+    else
+        echo ""
+    fi
 }
 
 path_to_install_type() {
