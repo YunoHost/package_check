@@ -534,8 +534,11 @@ TEST_CHANGE_URL () {
     at_least_one_install_succeeded || return 1
     this_is_a_web_app || return 0
 
+    local current_domain=$SUBDOMAIN
+    local current_path="$(default_install_path)"
+
     log_small_title "Preliminary install..." \
-        && _LOAD_SNAPSHOT_OR_INSTALL_APP "/"
+        && _LOAD_SNAPSHOT_OR_INSTALL_APP "$current_path"
 
     local ret=$?
     [ $ret -eq 0 ] || { return 1; }
@@ -577,12 +580,23 @@ TEST_CHANGE_URL () {
             local new_domain=$DOMAIN
         fi
 
-        log_small_title "Changing the url to $new_domain$new_path..." \
+        if [ "$new_path" == "$current_path" ] && [ "$new_domain" == "$current_domain" ]; then
+            continue
+        elif ! there_is_a_root_install_test && [ "$new_path" == "/" ]; then
+            continue
+        elif ! there_is_a_subdir_install_test  && [ "$new_path" != "/" ]; then
+            continue
+        fi
+
+        log_small_title "Changing the url from $current_domain$current_path to $new_domain$new_path..." \
             && _RUN_YUNOHOST_CMD "app change-url $app_id -d $new_domain -p $new_path" \
             && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $new_domain $new_path
 
         local ret=$?
         [ $ret -eq 0 ] || { return 1; }
+
+        current_domain=$new_domain
+        current_path=$new_path
 
         break_before_continue
     done
