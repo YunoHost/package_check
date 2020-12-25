@@ -488,7 +488,7 @@ TEST_BACKUP_RESTORE () {
             ret=$?
         fi
     
-        [ $ret -eq 0 ] || main_result=1
+        [ $ret -eq 0 ] || { main_result=1; break_before_continue; continue; }
 
         # Grab the backup archive into the LXC container, and keep a copy
         lxc file pull -r $LXC_NAME/home/yunohost.backup/archives $TEST_CONTEXT/ynh_backups
@@ -903,4 +903,3 @@ ACTIONS_CONFIG_PANEL () {
 
     return $main_result
 }
-
