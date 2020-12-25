@@ -279,6 +279,9 @@ function fetch_package_to_test() {
     # Check if the package directory is really here.
     if [ ! -d "$package_path" ]; then
         log_critical "Unable to find the directory $package_path for the package..."
+    fi
+}
+
 #=================================================
 # GET HOST ARCHITECTURE
 #=================================================
