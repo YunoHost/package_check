@@ -99,7 +99,7 @@ _LOAD_SNAPSHOT_OR_INSTALL_APP () {
             && CREATE_LXC_SNAPSHOT $snapname
     else
         # Or uses an existing snapshot
-        log_info "(Reusing an existing snapshot $snapname.)" \
+        log_info "(Reusing existing snapshot $snapname)" \
             && LOAD_LXC_SNAPSHOT $snapname
     fi
 }
