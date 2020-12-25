@@ -229,6 +229,56 @@ function fetch_or_upgrade_package_linter()
 }
 
 #=================================================
+# Pick up the package
+#=================================================
+
+function fetch_package_to_test() {
+
+    local path_to_package_to_test="$1"
+
+    # If the url is on a specific branch, extract the branch
+    if echo "$path_to_package_to_test" | grep -Eq "https?:\/\/.*\/tree\/"
+    then
+        gitbranch="-b ${path_to_package_to_test##*/tree/}"
+        path_to_package_to_test="${path_to_package_to_test%%/tree/*}"
+    fi
+
+    log_info "Testing the package $path_to_package_to_test"
+    [ -n "$gitbranch" ] && log_info " on the branch ${gitbranch##-b }"
+
+    package_path="$TEST_CONTEXT/app_folder"
+
+    # If the package is in a git repository
+    if echo "$path_to_package_to_test" | grep -Eq "https?:\/\/"
+    then
+        # Force the branch master if no branch is specified.
+        if [ -z "$gitbranch" ]
+        then
+            if git ls-remote --quiet --exit-code $path_to_package_to_test master
+            then
+                gitbranch="-b master"
+            else
+                if git ls-remote --quiet --exit-code $path_to_package_to_test stable
+                then
+                    gitbranch="-b stable"
+                else
+                    log_critical "Unable to find a default branch to test (master or stable)"
+                fi
+            fi
+        fi
+        # Clone the repository
+        git clone --quiet $path_to_package_to_test $gitbranch "$package_path"
+
+        # If it's a local directory
+    else
+        # Do a copy in the directory of Package check
+        cp -a "$path_to_package_to_test" "$package_path"
+    fi
+
+    # Check if the package directory is really here.
+    if [ ! -d "$package_path" ]; then
+        log_critical "Unable to find the directory $package_path for the package..."
+#=================================================
 # GET HOST ARCHITECTURE
 #=================================================
 

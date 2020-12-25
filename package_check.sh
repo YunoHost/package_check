@@ -11,6 +11,7 @@ print_help() {
 
     -b, --branch=BRANCH  Specify a branch to check.
     -i, --interactive    Wait for the user to continue before each remove.
+    -s, --force-stop     Force the stop of running package_check
     -r, --rebuild        (Re)Build the base container
                          (N.B.: you're not supposed to use this option, images
                          are supposed to be fetch from devbaseimgs.yunohost.org automatically)
@@ -31,6 +32,7 @@ exit 0
 gitbranch=""
 interactive=0
 rebuild=0
+force_stop=0
 
 function parse_args() {
 
@@ -47,6 +49,7 @@ function parse_args() {
         # For each argument in the array, reduce to short argument for getopts
         arguments[$i]=${arguments[$i]//--interactive/-i}
         arguments[$i]=${arguments[$i]//--rebuild/-r}
+        arguments[$i]=${arguments[$i]//--force-stop/-s}
         arguments[$i]=${arguments[$i]//--help/-h}
         getopts_built_arg+=("${arguments[$i]}")
     done
@@ -79,6 +82,11 @@ function parse_args() {
                         rebuild=1
                         shift_value=1
                         ;;
+                    s)
+                        # --force-stop
+                        force_stop=1
+                        shift_value=1
+                        ;;
                     h)
                         # --help
                         print_help
@@ -109,58 +117,18 @@ function parse_args() {
 arguments=("$@")
 parse_args
 
+
 #=================================================
-# Pick up the package
+# Force-stop
 #=================================================
 
-FETCH_PACKAGE_TO_TEST() {
-
-    local path_to_package_to_test="$1"
-
-    # If the url is on a specific branch, extract the branch
-    if echo "$path_to_package_to_test" | grep -Eq "https?:\/\/.*\/tree\/"
-    then
-        gitbranch="-b ${path_to_package_to_test##*/tree/}"
-        path_to_package_to_test="${path_to_package_to_test%%/tree/*}"
-    fi
-
-    log_info "Testing the package $path_to_package_to_test"
-    [ -n "$gitbranch" ] && log_info " on the branch ${gitbranch##-b }"
-
-    package_path="$TEST_CONTEXT/app_folder"
-
-    # If the package is in a git repository
-    if echo "$path_to_package_to_test" | grep -Eq "https?:\/\/"
-    then
-        # Force the branch master if no branch is specified.
-        if [ -z "$gitbranch" ]
-        then
-            if git ls-remote --quiet --exit-code $path_to_package_to_test master
-            then
-                gitbranch="-b master"
-            else
-                if git ls-remote --quiet --exit-code $path_to_package_to_test stable
-                then
-                    gitbranch="-b stable"
-                else
-                    log_critical "Unable to find a default branch to test (master or stable)"
-                fi
-            fi
-        fi
-        # Clone the repository
-        git clone --quiet $path_to_package_to_test $gitbranch "$package_path"
-
-        # If it's a local directory
-    else
-        # Do a copy in the directory of Package check
-        cp -a "$path_to_package_to_test" "$package_path"
-    fi
-
-    # Check if the package directory is really here.
-    if [ ! -d "$package_path" ]; then
-        log_critical "Unable to find the directory $package_path for the package..."
-    fi
-}
+if [[ $force_stop == 1 ]]
+then
+    package_check_pid="$(cat "./pcheck.lock" | cut -d: -f3)"
+    kill --signal 15 $package_check_pid
+    LXC_RESET
+    clean_exit 0
+fi
 
 #=================================================
 # Check if the lock file exist
@@ -202,9 +170,9 @@ fi
 #self_upgrade # FIXME renenable this later
 fetch_or_upgrade_package_linter
 
-TEST_CONTEXT=$(mktemp -d /tmp/package_check.XXXXXX)
+readonly TEST_CONTEXT=$(mktemp -d /tmp/package_check.XXXXXX)
 
-FETCH_PACKAGE_TO_TEST $path_to_package_to_test
+fetch_package_to_test "$path_to_package_to_test"
 readonly app_id="$(cat $package_path/manifest.json | jq -r .id)"
 
 run_all_tests
