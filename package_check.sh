@@ -193,7 +193,7 @@ echo "start:$(date +%s):$$" > "$lock_file"
 assert_we_are_connected_to_the_internets
 assert_we_have_all_dependencies
 
-if [[ $rebuild == 0 ]]
+if [[ $rebuild == 1 ]]
 then
     rebuild_base_lxc 2>&1 | tee -a "./build_base_lxc.log"
     clean_exit 0
