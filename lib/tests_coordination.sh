@@ -240,6 +240,8 @@ run_all_tests() {
     mkdir -p $TEST_CONTEXT/tests
     mkdir -p $TEST_CONTEXT/results
 
+    readonly app_id="$(jq -r .id $package_path/manifest.json)"
+
     # Parse the check_process only if it's exist
     check_process="$package_path/check_process"
 
@@ -273,6 +275,7 @@ run_all_tests() {
     LXC_START "yunohost --version --output-as json | jq -r .yunohost.version" >> $TEST_CONTEXT/ynh_version
     LXC_START "yunohost --version --output-as json | jq -r .yunohost.repo" >> $TEST_CONTEXT/ynh_branch
     echo $ARCH > $TEST_CONTEXT/architecture
+    echo $app_id > $TEST_CONTEXT/app_id
 
     # Init the value for the current test
     current_test_number=1

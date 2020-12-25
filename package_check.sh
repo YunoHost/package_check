@@ -174,8 +174,6 @@ fetch_or_upgrade_package_linter
 readonly TEST_CONTEXT=$(mktemp -d /tmp/package_check.XXXXXX)
 
 fetch_package_to_test "$path_to_package_to_test"
-readonly app_id="$(cat $package_path/manifest.json | jq -r .id)"
-
 run_all_tests
 
 clean_exit 0

@@ -1,6 +1,7 @@
 import sys
 import json
 import os
+import time
 
 def load_tests(test_folder):
 
@@ -212,18 +213,20 @@ print()
 
 
 summary = {
+    "app": open(test_context + "/app_id").read().strip(),
     "commit": open(test_context + "/commit").read().strip(),
     "architecture": open(test_context + "/architecture").read().strip(),
     "yunohost_version": open(test_context + "/ynh_version").read().strip(),
     "yunohost_branch": open(test_context + "/ynh_branch").read().strip(),
+    "timestamp": int(time.time()),
     "tests": [{
         "test_type": t["test_type"],
         "test_arg": t["test_arg"],
         "test_serie": t["test_serie"],
         "main_result": t["results"]["main_result"]
     } for t in tests],
-    "levels": {level.level: level.passed for level in levels[1:]},
-    "global_level": global_level.level
+    "level_results": {level.level: level.passed for level in levels[1:]},
+    "level": global_level.level
 }
 
 sys.stderr.write(json.dumps(summary, indent=4))
