@@ -124,9 +124,10 @@ parse_args
 
 if [[ $force_stop == 1 ]]
 then
-    package_check_pid="$(cat "./pcheck.lock" | cut -d: -f3)"
-    kill --signal 15 $package_check_pid
-    LXC_RESET
+    package_check_pid="$(cat "./pcheck.lock" 2> /dev/null | cut -d: -f3)"
+    if [ -n "$package_check_pid" ]; then
+        kill --signal 15 $package_check_pid
+    fi
     clean_exit 0
 fi
 
