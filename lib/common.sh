@@ -1,25 +1,22 @@
 #!/bin/bash
 
-ARCH="amd64"
-DIST="buster"
-
-# Yunohost version: stable, testing or unstable
-YNH_BRANCH="stable"
-
-# Admin password
+# Yunohost install parameters
 YUNO_PWD="admin"
-
-# Domaines de test
 DOMAIN="domain.tld"
 SUBDOMAIN="sub.$DOMAIN"
-
-# User de test
 TEST_USER="package_checker"
 
 [[ -e "./config" ]] && source "./config"
 
+ARCH=${ARCH:-amd64}
+DIST=${DIST:-buster}
+
+# Yunohost version: stable, testing or unstable
+YNH_BRANCH=${YNH_BRANCH:-stable}
+
 LXC_BASE="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-base"
 LXC_NAME="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-test"
+YNH_BRANCH="-d $YNH_BRANCH"
 
 readonly lock_file="./pcheck.lock"
 
