@@ -67,14 +67,21 @@ able to run `lxc` commands without sudo... You can check this with the command
 to propagate (sigh))
 
 Then you shall initialize LXD which will ask you a bunch of question. Usually
-answering the default (just pressing enter) to all questions is fine.
+answering the default (just pressing enter) to all questions is fine - EXCEPT
+for the size of the default storage it'll create (the default is 5G but you may
+want 10 or 20G for heavy usage ?).
 
 ```bash
-sudo lxd init
+lxd init
 ```
 
-You can keep the default answer to all question EXCEPT the size of the default
-storage it'll create (default is 5G but you probably want 10 instead ...  or 20 for heavy usage)
+The base images for tests are centralized on `devbaseimgs.yunohost.org` and we'll download them from there to speed things up:
+
+```bash
+lxc remote add yunohost https://devbaseimgs.yunohost.org --public
+```
+
+(At the time this README is written, fingerprint is d9ae6e76c374e3c58c3c20a881cffe7435809adb3b222ec393805f5bd01bb522 )
 
 Then you can : 
 

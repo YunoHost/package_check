@@ -6,7 +6,7 @@
 
 LXC_CREATE () {
     lxc image list $LXC_BASE | grep -q -w $LXC_BASE || log_critical "The base image $LXC_BASE doesn't exist yet. Consider using the build_base_lxc.sh to create it first" 
-    lxc launch $LXC_BASE $LXC_NAME || clean_exit 1
+    lxc launch yunohost:$LXC_BASE $LXC_NAME || clean_exit 1
     lxc config set "$LXC_NAME" security.nesting true
     _LXC_START_AND_WAIT $LXC_NAME
     set_witness_files

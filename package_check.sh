@@ -9,9 +9,11 @@ print_help() {
     cat << EOF
  Usage: package_check.sh [OPTION]... PACKAGE_TO_CHECK
 
-    -r, --rebuild        (Re)Build the base container
     -b, --branch=BRANCH  Specify a branch to check.
     -i, --interactive    Wait for the user to continue before each remove.
+    -r, --rebuild        (Re)Build the base container
+                         (N.B.: you're not supposed to use this option, images
+                         are supposed to be fetch from devbaseimgs.yunohost.org automatically)
     -h, --help           Display this help
 EOF
 exit 0
