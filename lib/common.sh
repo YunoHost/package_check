@@ -41,7 +41,7 @@ assert_we_are_connected_to_the_internets() {
 }
 
 assert_we_have_all_dependencies() {
-    for dep in "lxc" "lxd" "lynx" "jq" "python3"
+    for dep in "lxc" "lxd" "lynx" "jq" "python3" "pip3"
     do
         which $dep 2>&1 > /dev/null || log_critical "Please install $dep"
     done
@@ -189,47 +189,24 @@ stop_timer () {
 }
 
 #=================================================
-# Upgrade Package check
+# Package check self-upgrade
 #=================================================
-
 
 function self_upgrade()
 {
-    local git_repository=https://github.com/YunoHost/package_check
-    local version_file="./.pcheck_version"
+    # We only self-upgrade if we're in a git repo on master branch
+    # (which should correspond to production contexts)
+    [[ -d ".git" ]] || return
+    [[ $(git rev-parse --abbrev-ref HEAD) == "master" ]] || return
 
-    local check_version="$(git ls-remote $git_repository | cut -f 1 | head -n1)"
+    git fetch origin --quiet
 
-    # Check if the last commit on the repository match with the current version
-    if [ ! -e "$version_file" ] || [ "$check_version" != "$(cat "$version_file")" ]
-    then
-        # If the versions don't matches. Do an upgrade
-        log_info "Upgrading Package check"
+    # If already up to date, don't do anything else
+    [[ $(git rev-parse HEAD) == $(git rev-parse origin/master) ]] && return
 
-        # Build the upgrade script
-        cat > "./upgrade_script.sh" << EOF
-
-#!/bin/bash
-# Clone in another directory
-git clone --quiet $git_repository "./upgrade"
-cp -a "./upgrade/." "./."
-rm -rf "./upgrade"
-# Update the version file
-echo "$check_version" > "$version_file"
-rm "./pcheck.lock"
-# Execute package check by replacement of this process
-exec "./package_check.sh" "${arguments[@]}"
-EOF
-
-        # Give the execution right
-        chmod +x "./upgrade_script.sh"
-
-        # Start the upgrade script by replacement of this process
-        exec "./upgrade_script.sh"
-    fi
-
-    # Update the version file
-    echo "$check_version" > "$version_file"
+    log_info "Upgrading package_check..."
+    git reset --hard origin/master --quiet
+    exec "./package_check.sh" "${arguments[@]}"
 }
 
 #=================================================
@@ -239,35 +216,16 @@ EOF
 function fetch_or_upgrade_package_linter()
 {
     local git_repository=https://github.com/YunoHost/package_linter
-    local version_file="./.plinter_version"
 
-    local check_version="$(git ls-remote $git_repository | cut -f 1 | head -n1)"
-
-    # If the version file exist, check for an upgrade
-    if [ -e "$version_file" ]
+    if [[ ! -d "./package_linter" ]]
     then
-        # Check if the last commit on the repository match with the current version
-        if [ "$check_version" != "$(cat "$version_file")" ]
-        then
-            # If the versions don't matches. Do an upgrade
-            log_info "Upgrading Package linter"
-
-            # Clone in another directory
-            git clone --quiet $git_repository "./package_linter_tmp"
-            pip3 install pyparsing six
-
-            # And replace
-            cp -a "./package_linter_tmp/." "./package_linter/."
-            rm -r "./package_linter_tmp"
-        fi
-    else
         log_info "Installing Package linter"
         git clone --quiet $git_repository "./package_linter"
         pip3 install pyparsing six
+    else
+        git -C "./package_linter" fetch origin --quiet
+        git -C "./package_linter" reset --hard origin/master --quiet
     fi
-
-    # Update the version file
-    echo "$check_version" > "$version_file"
 }
 
 #=================================================
