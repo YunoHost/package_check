@@ -65,7 +65,7 @@ function parse_args() {
                 # Initialize the index of getopts
                 OPTIND=1
                 # Parse with getopts only if the argument begin by -
-                getopts ":b:fihlyr" parameter || true
+                getopts ":b:irsh" parameter || true
                 case $parameter in
                     b)
                         # --branch=branch-name
