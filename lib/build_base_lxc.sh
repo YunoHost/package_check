@@ -1,8 +1,5 @@
 #!/bin/bash
 
-cd $(dirname $(realpath $0))
-source "./lib/common.sh"
-
 function launch_new_lxc()
 {
     lxc info $LXC_BASE >/dev/null && lxc delete $LXC_BASE --force
@@ -69,9 +66,7 @@ function rebuild_base_lxc()
 
     lxc stop $LXC_BASE
     lxc image delete $LXC_BASE
-    lxc publish $LXC_BASE --alias $LXC_BASE
+    lxc publish $LXC_BASE --alias $LXC_BASE --public
     lxc delete $LXC_BASE
     set +x
 }
-
-rebuild_base_lxc 2>&1 | tee -a "./build_base_lxc.log"

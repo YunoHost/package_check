@@ -3,18 +3,16 @@
 cd $(dirname $(realpath $0))
 source "./lib/common.sh"
 source "./lib/tests_coordination.sh"
+source "./lib/build_base_lxc.sh"
 
 print_help() {
     cat << EOF
+ Usage: package_check.sh [OPTION]... PACKAGE_TO_CHECK
 
-Usage:
-package_check.sh [OPTION]... PACKAGE_TO_CHECK
-    -b, --branch=BRANCH
-        Specify a branch to check.
-    -i, --interactive
-        Wait for the user to continue before each remove.
-    -h, --help
-        Display this help
+    -r, --rebuild        (Re)Build the base container
+    -b, --branch=BRANCH  Specify a branch to check.
+    -i, --interactive    Wait for the user to continue before each remove.
+    -h, --help           Display this help
 EOF
 exit 0
 }
@@ -30,6 +28,7 @@ exit 0
 
 gitbranch=""
 interactive=0
+rebuild=0
 
 function parse_args() {
 
@@ -45,6 +44,7 @@ function parse_args() {
         fi
         # For each argument in the array, reduce to short argument for getopts
         arguments[$i]=${arguments[$i]//--interactive/-i}
+        arguments[$i]=${arguments[$i]//--rebuild/-r}
         arguments[$i]=${arguments[$i]//--help/-h}
         getopts_built_arg+=("${arguments[$i]}")
     done
@@ -70,6 +70,11 @@ function parse_args() {
                     i)
                         # --interactive
                         interactive=1
+                        shift_value=1
+                        ;;
+                    r)
+                        # --rebuild
+                        rebuild=1
                         shift_value=1
                         ;;
                     h)
@@ -101,30 +106,6 @@ function parse_args() {
 
 arguments=("$@")
 parse_args
-
-#=================================================
-# Check if the lock file exist
-#=================================================
-
-if test -e "$lock_file"
-then
-    # If the lock file exist
-    echo "The lock file $lock_file is present. Package check would not continue."
-    if [ $interactive -eq 1 ]; then
-        echo -n "Do you want to continue anyway? (y/n) :"
-        read answer
-    fi
-    # Set the answer at lowercase only
-    answer=${answer,,}
-    if [ "${answer:0:1}" != "y" ]
-    then
-        echo "Cancel Package check execution"
-        exit 0
-    fi
-fi
-# Create the lock file
-# $$ is the PID of package_check itself.
-echo "start:$(date +%s):$$" > "$lock_file"
 
 #=================================================
 # Pick up the package
@@ -179,12 +160,43 @@ FETCH_PACKAGE_TO_TEST() {
     fi
 }
 
+#=================================================
+# Check if the lock file exist
+#=================================================
+
+if test -e "$lock_file"
+then
+    # If the lock file exist
+    echo "The lock file $lock_file is present. Package check would not continue."
+    if [ $interactive -eq 1 ]; then
+        echo -n "Do you want to continue anyway? (y/n) :"
+        read answer
+    fi
+    # Set the answer at lowercase only
+    answer=${answer,,}
+    if [ "${answer:0:1}" != "y" ]
+    then
+        echo "Cancel Package check execution"
+        exit 0
+    fi
+fi
+# Create the lock file
+# $$ is the PID of package_check itself.
+echo "start:$(date +%s):$$" > "$lock_file"
+
 ###################################
 # Main code
 ###################################
 
 assert_we_are_connected_to_the_internets
 assert_we_have_all_dependencies
+
+if [[ $rebuild == 0 ]]
+then
+    rebuild_base_lxc 2>&1 | tee -a "./build_base_lxc.log"
+    clean_exit 0
+fi
+
 #self_upgrade # FIXME renenable this later
 fetch_or_upgrade_package_linter
 
