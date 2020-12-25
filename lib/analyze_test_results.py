@@ -153,7 +153,8 @@ def level_9(tests):
         and "App.qualify_for_level_9" in linter_tests[0]["results"]["success"]
 
 
-tests = list(load_tests(sys.argv[1]))
+text_context = sys.argv[1]
+tests = list(load_tests(test_context))
 
 test_types = {
     "PACKAGE_LINTER": "Package linter",
@@ -211,6 +212,10 @@ print()
 
 
 summary = {
+    "commit": open(test_context + "/commit").read().strip(),
+    "architecture": open(test_context + "/architecture").read().strip(),
+    "yunohost_version": open(test_context + "/ynh_version").read().strip(),
+    "yunohost_branch": open(test_context + "/ynh_branch").read().strip(),
     "tests": [{
         "test_type": t["test_type"],
         "test_arg": t["test_arg"],
@@ -221,7 +226,4 @@ summary = {
     "global_level": global_level.level
 }
 
-sys.stderr.write(json.dumps(summary))
-
-
-
+sys.stderr.write(json.dumps(summary, indent=4))

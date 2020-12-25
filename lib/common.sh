@@ -16,7 +16,6 @@ YNH_BRANCH=${YNH_BRANCH:-stable}
 
 LXC_BASE="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-base"
 LXC_NAME="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-test"
-YNH_BRANCH="-d $YNH_BRANCH"
 
 readonly lock_file="./pcheck.lock"
 
@@ -274,6 +273,8 @@ function fetch_package_to_test() {
         # Do a copy in the directory of Package check
         cp -a "$path_to_package_to_test" "$package_path"
     fi
+
+    git -C $package_path rev-parse HEAD > $TEST_CONTEXT/commit
 
     # Check if the package directory is really here.
     if [ ! -d "$package_path" ]; then

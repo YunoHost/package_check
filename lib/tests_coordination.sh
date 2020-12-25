@@ -270,6 +270,9 @@ run_all_tests() {
     # Print the version of YunoHost from the LXC container
     log_small_title "YunoHost versions"
     LXC_START "yunohost --version"
+    LXC_START "yunohost --version --output-as json | jq -r .yunohost.version" >> $TEST_CONTEXT/ynh_version
+    LXC_START "yunohost --version --output-as json | jq -r .yunohost.repo" >> $TEST_CONTEXT/ynh_branch
+    echo $ARCH > $TEST_CONTEXT/architecture
 
     # Init the value for the current test
     current_test_number=1
@@ -283,7 +286,7 @@ run_all_tests() {
     # Print the final results of the tests
     log_title "Tests summary"
     
-    python3 lib/analyze_test_results.py $TEST_CONTEXT 2>$TEST_CONTEXT/summary.json
+    python3 lib/analyze_test_results.py $TEST_CONTEXT 2>./results.json
 
     # Restore the started time for the timer
     starttime=$complete_start_timer

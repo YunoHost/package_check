@@ -39,7 +39,7 @@ function rebuild_base_lxc()
     
     INSTALL_SCRIPT="https://install.yunohost.org/$DIST"
     $IN_LXC apt install curl -y
-    $IN_LXC /bin/bash -c "curl $INSTALL_SCRIPT | bash -s -- -a $YNH_BRANCH"
+    $IN_LXC /bin/bash -c "curl $INSTALL_SCRIPT | bash -s -- -a -d $YNH_BRANCH"
     
     $IN_LXC systemctl -q stop apt-daily.timer
     $IN_LXC systemctl -q stop apt-daily-upgrade.timer
