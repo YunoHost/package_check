@@ -479,6 +479,7 @@ TEST_BACKUP_RESTORE () {
         then
             log_error "Installation failed..."
             main_result=1
+            break_before_continue
             continue
         else
             log_small_title "Backup of the application..."
