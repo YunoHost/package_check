@@ -452,74 +452,87 @@ TEST_BACKUP_RESTORE () {
     # Check if an install have previously work
     at_least_one_install_succeeded || return 1
 
-    local check_path="$(default_install_path)"
+    local check_paths=()
 
-    # Install the application in a LXC container
-    _LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path"
-
-    local ret=$?
+    if this_is_a_web_app; then
+        there_is_a_root_install_test && check_paths+=("$(root_path)")
+        there_is_a_subdir_install_test && check_paths+=("$(subdir_path)")
+    else
+        check_paths+=("")
+    fi
 
     local main_result=0
 
-    # Remove the previous residual backups
-    RUN_INSIDE_LXC rm -rf /home/yunohost.backup/archives
-
-    # BACKUP
-    # Made a backup if the installation succeed
-    if [ $ret -ne 0 ]
-    then
-        log_error "Installation failed..."
-    else
-        log_small_title "Backup of the application..."
-
-        # Made a backup of the application
-        _RUN_YUNOHOST_CMD "backup create -n Backup_test --apps $app_id"
-        ret=$?
-    fi
-
-    [ $ret -eq 0 ] || main_result=1
-
-    # Grab the backup archive into the LXC container, and keep a copy
-    lxc file pull -r $LXC_NAME/home/yunohost.backup/archives $TEST_CONTEXT/ynh_backups
-
-    # RESTORE
-    # Try the restore process in 2 times, first after removing the app, second after a restore of the container.
-    local j=0
-    for j in 0 1
+    for check_path in "${check_paths[@]}"
     do
-        # First, simply remove the application
-        if [ $j -eq 0 ]
-        then
-            # Remove the application
-            _REMOVE_APP
-
-            log_small_title "Restore after removing the application..."
-
-            # Second, restore the whole container to remove completely the application
-        elif [ $j -eq 1 ]
-        then
-
-            LOAD_LXC_SNAPSHOT snap0
-
-            # Remove the previous residual backups
-            RUN_INSIDE_LXC rm -rf /home/yunohost.backup/archives
-
-            # Place the copy of the backup archive in the container.
-            lxc file push -r $TEST_CONTEXT/ynh_backups/archives $LXC_NAME/home/yunohost.backup/
-        
-            _PREINSTALL
-
-            log_small_title "Restore on a fresh YunoHost system..."
-        fi
-
-        # Restore the application from the previous backup
-        _RUN_YUNOHOST_CMD "backup restore Backup_test --force --apps $app_id" \
-            && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path"
+        # Install the application in a LXC container
+        _LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path"
 
         local ret=$?
-        [ $ret -eq 0 ] || main_result=1
 
-        break_before_continue
+        # Remove the previous residual backups
+        RUN_INSIDE_LXC rm -rf /home/yunohost.backup/archives
+
+        # BACKUP
+        # Made a backup if the installation succeed
+        if [ $ret -ne 0 ]
+        then
+            log_error "Installation failed..."
+            main_result=1
+            break_before_continue
+            continue
+        else
+            log_small_title "Backup of the application..."
+
+            # Made a backup of the application
+            _RUN_YUNOHOST_CMD "backup create -n Backup_test --apps $app_id"
+            ret=$?
+        fi
+    
+        [ $ret -eq 0 ] || { main_result=1; break_before_continue; continue; }
+
+        # Grab the backup archive into the LXC container, and keep a copy
+        lxc file pull -r $LXC_NAME/home/yunohost.backup/archives $TEST_CONTEXT/ynh_backups
+
+        # RESTORE
+        # Try the restore process in 2 times, first after removing the app, second after a restore of the container.
+        local j=0
+        for j in 0 1
+        do
+            # First, simply remove the application
+            if [ $j -eq 0 ]
+            then
+                # Remove the application
+                _REMOVE_APP
+
+                log_small_title "Restore after removing the application..."
+
+                # Second, restore the whole container to remove completely the application
+            elif [ $j -eq 1 ]
+            then
+
+                LOAD_LXC_SNAPSHOT snap0
+
+                # Remove the previous residual backups
+                RUN_INSIDE_LXC rm -rf /home/yunohost.backup/archives
+
+                # Place the copy of the backup archive in the container.
+                lxc file push -r $TEST_CONTEXT/ynh_backups/archives $LXC_NAME/home/yunohost.backup/
+            
+                _PREINSTALL
+
+                log_small_title "Restore on a fresh YunoHost system..."
+            fi
+
+            # Restore the application from the previous backup
+            _RUN_YUNOHOST_CMD "backup restore Backup_test --force --apps $app_id" \
+                && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path"
+
+            ret=$?
+            [ $ret -eq 0 ] || main_result=1
+
+            break_before_continue
+        done
     done
 
     return $main_result
@@ -891,4 +904,3 @@ ACTIONS_CONFIG_PANEL () {
 
     return $main_result
 }
-

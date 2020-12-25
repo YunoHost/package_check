@@ -403,15 +403,19 @@ this_is_a_web_app () {
     return $(there_is_a_root_install_test) || $(there_is_a_subdir_install_test)
 }
 
+root_path () {
+    echo "/"
+}
+
+subdir_path () {
+    echo "/path"
+}
+
 default_install_path() {
     # All webapps should be installable at the root or in a subpath of a domain
-    if there_is_a_root_install_test; then
-        echo "/"
-    elif there_is_a_subdir_install_test; then
-        echo "/path"
-    else
-        echo ""
-    fi
+    there_is_a_root_install_test && { root_path; return; }
+    there_is_a_subdir_install_test && { subdir_path; return; }
+    echo ""
 }
 
 path_to_install_type() {
