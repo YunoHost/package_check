@@ -154,7 +154,7 @@ def level_9(tests):
         and "App.qualify_for_level_9" in linter_tests[0]["results"]["success"]
 
 
-text_context = sys.argv[1]
+test_context = sys.argv[1]
 tests = list(load_tests(test_context))
 
 test_types = {
