@@ -5,7 +5,7 @@
 #=================================================
 
 LXC_CREATE () {
-    lxc launch yunohost:$LXC_BASE $LXC_NAME || clean_exit 1
+    lxc launch yunohost:$LXC_BASE $LXC_NAME | grep -v -E "^\s*Remapping container filesystem\s*$" || clean_exit 1
     lxc config set "$LXC_NAME" security.nesting true
     _LXC_START_AND_WAIT $LXC_NAME
     set_witness_files
