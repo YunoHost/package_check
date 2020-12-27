@@ -109,7 +109,7 @@ _LXC_START_AND_WAIT() {
 		# Wait for container to start, we are using systemd to check this,
 		# for the sake of brevity.
 		for j in $(seq 1 10); do
-			if lxc exec "$1" -- /bin/bash -c "systemctl isolate multi-user.target" >/dev/null 2>/dev/null; then
+			if lxc exec "$1" -- systemctl isolate multi-user.target >/dev/null 2>/dev/null; then
 				break
 			fi
 
@@ -125,7 +125,7 @@ _LXC_START_AND_WAIT() {
 
 		# Wait for container to access the internet
 		for j in $(seq 1 10); do
-			if lxc exec "$1" -- /bin/bash -c "! which wget > /dev/null 2>&1 || wget -q --spider http://debian.org"; then
+			if lxc exec "$1" -- curl -s http://wikipedia.org > /dev/null 2>/dev/nul; then
 				break
 			fi
 
