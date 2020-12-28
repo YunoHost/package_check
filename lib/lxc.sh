@@ -5,8 +5,13 @@
 #=================================================
 
 LXC_CREATE () {
-    lxc launch yunohost:$LXC_BASE $LXC_NAME | grep -v -E "^\s*Remapping container filesystem\s*$" || clean_exit 1
+    lxc launch yunohost:$LXC_BASE $LXC_NAME | grep -v -E "^\s*Remapping container filesystem\s*$"
+    local returncode=${PIPESTATUS[0]}
+    [[ $returncode -eq 0 ]] || clean_exit 1
     lxc config set "$LXC_NAME" security.nesting true
+    lxc config set "$LXC_NAME" security.privileged true
+    lxc config set "$LXC_NAME" limits.memory 80%
+    lxc config set "$LXC_NAME" limits.cpu.allowance 80%
     _LXC_START_AND_WAIT $LXC_NAME
     set_witness_files
     lxc snapshot $LXC_NAME snap0
@@ -125,7 +130,7 @@ _LXC_START_AND_WAIT() {
 
 		# Wait for container to access the internet
 		for j in $(seq 1 10); do
-			if lxc exec "$1" -- curl -s http://wikipedia.org > /dev/null 2>/dev/nul; then
+			if lxc exec "$1" -- curl -s http://wikipedia.org > /dev/null 2>/dev/null; then
 				break
 			fi
 
