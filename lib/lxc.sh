@@ -5,13 +5,15 @@
 #=================================================
 
 LXC_CREATE () {
-    lxc launch yunohost:$LXC_BASE $LXC_NAME | grep -v -E "^\s*Remapping container filesystem\s*$"
-    local returncode=${PIPESTATUS[0]}
-    [[ $returncode -eq 0 ]] || clean_exit 1
-    lxc config set "$LXC_NAME" security.nesting true
-    lxc config set "$LXC_NAME" security.privileged true
-    lxc config set "$LXC_NAME" limits.memory 80%
-    lxc config set "$LXC_NAME" limits.cpu.allowance 80%
+    lxc launch yunohost:$LXC_BASE $LXC_NAME \
+        -c security.nesting=true \
+        -c security.privileged=true \
+        -c limits.memory=80% \
+        -c limits.cpu.allowance=80% \
+        | grep -v -E "^\s*Remapping container filesystem\s*$"
+
+    [[ "${PIPESTATUS[0]}" -eq 0 ]] || clean_exit 1
+
     _LXC_START_AND_WAIT $LXC_NAME
     set_witness_files
     lxc snapshot $LXC_NAME snap0
