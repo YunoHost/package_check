@@ -41,7 +41,7 @@ CREATE_LXC_SNAPSHOT () {
     lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done'
     lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do rm -f $swapfile; done'
     
-    lxc stop --timeout 15 $LXC_NAME 2>/dev/null
+    timeout 30 lxc stop --timeout 15 $LXC_NAME 2>/dev/null
 
     # Check if the snapshot already exist
     if ! LXC_SNAPSHOT_EXISTS "$snapname"
@@ -58,7 +58,7 @@ CREATE_LXC_SNAPSHOT () {
 LOAD_LXC_SNAPSHOT () {
     local snapname=$1
     log_debug "Loading snapshot $snapname ..."
-    lxc stop --timeout 15 $LXC_NAME 2>/dev/null
+    timeout 30 lxc stop --timeout 15 $LXC_NAME 2>/dev/null
     lxc restore $LXC_NAME $snapname
     lxc start $LXC_NAME
     _LXC_START_AND_WAIT $LXC_NAME
@@ -88,11 +88,13 @@ LXC_START () {
 }
 
 LXC_STOP () {
-    lxc stop --timeout 15 $LXC_NAME 2>/dev/null
+    # (We also use timeout 30 in front of the command because sometime lxc
+    # commands can hang forever despite the --timeout >_>...)
+    timeout 30 lxc stop --timeout 15 $LXC_NAME 2>/dev/null
 }
 
 LXC_RESET () {
-    lxc stop --timeout 15 $LXC_NAME 2>/dev/null
+    timeout 30 lxc stop --timeout 15 $LXC_NAME 2>/dev/null
     lxc delete $LXC_NAME 2>/dev/null
 }
 
@@ -101,7 +103,7 @@ _LXC_START_AND_WAIT() {
 
 	restart_container()
 	{
-		lxc stop "$1" --timeout 15 &>/dev/null
+        timeout 30 lxc stop --timeout 15 $1 2>/dev/null
 		lxc start "$1"
 	}
 
