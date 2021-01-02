@@ -520,7 +520,7 @@ CHECK_URL () {
 					yuno_portal=1
 				else
 					yuno_portal=0
-					if [ "$url_title" = "Welcome to nginx on Debian!" ]
+					if echo "$url_title" | grep -q "Welcome to nginx"
 					then
 						# Falling on nginx default page is an error.
 						curl_error=1
