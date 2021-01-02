@@ -222,7 +222,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
                 log_debug "The connection attempt fall on the YunoHost portal."
                 fell_on_sso_portal=1
                 # Falling on nginx default page is an error.
-            elif [ "$page_title" = "Welcome to nginx on Debian!" ]
+            elif echo "$page_title" | grep -q "Welcome to nginx"
             then
                 log_error "The connection attempt fall on nginx default page."
                 curl_error=1
