@@ -341,7 +341,10 @@ TEST_LAUNCHER () {
 SET_RESULT() {
     local result=$1
     local name=$2
-    [ "$result" == "success" ] && log_report_test_success || log_report_test_failed
+    if [ "$name" != "test_duration" ]
+    then
+        [ "$result" == "success" ] && log_report_test_success || log_report_test_failed
+    fi
     local current_results="$(cat $current_test_results)"
     echo "$current_results" | jq --arg result $result ".$name=\$result" > $current_test_results
 }
