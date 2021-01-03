@@ -471,6 +471,7 @@ TEST_BACKUP_RESTORE () {
         local ret=$?
 
         # Remove the previous residual backups
+        rm -rf $TEST_CONTEXT/ynh_backups
         RUN_INSIDE_LXC rm -rf /home/yunohost.backup/archives
 
         # BACKUP
