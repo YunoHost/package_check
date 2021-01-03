@@ -10,7 +10,7 @@ LXC_CREATE () {
         -c security.privileged=true \
         -c limits.memory=80% \
         -c limits.cpu.allowance=80% \
-        | grep -v -E "^\s*Remapping container filesystem\s*$"
+        | grep -v -E "^\s*Remapping container filesystem\s*$\|^\s*Retrieving image"
 
     [[ "${PIPESTATUS[0]}" -eq 0 ]] || clean_exit 1
 
