@@ -119,7 +119,7 @@ def level_6(tests):
 def level_7(tests):
     """
     All tests succeeded + no warning in linter (that part is tested by the
-    # linter which will report a "qualify_for_level_7" in successes)
+    linter which will report a "qualify_for_level_7" in successes)
     """
 
     linter_tests = [t for t in tests if t["test_type"] == "PACKAGE_LINTER"]
@@ -223,7 +223,8 @@ summary = {
         "test_type": t["test_type"],
         "test_arg": t["test_arg"],
         "test_serie": t["test_serie"],
-        "main_result": t["results"]["main_result"]
+        "main_result": t["results"]["main_result"],
+        "test_duration": t["results"]["test_duration"]
     } for t in tests],
     "level_results": {level.level: level.passed for level in levels[1:]},
     "level": global_level.level

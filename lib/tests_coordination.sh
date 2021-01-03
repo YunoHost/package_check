@@ -321,6 +321,9 @@ TEST_LAUNCHER () {
 
     [ $? -eq 0 ] && SET_RESULT "success" main_result || SET_RESULT "failure" main_result
 
+    local test_duration=$(echo $(( $(date +%s) - $global_start_timer )))
+    SET_RESULT "$test_duration" test_duration
+
     break_before_continue
 
     # Restore the started time for the timer

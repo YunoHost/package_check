@@ -177,7 +177,7 @@ stop_timer () {
     [ $minutes -eq 1 ] && pminutes="${pminutes}, " || test -z "$pminutes" || pminutes="${pminutes}s, "
     [ $seconds -gt 1 ] && pseconds="${pseconds}s" || pseconds="0s"
 
-    time="${phours}${pminutes}${pseconds} ($(date '+%T'))"
+    local time="${phours}${pminutes}${pseconds} ($(date '+%T'))"
     if [ $1 -eq 2 ]; then
         log_info "Working time for this test: $time"
     elif [ $1 -eq 3 ]; then
