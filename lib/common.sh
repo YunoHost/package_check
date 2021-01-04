@@ -19,16 +19,6 @@ LXC_NAME="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-test"
 
 readonly lock_file="./pcheck.lock"
 
-clean_exit () {
-
-    LXC_RESET
-
-    [ -n "$TEST_CONTEXT" ] && rm -rf "$TEST_CONTEXT"
-    rm -f "$lock_file"
-
-    exit $1
-}
-
 #=================================================
 # LXC helpers
 #=================================================
@@ -124,7 +114,7 @@ function log_error()
 function log_critical()
 {
     echo "${BOLD}${RED}Critical: ${1}${NORMAL}" | tee -a /proc/self/fd/3
-    clean_exit 1
+    exit 1
 }
 
 function log_report_test_success () {

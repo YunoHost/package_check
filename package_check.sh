@@ -117,10 +117,17 @@ function parse_args() {
 arguments=("$@")
 parse_args
 
+#=================================================
+# Cleanup / force-stop
+#=================================================
 
-#=================================================
-# Force-stop
-#=================================================
+function cleanup()
+{
+    LXC_RESET
+
+    [ -n "$TEST_CONTEXT" ] && rm -rf "$TEST_CONTEXT"
+    [ -n "$lock_file" ] && rm -f "$lock_file"
+}
 
 if [[ $force_stop == 1 ]]
 then
@@ -128,36 +135,48 @@ then
     if [ -n "$package_check_pid" ]; then
         kill --signal 15 $package_check_pid
     fi
-    clean_exit 0
+    cleanup
+    exit 0
 fi
 
 #=================================================
 # Check if the lock file exist
 #=================================================
 
-if test -e "$lock_file"
+# If the lock file exist and corresponding process still exists
+if test -e "$lock_file" && ps --pid "$(cat pcheck.lock | cut -d: -f3)" | grep --quiet "$(cat pcheck.lock | cut -d: -f3)"
 then
-    # If the lock file exist
-    echo "The lock file $lock_file is present. Package check would not continue."
     if [ $interactive -eq 1 ]; then
+        echo "The lock file $lock_file already exists."
         echo -n "Do you want to continue anyway? (y/n) :"
         read answer
+    else
+        log_critical "The lock file $lock_file already exists. Package check won't continue."
     fi
     # Set the answer at lowercase only
     answer=${answer,,}
     if [ "${answer:0:1}" != "y" ]
     then
-        echo "Cancel Package check execution"
-        exit 0
+        log_critical "Package check cancelled"
     fi
 fi
 # Create the lock file
 # $$ is the PID of package_check itself.
 echo "start:$(date +%s):$$" > "$lock_file"
 
-###################################
+#==========================
+# Cleanup
+# N.B. the traps are added AFTER the lock is taken
+# because we don't want to mess with with the lock and LXC
+# it we ain't the process with the lock...
+#==========================
+
+trap cleanup EXIT
+trap 'exit 2' TERM KILL
+
+#==========================
 # Main code
-###################################
+#==========================
 
 assert_we_are_connected_to_the_internets
 assert_we_have_all_dependencies
@@ -165,7 +184,7 @@ assert_we_have_all_dependencies
 if [[ $rebuild == 1 ]]
 then
     rebuild_base_lxc 2>&1 | tee -a "./build_base_lxc.log"
-    clean_exit 0
+    exit 0
 fi
 
 #self_upgrade # FIXME renenable this later
@@ -176,4 +195,4 @@ readonly TEST_CONTEXT=$(mktemp -d /tmp/package_check.XXXXXX)
 fetch_package_to_test "$path_to_package_to_test"
 run_all_tests
 
-clean_exit 0
+exit 0

@@ -12,7 +12,7 @@ LXC_CREATE () {
         -c limits.cpu.allowance=80% \
         | grep -v -E "^\s*Remapping container filesystem\s*$\|^\s*Retrieving image"
 
-    [[ "${PIPESTATUS[0]}" -eq 0 ]] || clean_exit 1
+    [[ "${PIPESTATUS[0]}" -eq 0 ]] || exit 1
 
     _LXC_START_AND_WAIT $LXC_NAME
     set_witness_files
