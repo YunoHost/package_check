@@ -141,7 +141,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
     then
         log_debug "Forcing public access using a skipped_uris setting"
         # Add a skipped_uris on / for the app
-        _RUN_YUNOHOST_CMD "app setting $app_id_to_check skipped_uris -v \"/\""
+        _RUN_YUNOHOST_CMD "app setting $app_id_to_check skipped_uris -v /"
         # Regen the config of sso
         _RUN_YUNOHOST_CMD "app ssowatconf"
     fi
