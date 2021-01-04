@@ -60,7 +60,7 @@ function rebuild_base_lxc()
 
     $IN_LXC yunohost domain add $SUBDOMAIN
     TEST_USER_DISPLAY=${TEST_USER//"_"/""}
-    $IN_LXC yunohost user create $TEST_USER --firstname $TEST_USER_DISPLAY --mail $TEST_USER@$DOMAIN --lastname $TEST_USER_DISPLAY --password '$YUNO_PWD'
+    $IN_LXC yunohost user create $TEST_USER --firstname $TEST_USER_DISPLAY --mail $TEST_USER@$DOMAIN --lastname $TEST_USER_DISPLAY --password "$YUNO_PWD"
 
     $IN_LXC yunohost --version
 
