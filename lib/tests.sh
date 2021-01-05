@@ -233,8 +233,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
             fi
         fi
 
-        echo -e "
-\nTest url: $check_domain$curl_check_path
+        echo -e "Test url: $check_domain$curl_check_path
 Real url: $(cat "./curl_print" | cut --delimiter=';' --fields=2)
 HTTP code: $http_code
 Page title: $page_title
