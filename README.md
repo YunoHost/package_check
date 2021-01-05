@@ -72,12 +72,14 @@ for the size of the default storage it'll create (the default is 5G but you may
 want 10 or 20G for heavy usage ?).
 
 ```bash
-lxd init
+lxd init --storage-backend=dir
 ```
 
 The base images for tests are centralized on `devbaseimgs.yunohost.org` and we'll download them from there to speed things up:
 
 ```bash
+# Stupid hack because ipv6 is interfering
+echo "$(dig +short A devbaseimgs.yunohost.org | tail -n 1) devbaseimgs.yunohost.org" >> /etc/hosts
 lxc remote add yunohost https://devbaseimgs.yunohost.org --public
 ```
 
