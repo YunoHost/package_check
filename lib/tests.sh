@@ -136,8 +136,12 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
     log_small_title "Validating that the app can (or cannot) be accessed with its url..."
 
-    # Force a skipped_uris if public mode is not set
-    if [ "$install_type" != 'private' ]
+    # Force the app to public only if we're checking the public-like installs AND there's no is_public arg
+    # For example, that's the case for agendav which is always installed as
+    # private by default For "regular" apps (with a is_public arg) they are
+    # installed as public, and we precisely want to check they are publicly
+    # accessible *without* tweaking skipped_uris...
+    if [ "$install_type" != 'private' ] && [[ -z "$(jq -r '.arguments.install[] | select(.name=="is_public")' $package_path/manifest.json)" ]]
     then
         log_debug "Forcing public access using a skipped_uris setting"
         # Add a skipped_uris on / for the app
