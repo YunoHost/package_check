@@ -72,7 +72,7 @@ for the size of the default storage it'll create (the default is 5G but you may
 want 10 or 20G for heavy usage ?).
 
 ```bash
-lxd init --storage-backend=dir
+lxd init --storage-backend=zfs  # Or use 'dir' if you have a kernel < 5.x or not the proper modules installed
 ```
 
 The base images for tests are centralized on `devbaseimgs.yunohost.org` and we'll download them from there to speed things up:
