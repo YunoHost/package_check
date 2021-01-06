@@ -46,6 +46,9 @@ _PREINSTALL () {
 _INSTALL_APP () {
     local install_args="$(jq -r '.install_args' $current_test_infos)"
 
+    # Make sure we have a trailing & because that assumption is used in some sed regex later
+    [[ ${install_args: -1} == '&' ]] || install_args+="&"
+
     # We have default values for domain, user and is_public, but these
     # may still be overwritten by the args ($@)
     for arg_override in "domain=$SUBDOMAIN" "admin=$TEST_USER" "user=$TEST_USER" "is_public=1" "$@"
@@ -71,7 +74,8 @@ _INSTALL_APP () {
         then
             local default_value=$(jq -e -r --arg ARG $ARG '.arguments.install[] | select(.name==$ARG) | .default' $package_path/manifest.json)
             [[ $? -eq 0 ]] || { log_error "Missing install arg $ARG ?"; return 1; }
-            install_args+="$ARG=$default_value&"
+            [[ ${install_args: -1} == '&' ]] || install_args+="&"
+            install_args+="$ARG=$default_value"
         fi
     done
 
