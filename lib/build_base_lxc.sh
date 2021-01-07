@@ -31,7 +31,6 @@ function rebuild_base_lxc()
 {
     check_lxd_setup
 
-    set -x
     launch_new_lxc
     sleep 5
     
@@ -68,5 +67,4 @@ function rebuild_base_lxc()
     lxc image delete $LXC_BASE
     lxc publish $LXC_BASE --alias $LXC_BASE --public
     lxc delete $LXC_BASE
-    set +x
 }
