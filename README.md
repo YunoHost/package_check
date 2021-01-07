@@ -78,8 +78,6 @@ lxd init --storage-backend=zfs  # Or use 'dir' if you have a kernel < 5.x or not
 The base images for tests are centralized on `devbaseimgs.yunohost.org` and we'll download them from there to speed things up:
 
 ```bash
-# Stupid hack because ipv6 is interfering
-echo "$(dig +short A devbaseimgs.yunohost.org | tail -n 1) devbaseimgs.yunohost.org" >> /etc/hosts
 lxc remote add yunohost https://devbaseimgs.yunohost.org --public
 ```
 
@@ -249,4 +247,3 @@ The `package_check.sh` script accept 6 arguments in addition of the package to b
 	You can use an url with a branch, https://github.com/YunoHost-Apps/APP_ynh/tree/my_branch, to implicitly use this argument.
 - `--interactive`: Wait for user input between each tests
 - `--help`: Display help.
-
