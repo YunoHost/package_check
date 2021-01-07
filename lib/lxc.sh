@@ -5,7 +5,12 @@
 #=================================================
 
 LXC_CREATE () {
-    lxc launch yunohost:$LXC_BASE $LXC_NAME \
+    local remote=""
+    if lxc image list yunohost: | grep -qw $LXC_BASE
+    then
+        remote="yunohost:"
+    fi
+    lxc launch ${remote}$LXC_BASE $LXC_NAME \
         -c security.nesting=true \
         -c security.privileged=true \
         -c limits.memory=80% \
