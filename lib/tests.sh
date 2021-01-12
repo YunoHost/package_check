@@ -13,7 +13,7 @@ _RUN_YUNOHOST_CMD() {
     lxc file push -p -r "$package_path" $LXC_NAME/app_folder --quiet
 
     # --output-as none is to disable the json-like output for some commands like backup create
-    LXC_START "yunohost --output-as none --debug $1" \
+    LXC_EXEC "yunohost --output-as none --debug $1" \
         | grep --line-buffered -v --extended-regexp '^[0-9]+\s+.{1,15}DEBUG' \
         | grep --line-buffered -v 'processing action'
 
@@ -39,7 +39,7 @@ _PREINSTALL () {
         # Copy the pre-install script into the container.
         lxc file push "$preinstall_script" "$LXC_NAME/preinstall.sh"
         # Then execute the script to execute the pre-install commands.
-        LXC_START "bash /preinstall.sh"
+        LXC_EXEC "bash /preinstall.sh"
     fi
 }
 
@@ -439,7 +439,7 @@ TEST_PORT_ALREADY_USED () {
     lxc file push $TEST_CONTEXT/netcat.service $LXC_NAME/etc/systemd/system/netcat.service
 
     # Then start this service to block this port.
-    LXC_START "systemctl enable netcat & systemctl start netcat"
+    LXC_EXEC "systemctl enable netcat & systemctl start netcat"
 
     _PREINSTALL
 

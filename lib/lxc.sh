@@ -66,7 +66,7 @@ LOAD_LXC_SNAPSHOT () {
 
 #=================================================
 
-LXC_START () {
+LXC_EXEC () {
     # Start the lxc container and execute the given command in it
     local cmd=$1
 
