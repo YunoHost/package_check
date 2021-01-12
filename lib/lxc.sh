@@ -94,8 +94,8 @@ LXC_STOP () {
 }
 
 LXC_RESET () {
-    timeout 30 lxc stop --timeout 15 $LXC_NAME 2>/dev/null
-    lxc delete $LXC_NAME 2>/dev/null
+    timeout 30 lxc stop --timeout 15 $LXC_NAME --force 2>/dev/null
+    lxc delete $LXC_NAME --force 2>/dev/null
 }
 
 
