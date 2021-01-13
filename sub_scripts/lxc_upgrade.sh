@@ -83,6 +83,7 @@ sudo lxc-attach -n $LXC_NAME -- cp /bin/true /usr/lib/apt/apt.systemd.daily
 
 echo -e "\e[1m> Update\e[0m"
 update_apt=0
+sudo lxc-attach -n $LXC_NAME -- apt-get update
 sudo lxc-attach -n $LXC_NAME -- apt-get dist-upgrade --dry-run | grep -q "^Inst "	# Vérifie si il y aura des mises à jour.
 
 if [ "$?" -eq 0 ]; then
