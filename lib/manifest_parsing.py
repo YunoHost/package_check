@@ -1,5 +1,4 @@
-# Merci a Bram pour ce code python.
-# https://github.com/YunoHost/ci
+#!/usr/bin/python3
 
 import sys
 import json
@@ -54,4 +53,4 @@ if __name__ == '__main__':
     manifest = json.load(open(manifest_path, "r"))
 
     for question in manifest["arguments"]["install"]:
-        print ":".join(argument_for_question(question, all_choices=True))
+        print(":".join(argument_for_question(question, all_choices=True)))

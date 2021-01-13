@@ -214,7 +214,7 @@ guess_test_configuration() {
             > "$TEST_CONTEXT/tests/$test_id.json"
     }
 
-    local install_args=$(python "./lib/manifest_parsing.py" "$package_path/manifest.json" | cut -d ':' -f1,2 | tr ':' '=' | tr '\n' '&')
+    local install_args=$(python3 "./lib/manifest_parsing.py" "$package_path/manifest.json" | cut -d ':' -f1,2 | tr ':' '=' | tr '\n' '&')
 
     add_test "PACKAGE_LINTER"
     add_test "TEST_INSTALL" "root"
