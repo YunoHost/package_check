@@ -5,12 +5,13 @@
 #=================================================
 
 LXC_CREATE () {
+    log_info "Launching new LXC $LXC_NAME ..."
     lxc launch yunohost:$LXC_BASE $LXC_NAME \
         -c security.nesting=true \
         -c security.privileged=true \
         -c limits.memory=80% \
         -c limits.cpu.allowance=80% \
-        | grep -v -E "^\s*Remapping container filesystem\s*$\|^\s*Retrieving image"
+        >>/proc/self/fd/3
 
     [[ "${PIPESTATUS[0]}" -eq 0 ]] || exit 1
 

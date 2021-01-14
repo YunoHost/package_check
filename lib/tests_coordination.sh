@@ -260,7 +260,7 @@ run_all_tests() {
     fi
 
     # Launch all tests successively
-    cat $TEST_CONTEXT/tests/*.json >&3
+    cat $TEST_CONTEXT/tests/*.json >> /proc/self/fd/3
     
     # Reset and create a fresh container to work with
     check_lxd_setup
