@@ -59,6 +59,11 @@ CREATE_LXC_SNAPSHOT () {
 LOAD_LXC_SNAPSHOT () {
     local snapname=$1
     log_debug "Loading snapshot $snapname ..."
+
+    # Remove swap files before restoring the snapshot.
+    lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done' 2>/dev/null
+    lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do rm -f $swapfile; done' 2>/dev/null
+
     timeout 30 lxc stop --timeout 15 $LXC_NAME 2>/dev/null
     lxc restore $LXC_NAME $snapname
     lxc start $LXC_NAME
