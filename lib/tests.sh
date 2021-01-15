@@ -414,7 +414,7 @@ TEST_UPGRADE () {
     log_small_title "Upgrade..."
 
     # Upgrade the application in a LXC container
-    _RUN_YUNOHOST_CMD "app upgrade $app_id -f /app_folder" \
+    _RUN_YUNOHOST_CMD "app upgrade $app_id --file /app_folder --force" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "upgrade"
 
     return $?
