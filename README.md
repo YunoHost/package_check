@@ -83,14 +83,11 @@ lxc remote add yunohost https://devbaseimgs.yunohost.org --public
 
 (At the time this README is written, fingerprint is d9ae6e76c374e3c58c3c20a881cffe7435809adb3b222ec393805f5bd01bb522 )
 
-Then you can : 
+Then you can install package check : 
 
 ```
 git clone https://github.com/YunoHost/package_check
 cd package_check
-
-# Build the base image with pre-installed yunohost (this will take some time!)
-./build_base_lxc.sh
 ```
 
 Then test your packages : 
