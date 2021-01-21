@@ -67,12 +67,15 @@ able to run `lxc` commands without sudo... You can check this with the command
 to propagate (sigh))
 
 Then you shall initialize LXD which will ask you a bunch of question. Usually
-answering the default (just pressing enter) to all questions is fine - EXCEPT
-for the size of the default storage it'll create (the default is 5G but you may
-want 10 or 20G for heavy usage ?).
+answering the default (just pressing enter) to all questions is fine. Just pay
+attention to :
+- the storage backend driver. Possibly `zfs` is the best, but requires a kernel >= 5.x 
+and corresponding kernel module loaded. You can fallback to the `dir` driver.
+- the size of the default storage it'll create (the default is 5G but you may
+want 10G for heavy usage ?) (if you're using the 'dir' driver, this won't be asked)
 
 ```bash
-lxd init --storage-backend=zfs  # Or use 'dir' if you have a kernel < 5.x or not the proper modules installed
+lxd init
 ```
 
 The base images for tests are centralized on `devbaseimgs.yunohost.org` and we'll download them from there to speed things up:
