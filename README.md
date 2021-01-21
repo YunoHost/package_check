@@ -8,22 +8,17 @@ The `package_check.sh` script perform a series of tests on a package for verify 
 The test results are printed directly in the terminal and stored in the log file Test_results.log
 
 The script is able to perform the following tests:
-- Check the package with [package linter](https://github.com/YunoHost/package_linter)
-- Installation at the root of a domain
-- Installation in a subpath
-- Installation without url access (For non-web apps)
-- Removal
-- Reinstallation after removal
-- Private installation
-- Upgrade from same version of the package
-- Upgrade from a previous version of the package
-- Backup
-- Restore from a backup after removal
-- Restore from a backup on a fresh system
-- Multi-instances installation
-- Test with the port already used
-- Test of change_url script
-- Test of all actions and configurations available in config-panel
+- [Linter](https://github.com/YunoHost/package_linter)
+- Install/remove/reinstall at the root of a domain (`domain.tld/`)
+- Install/remove/reinstall in a subpath (`domain.tld/foobar`)
+- Install/remove/reinstall with no url (for non-webapps)
+- Install with `is_public=0` (private install)
+- Install multiple instances (if `multi_instance` is true)
+- Upgrade from same version
+- Upgrade from previous versions
+- Backup/restore
+- Changing the installation url (`change_url`)
+- Actions and config-panel
 
 Package_check script uses a LXC container to manipulate the package in a clean environment without any previous installations.
 
