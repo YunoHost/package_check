@@ -232,8 +232,7 @@ function fetch_package_to_test() {
         path_to_package_to_test="${path_to_package_to_test%%/tree/*}"
     fi
 
-    log_info "Testing the package $path_to_package_to_test"
-    [ -n "$gitbranch" ] && log_info " on the branch ${gitbranch##-b }"
+    log_info "Testing package $path_to_package_to_test"
 
     package_path="$TEST_CONTEXT/app_folder"
 
@@ -255,8 +254,13 @@ function fetch_package_to_test() {
                 fi
             fi
         fi
+
+        log_info " on branch ${gitbranch##-b }"
+
         # Clone the repository
         git clone --quiet $path_to_package_to_test $gitbranch "$package_path"
+
+        log_info " (commit $(git -C $package_path rev-parse HEAD))"
 
         # If it's a local directory
     else
