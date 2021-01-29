@@ -101,7 +101,7 @@ LXC_STOP () {
 
 LXC_RESET () {
     timeout 30 lxc stop --timeout 15 $LXC_NAME --force 2>/dev/null
-    swapoff $(cat /proc/swaps | grep "ynh-appci-buster-amd64-stable-test/rootfs/swap_") 2>/dev/null
+    swapoff /var/snap/lxd/common/lxd/containers/$LXC_NAME/rootfs/swap_* 2>/dev/null
     lxc delete $LXC_NAME --force 2>/dev/null
 }
 
@@ -177,5 +177,4 @@ _LXC_START_AND_WAIT() {
 RUN_INSIDE_LXC() {
     lxc exec $LXC_NAME -- $@
 }
-
 
