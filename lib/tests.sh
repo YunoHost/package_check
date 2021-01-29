@@ -439,7 +439,7 @@ TEST_PORT_ALREADY_USED () {
     lxc file push $TEST_CONTEXT/netcat.service $LXC_NAME/etc/systemd/system/netcat.service
 
     # Then start this service to block this port.
-    LXC_EXEC "systemctl enable netcat & systemctl start netcat"
+    LXC_EXEC "systemctl enable --now netcat"
 
     _PREINSTALL
 
