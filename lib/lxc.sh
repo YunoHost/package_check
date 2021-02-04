@@ -39,8 +39,7 @@ CREATE_LXC_SNAPSHOT () {
     check_witness_files >&2
 
     # Remove swap files to avoid killing the CI with huge snapshots.
-    lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done'
-    lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do rm -f $swapfile; done'
+    CLEAN_SWAPFILES
     
     timeout 30 lxc stop --timeout 15 $LXC_NAME 2>/dev/null
 
@@ -61,8 +60,7 @@ LOAD_LXC_SNAPSHOT () {
     log_debug "Loading snapshot $snapname ..."
 
     # Remove swap files before restoring the snapshot.
-    lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done' 2>/dev/null
-    lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do rm -f $swapfile; done' 2>/dev/null
+    CLEAN_SWAPFILES
 
     timeout 30 lxc stop --timeout 15 $LXC_NAME 2>/dev/null
     lxc restore $LXC_NAME $snapname
@@ -100,9 +98,13 @@ LXC_STOP () {
 }
 
 LXC_RESET () {
+    # If the container exists
+    if lxc info $LXC_NAME >/dev/null 2>/dev/null; then
+        # Remove swap files before deletting the continer
+        CLEAN_SWAPFILES
+    fi 
+
     timeout 30 lxc stop --timeout 15 $LXC_NAME --force 2>/dev/null
-    swapoff /var/snap/lxd/common/lxd/containers/$LXC_NAME/rootfs/swap_* 2>/dev/null
-    swapoff /var/lib/lxd/containers/$LXC_NAME/rootfs/swap_* 2>/dev/null
     lxc delete $LXC_NAME --force 2>/dev/null
 }
 
@@ -174,8 +176,17 @@ _LXC_START_AND_WAIT() {
     LXC_IP=$(lxc exec $1 -- hostname -I | grep -E -o "\<[0-9.]{8,}\>")
 }
 
+CLEAN_SWAPFILES() {
+    # Restart it if needed
+    if [ "$(lxc info $LXC_NAME | grep Status | awk '{print $2}')" != "Running" ]; then
+        lxc start $LXC_NAME
+        _LXC_START_AND_WAIT $LXC_NAME
+    fi
+    lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done'
+    lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do rm -f $swapfile; done'
+}
 
 RUN_INSIDE_LXC() {
-    lxc exec $LXC_NAME -- $@
+    lxc exec $LXC_NAME -- "$@"
 }
 
