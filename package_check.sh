@@ -133,7 +133,7 @@ if [[ $force_stop == 1 ]]
 then
     package_check_pid="$(cat "./pcheck.lock" 2> /dev/null | cut -d: -f3)"
     if [ -n "$package_check_pid" ]; then
-        kill --signal 15 $package_check_pid
+        kill -15 $package_check_pid
     fi
     cleanup
     exit 0
