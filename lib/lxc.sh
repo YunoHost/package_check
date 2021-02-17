@@ -6,13 +6,25 @@
 
 LXC_CREATE () {
     log_info "Launching new LXC $LXC_NAME ..."
-    lxc launch yunohost:$LXC_BASE $LXC_NAME \
-        -c security.nesting=true \
-        -c security.privileged=true \
-        -c limits.memory=80% \
-        -c limits.cpu.allowance=80% \
-        >>/proc/self/fd/3
-
+    # Check if we can launch container from yunohost remote image
+    if lxc remote list | grep -q "yunohost" && lxc image list yunohost:$LXC_BASE | grep -q -w $LXC_BASE; then
+        lxc launch yunohost:$LXC_BASE $LXC_NAME \
+            -c security.nesting=true \
+            -c security.privileged=true \
+            -c limits.memory=80% \
+            -c limits.cpu.allowance=80% \
+            >>/proc/self/fd/3
+    # Check if we can launch container from a local image
+    elif lxc image list $LXC_BASE | grep -q -w $LXC_BASE; then
+        lxc launch $LXC_BASE $LXC_NAME \
+            -c security.nesting=true \
+            -c security.privileged=true \
+            -c limits.memory=80% \
+            -c limits.cpu.allowance=80% \
+            >>/proc/self/fd/3
+    else
+        log_critical "Can't find base image $LXC_BASE, run ./package_check --rebuild"
+    fi
     [[ "${PIPESTATUS[0]}" -eq 0 ]] || exit 1
 
     _LXC_START_AND_WAIT $LXC_NAME
