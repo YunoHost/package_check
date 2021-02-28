@@ -49,9 +49,9 @@ _INSTALL_APP () {
     # Make sure we have a trailing & because that assumption is used in some sed regex later
     [[ ${install_args: -1} == '&' ]] || install_args+="&"
 
-    # We have default values for domain, user and is_public, but these
+    # We have default values for domain, admin and is_public, but these
     # may still be overwritten by the args ($@)
-    for arg_override in "domain=$SUBDOMAIN" "admin=$TEST_USER" "user=$TEST_USER" "is_public=1" "$@"
+    for arg_override in "domain=$SUBDOMAIN" "admin=$TEST_USER" "is_public=1" "$@"
     do
         key="$(echo $arg_override | cut -d '=' -f 1)"
         value="$(echo $arg_override | cut -d '=' -f 2-)"
