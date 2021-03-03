@@ -123,6 +123,7 @@ parse_args
 
 function cleanup()
 {
+    trap '' SIGINT # Disable ctrl+c in this function
     LXC_RESET
 
     [ -n "$TEST_CONTEXT" ] && rm -rf "$TEST_CONTEXT"
