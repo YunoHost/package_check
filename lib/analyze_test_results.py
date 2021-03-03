@@ -68,10 +68,10 @@ def level_3(tests):
     All upgrade tests succeeded (and at least one test was made)
     """
 
-    upgrade_tests = [t for t in tests if t["test_type"] == "TEST_UPGRADE"]
+    upgrade_same_version_tests = [t for t in tests if t["test_type"] == "TEST_UPGRADE" and not t["test_arg"]]
 
-    return upgrade_tests != [] \
-        and all(t["results"]["main_result"] == "success" for t in upgrade_tests)
+    return upgrade_same_version_tests != [] \
+        and all(t["results"]["main_result"] == "success" for t in upgrade_same_version_tests)
 
 
 @level(4, "Can be backup/restored")
