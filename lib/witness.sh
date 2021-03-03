@@ -37,9 +37,8 @@ set_witness_files () {
     create_witness_file "/etc/systemd/system/witnessfile.service" file
 
     # Database
-    local mysqlpwd=$(RUN_INSIDE_LXC cat /etc/yunohost/mysql)
-    RUN_INSIDE_LXC mysqladmin --user=root --password="$mysqlpwd" --wait status > /dev/null 2>&1
-    echo "CREATE DATABASE witnessdb" | RUN_INSIDE_LXC mysql --user=root --password="$mysqlpwd" --wait > /dev/null 2>&1
+    RUN_INSIDE_LXC mysqladmin --wait status > /dev/null 2>&1
+    echo "CREATE DATABASE witnessdb" | RUN_INSIDE_LXC mysql --wait > /dev/null 2>&1
 }
 
 check_witness_files () {
@@ -82,8 +81,7 @@ check_witness_files () {
     check_file_exist "/etc/systemd/system/witnessfile.service"
 
     # Database
-    local mysqlpwd=$(RUN_INSIDE_LXC cat /etc/yunohost/mysql)
-    if ! RUN_INSIDE_LXC mysqlshow --user=root --password="$mysqlpwd" witnessdb > /dev/null 2>&1
+    if ! RUN_INSIDE_LXC mysqlshow witnessdb > /dev/null 2>&1
     then
         log_error "The database witnessdb is missing ! Something gone wrong !"
         SET_RESULT "failure" witness
