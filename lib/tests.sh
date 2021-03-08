@@ -175,7 +175,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
         while [ $retry -lt 3 ] && should_retry;
         do
-            sleep $$(($retry*$retry*$retry + 3))
+            sleep $(($retry*$retry*$retry + 3))
 
             log_debug "Running curl $check_domain$curl_check_path"
 
