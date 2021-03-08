@@ -239,6 +239,7 @@ run_all_tests() {
 
     mkdir -p $TEST_CONTEXT/tests
     mkdir -p $TEST_CONTEXT/results
+    mkdir -p $TEST_CONTEXT/logs
 
     readonly app_id="$(jq -r .id $package_path/manifest.json)"
 
@@ -284,6 +285,7 @@ run_all_tests() {
     for testfile in $(ls $TEST_CONTEXT/tests/*.json);
     do
         TEST_LAUNCHER $testfile
+        current_test_number=$((current_test_number+1))
     done
 
     # Print the final results of the tests
@@ -311,13 +313,25 @@ TEST_LAUNCHER () {
     current_test_id=$(basename $testfile | cut -d. -f1)
     current_test_infos="$TEST_CONTEXT/tests/$current_test_id.json"
     current_test_results="$TEST_CONTEXT/results/$current_test_id.json"
+    current_test_log="$TEST_CONTEXT/logs/$current_test_id.log"
     echo "{}" > $current_test_results
+    echo "" > $current_test_log
 
     local test_type=$(jq -r '.test_type' $testfile)
     local test_arg=$(jq -r '.test_arg' $testfile)
 
     # Execute the test
     $test_type $test_arg
+
+    # Check that the number of warning ain't higher than a treshold
+    local n_warnings=$(grep --extended-regexp '^[0-9]+\s+.{1,15}WARNING' $current_test_log | wc -l)
+    # (we ignore this test for upgrade from older commits to avoid having to patch older commits for this)
+    if [ "$n_warnings" -gt 250 ] && [ "$test_type" != "TEST_UPGRADE" -o "$test_arg" == "" ]
+    then
+        log_error "There's a shitload of warnings in the output ! If those warnings are coming from some app build step and ain't actual warnings, please redirect them to the standard output instead of the error output ...!"
+        log_report_test_failed
+        SET_RESULT "failure" too_many_warnings
+    fi
 
     [ $? -eq 0 ] && SET_RESULT "success" main_result || SET_RESULT "failure" main_result
 
@@ -385,9 +399,6 @@ start_test () {
     total_number_of_test=$(ls $TEST_CONTEXT/tests/*.json | wc -l)
 
     log_title " [Test $current_test_number/$total_number_of_test] $current_test_serie$1"
-
-    # Increment the value of the current test
-    current_test_number=$((current_test_number+1))
 }
 
 there_is_an_install_type() {

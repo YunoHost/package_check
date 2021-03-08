@@ -91,7 +91,7 @@ LXC_EXEC () {
     start_timer
 
     # Execute the command given in argument in the container and log its results.
-    lxc exec $LXC_NAME --env PACKAGE_CHECK_EXEC=1 -t -- $cmd | tee -a "$complete_log"
+    lxc exec $LXC_NAME --env PACKAGE_CHECK_EXEC=1 -t -- $cmd | tee -a "$complete_log" $current_test_log
 
     # Store the return code of the command
     local returncode=${PIPESTATUS[0]}
