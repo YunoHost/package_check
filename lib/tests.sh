@@ -246,6 +246,13 @@ Page extract:\n$page_extract" > $TEST_CONTEXT/curl_result
         [[ $curl_error -eq 0 ]] \
             && log_debug "$(cat $TEST_CONTEXT/curl_result)" \
             || log_warning "$(cat $TEST_CONTEXT/curl_result)"
+
+        # If we had a 50x error, try to display service info and logs to help debugging
+        if [[ $curl_error -ne 0 ]] && echo "5" | grep -q "${http_code:0:1}"
+        then
+            LXC_EXEC "systemctl | grep '$app.*service'"
+            LXC_EXEC "for SERVICE in $(systemctl | grep "$app.*service" | awk '{print $1}'); do journalctl --no-pager --no-hostname -n 30 -u $SERVICE; done"
+        fi
     done
 
     # Detect the issue alias_traversal, https://github.com/yandex/gixy/blob/master/docs/en/plugins/aliastraversal.md
