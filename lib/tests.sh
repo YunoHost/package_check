@@ -138,7 +138,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
     # Not checking this if this ain't relevant for the current app
     this_is_a_web_app || return 0
 
-    log_small_title "Validating that the app can (or cannot) be accessed with its url..."
+    log_small_title "Validating that the app $app_id_to_check can/cant be accessed with its url..."
 
     # Force the app to public only if we're checking the public-like installs AND there's no is_public arg
     # For example, that's the case for agendav which is always installed as
@@ -175,7 +175,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
         while [ $retry -lt 3 ] && should_retry;
         do
-            sleep 1
+            sleep $$(($retry*$retry*$retry + 3))
 
             log_debug "Running curl $check_domain$curl_check_path"
 
