@@ -323,6 +323,8 @@ TEST_LAUNCHER () {
     # Execute the test
     $test_type $test_arg
 
+    [ $? -eq 0 ] && SET_RESULT "success" main_result || SET_RESULT "failure" main_result
+
     # Check that the number of warning ain't higher than a treshold
     local n_warnings=$(grep --extended-regexp '^[0-9]+\s+.{1,15}WARNING' $current_test_log | wc -l)
     # (we ignore this test for upgrade from older commits to avoid having to patch older commits for this)
@@ -332,8 +334,6 @@ TEST_LAUNCHER () {
         log_report_test_failed
         SET_RESULT "failure" too_many_warnings
     fi
-
-    [ $? -eq 0 ] && SET_RESULT "success" main_result || SET_RESULT "failure" main_result
 
     local test_duration=$(echo $(( $(date +%s) - $global_start_timer )))
     SET_RESULT "$test_duration" test_duration
