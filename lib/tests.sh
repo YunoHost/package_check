@@ -85,6 +85,12 @@ _INSTALL_APP () {
 
     local ret=$?
     [ $ret -eq 0 ] && log_debug "Installation successful." || log_error "Installation failed."
+
+    if LXC_EXEC "su nobody -s /bin/bash -c 'test -r /var/www/$app_id || test -w /var/www/$app_id || test -x /var/www/$app_id'"
+    then
+        log_error "It looks like anybody can read/enter /var/www/$app_id, which ain't super great from a security point of view ... Config files or other files may contain secrets or information that should in most case not be world-readable. You should remove all 'others' permissions with 'chmod o-rwx', and setup appropriate, exclusive permissions to the appropriate owner/group with chmod/chown."
+    fi
+
     return $ret
 }
 
@@ -326,7 +332,7 @@ TEST_INSTALL () {
     _PREINSTALL
 
     # Install the application in a LXC container
-   _INSTALL_APP "path=$check_path" "is_public=$is_public" \
+    _INSTALL_APP "path=$check_path" "is_public=$is_public" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "$install_type" \
 
     local install=$?
