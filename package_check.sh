@@ -188,7 +188,7 @@ then
     exit 0
 fi
 
-#self_upgrade # FIXME renenable this later
+self_upgrade
 fetch_or_upgrade_package_linter
 
 readonly TEST_CONTEXT=$(mktemp -d /tmp/package_check.XXXXXX)
