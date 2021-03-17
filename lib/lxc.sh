@@ -96,7 +96,7 @@ LXC_EXEC () {
     # Store the return code of the command
     local returncode=${PIPESTATUS[0]}
 
-    log_debug "Return code: $return_code"
+    log_debug "Return code: $returncode"
 
     stop_timer 1
     # Return the exit code of the ssh command
