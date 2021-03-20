@@ -194,7 +194,7 @@ guess_test_configuration() {
 
     log_error "Not check_process file found."
     log_warning "Package check will attempt to automatically guess what tests to run."
-    
+
     local test_id=100
 
     add_test() {
@@ -262,7 +262,7 @@ run_all_tests() {
 
     # Launch all tests successively
     cat $TEST_CONTEXT/tests/*.json >> /proc/self/fd/3
-    
+
     # Reset and create a fresh container to work with
     check_lxd_setup
     LXC_RESET
@@ -290,7 +290,7 @@ run_all_tests() {
 
     # Print the final results of the tests
     log_title "Tests summary"
-    
+
     python3 lib/analyze_test_results.py $TEST_CONTEXT 2>./results.json
 
     # Restore the started time for the timer
@@ -324,6 +324,13 @@ TEST_LAUNCHER () {
     $test_type $test_arg
 
     [ $? -eq 0 ] && SET_RESULT "success" main_result || SET_RESULT "failure" main_result
+
+    # Check that we don't have this message characteristic of a file that got manually modified,
+    # which should not happen during tests because no human modified the file ...
+    if grep -q --extended-regexp 'has been manually modified since the installation or last upgrade. So it has been duplicated' $current_test_log
+    then
+        log_error "Apparently the log is telling that 'some file got manually modified' ... which should not happen, considering that no human modified the file ... ! Maybe you need to check what's happening with ynh_store_file_checksum and ynh_backup_if_checksum_is_different between install and upgrade."
+    fi
 
     # Check that the number of warning ain't higher than a treshold
     local n_warnings=$(grep --extended-regexp '^[0-9]+\s+.{1,15}WARNING' $current_test_log | wc -l)
