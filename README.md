@@ -44,7 +44,7 @@ be able to install `snapd` using the system package manager (or even
 `lxd` directly).
 
 ```bash
-apt install git snapd
+apt install git snapd lynx
 sudo snap install core
 sudo snap install lxd
 
