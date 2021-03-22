@@ -108,10 +108,14 @@ parse_check_process() {
             # Upgrades with a specific commit
             if [[ "$test_type" == "TEST_UPGRADE" ]] && [[ -n "$test_arg" ]]
             then
-                local specific_upgrade_install_args="$(grep "^manifest_arg=" "$TEST_CONTEXT/upgrades/$test_arg" | cut -d'=' -f2-)"
-                [[ -n "$specific_upgrade_install_args" ]] && _install_args="$specific_upgrade_install_args"
+                if [ -f "$TEST_CONTEXT/upgrades/$test_arg" ]; then
+                    local specific_upgrade_install_args="$(grep "^manifest_arg=" "$TEST_CONTEXT/upgrades/$test_arg" | cut -d'=' -f2-)"
+                    [[ -n "$specific_upgrade_install_args" ]] && _install_args="$specific_upgrade_install_args"
 
-                local upgrade_name="$(grep "^name=" "$TEST_CONTEXT/upgrades/$test_arg" | cut -d'=' -f2)"
+                    local upgrade_name="$(grep "^name=" "$TEST_CONTEXT/upgrades/$test_arg" | cut -d'=' -f2)"
+                else
+                    local upgrade_name="$test_arg"
+                fi
                 extra="$(jq -n --arg upgrade_name "$upgrade_name" '{ $upgrade_name }')"
             elif [[ "$test_type" == "ACTIONS_CONFIG_PANEL" ]] && [[ "$test_arg" == "actions" ]]
             then
