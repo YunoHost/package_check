@@ -256,8 +256,8 @@ Page extract:\n$page_extract" > $TEST_CONTEXT/curl_result
         # If we had a 50x error, try to display service info and logs to help debugging
         if [[ $curl_error -ne 0 ]] && echo "5" | grep -q "${http_code:0:1}"
         then
-            LXC_EXEC "systemctl" | grep "$app_id_to_check.*service"
-            for SERVICE in $(LXC_EXEC "systemctl" | grep "$app_id_to_check.*service" | awk '{print $1}')
+            LXC_EXEC "systemctl --all" | grep "$app_id_to_check.*service"
+            for SERVICE in $(LXC_EXEC "systemctl -all" | grep "$app_id_to_check.*service" | awk '{print $1}')
             do
                 LXC_EXEC "journalctl --no-pager --no-hostname -n 30 -u $SERVICE";
             done
