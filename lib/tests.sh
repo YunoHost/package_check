@@ -886,12 +886,12 @@ ACTIONS_CONFIG_PANEL () {
                         then
                             # Build the argument from a value from the check_process
                             local action_config_actual_argument="$(echo "$actions_config_arguments_specifics" | cut -d'|' -f $j)"
-                            action_config_argument_built="--args $action_config_argument_name=$action_config_actual_argument"
+                            action_config_argument_built="--args \"$action_config_argument_name=$action_config_actual_argument\""
                         elif [ -n "$action_config_argument_default" ]
                         then
                             # Build the argument from the default value
                             local action_config_actual_argument="$action_config_argument_default"
-                            action_config_argument_built="--args $action_config_argument_name=$action_config_actual_argument"
+                            action_config_argument_built="--args \"$action_config_argument_name=$action_config_actual_argument\""
                         else
                             log_warning "> No argument into the check_process to use or default argument for \"$action_config_name\"..."
                             action_config_actual_argument=""
