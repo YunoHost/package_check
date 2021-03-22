@@ -78,7 +78,7 @@ parse_check_process() {
         # Looking like domain=foo.com&path=/bar&password=stuff
         # "Standard" arguments like domain/path will later be overwritten
         # during tests
-        local install_args=$(       extract_check_process_section "^; Manifest"     "^; " $test_serie_rawconf | tr '\n' '&')
+        local install_args=$(       extract_check_process_section "^; Manifest"     "^; " $test_serie_rawconf | awk '{print $1}' | tr -d '"' | tr '\n' '&')
         local preinstall_template=$(extract_check_process_section "^; pre-install"  "^; " $test_serie_rawconf)
         local action_infos=$(       extract_check_process_section "^; Actions"      "^; " $test_serie_rawconf)
         local configpanel_infos=$(  extract_check_process_section "^; Config_panel" "^; " $test_serie_rawconf)
