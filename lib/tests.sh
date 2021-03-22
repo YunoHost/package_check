@@ -80,8 +80,8 @@ _INSTALL_APP () {
     done
 
     # Install the application in a LXC container
-    log_info "Running: yunohost app install --force /app_folder -a $install_args"
-    _RUN_YUNOHOST_CMD "app install --force /app_folder -a $install_args"
+    log_info "Running: yunohost app install --force /app_folder -a \"$install_args\""
+    _RUN_YUNOHOST_CMD "app install --force /app_folder -a \"$install_args\""
 
     local ret=$?
     [ $ret -eq 0 ] && log_debug "Installation successful." || log_error "Installation failed."
