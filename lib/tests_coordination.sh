@@ -341,9 +341,14 @@ TEST_LAUNCHER () {
     # (we ignore this test for upgrade from older commits to avoid having to patch older commits for this)
     if [ "$n_warnings" -gt 50 ] && [ "$test_type" != "TEST_UPGRADE" -o "$test_arg" == "" ]
     then
-        log_error "There's a shitload of warnings in the output ! If those warnings are coming from some app build step and ain't actual warnings, please redirect them to the standard output instead of the error output ...!"
-        log_report_test_failed
-        SET_RESULT "failure" too_many_warnings
+        if [ "$n_warnings" -gt 200 ]
+        then
+            log_error "There's A SHITLOAD of warnings in the output ! If those warnings are coming from some app build step and ain't actual warnings, please redirect them to the standard output instead of the error output ...!"
+            log_report_test_failed
+            SET_RESULT "failure" too_many_warnings
+        else
+            log_error "There's quite a lot of warnings in the output ! If those warnings are coming from some app build step and ain't actual warnings, please redirect them to the standard output instead of the error output ...!"
+        fi
     fi
 
     local test_duration=$(echo $(( $(date +%s) - $global_start_timer )))
