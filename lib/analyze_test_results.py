@@ -95,12 +95,9 @@ def level_5(tests):
     """
 
     alias_traversal_detected = any(t["results"].get("alias_traversal") for t in tests)
-    too_many_warnings = any(t["results"].get("too_many_warnings") for t in tests)
-
     linter_tests = [t for t in tests if t["test_type"] == "PACKAGE_LINTER"]
 
     return not alias_traversal_detected \
-        and not too_many_warnings \
         and linter_tests != [] \
         and linter_tests[0]["results"]["main_result"] == "success"
 
@@ -126,9 +123,11 @@ def level_7(tests):
     """
 
     linter_tests = [t for t in tests if t["test_type"] == "PACKAGE_LINTER"]
-
+    too_many_warnings = any(t["results"].get("too_many_warnings") for t in tests)
+    
     return all(t["results"]["main_result"] == "success" for t in tests) \
         and linter_tests != [] \
+        and not too_many_warnings \
         and "App.qualify_for_level_7" in linter_tests[0]["results"]["success"]
 
 
