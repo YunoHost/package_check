@@ -257,7 +257,7 @@ Page extract:\n$page_extract" > $TEST_CONTEXT/curl_result
         if [[ $curl_error -ne 0 ]] && echo "5" | grep -q "${http_code:0:1}"
         then
             LXC_EXEC "systemctl --all" | grep "$app_id_to_check.*service"
-            for SERVICE in $(LXC_EXEC "systemctl -all" | grep "$app_id_to_check.*service" | awk '{print $1}')
+            for SERVICE in $(LXC_EXEC "systemctl -all" | grep -o "$app_id_to_check.*service")
             do
                 LXC_EXEC "journalctl --no-pager --no-hostname -n 30 -u $SERVICE";
             done
