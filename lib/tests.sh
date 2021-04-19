@@ -261,6 +261,11 @@ Page extract:\n$page_extract" > $TEST_CONTEXT/curl_result
             do
                 LXC_EXEC "journalctl --no-pager --no-hostname -n 30 -u $SERVICE";
             done
+            for PHP_VERSION in $(LXC_EXEC "ls /etc/php/*/fpm/pool.d/$app_id_to_check.conf 2>/dev/null" | awk -F/ '{print $4}')
+            do
+                LXC_EXEC "journalctl --no-pager --no-hostname -n 30 -u php$PHP_VERSION-fpm";
+                LXC_EXEC "tail -n 30 /var/log/php$PHP_VERSION-fpm.log"
+            done
         fi
     done
 
