@@ -410,6 +410,8 @@ TEST_UPGRADE () {
 
         LOAD_LXC_SNAPSHOT snap0
 
+        _PREINSTALL
+
         # Install the application
         _INSTALL_APP "path=$check_path"
 
