@@ -8,7 +8,7 @@ def argument_for_question(question, all_choices=False):
 
     if question_type is None and question.get("choices"):
         question_type = "boolean"
-    elif question_type is None and question.get("default"):
+    elif question_type in [None, "string"] and question.get("default"):
         question_type = "with_default"
     elif question_type is None and question["name"] == "admin":
         question_type = "user"
