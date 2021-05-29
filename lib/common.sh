@@ -19,6 +19,9 @@ LXC_NAME="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-test"
 
 readonly lock_file="./pcheck.lock"
 
+DEFAULT_PHP_VERSION="7.3"
+[[ "$DIST" == "bullseye" ]] && DEFAULT_PHP_VERSION="7.4"
+
 #=================================================
 # LXC helpers
 #=================================================

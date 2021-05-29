@@ -28,7 +28,7 @@ set_witness_files () {
     create_witness_file "/var/log/witnessfile" file
 
     # Config fpm
-    create_witness_file "/etc/php/7.3/fpm/pool.d/witnessfile.conf" file
+    create_witness_file "/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf" fime
 
     # Config logrotate
     create_witness_file "/etc/logrotate.d/witnessfile" file
@@ -72,7 +72,7 @@ check_witness_files () {
     check_file_exist "/var/log/witnessfile"
 
     # Config fpm
-    check_file_exist "/etc/php/7.3/fpm/pool.d/witnessfile.conf"
+    check_file_exist "/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf"
 
     # Config logrotate
     check_file_exist "/etc/logrotate.d/witnessfile"
