@@ -28,7 +28,7 @@ set_witness_files () {
     create_witness_file "/var/log/witnessfile" file
 
     # Config fpm
-    create_witness_file "/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf" fime
+    create_witness_file "/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf" file
 
     # Config logrotate
     create_witness_file "/etc/logrotate.d/witnessfile" file
