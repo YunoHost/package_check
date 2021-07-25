@@ -144,7 +144,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
     # Not checking this if this ain't relevant for the current app
     this_is_a_web_app || return 0
 
-    log_small_title "Validating that the app $app_id_to_check can/cant be accessed with its url..."
+    log_small_title "Validating that the app $app_id_to_check can/can't be accessed with its URL..."
 
     # Force the app to public only if we're checking the public-like installs AND there's no is_public arg
     # For example, that's the case for agendav which is always installed as
@@ -160,7 +160,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
         _RUN_YUNOHOST_CMD "app ssowatconf"
     fi
 
-    # Try to access to the url in 2 times, with a final / and without
+    # Try to access to the URL in 2 times, with a final / and without
     for i in $(seq 1 2)
     do
 
@@ -185,7 +185,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
             log_debug "Running curl $check_domain$curl_check_path"
 
-            # Call curl to try to access to the url of the app
+            # Call curl to try to access to the URL of the app
             curl --location --insecure --silent --show-error \
                 --header "Host: $check_domain" \
                 --resolve $DOMAIN:80:$LXC_IP \
@@ -223,28 +223,28 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
             [ $curl_error -eq 1 ] && log_error "The HTTP code shows an error."
         fi
 
-        # Analyze the output of curl
+        # Analyze the output of cURL
         if [ -e "$curl_output" ]
         then
             # Print the title of the page
             local page_title=$(grep "<title>" "$curl_output" | cut --delimiter='>' --fields=2 | cut --delimiter='<' --fields=1)
             local page_extract=$(lynx -dump -force_html "$curl_output" | head --lines 20 | tee -a "$complete_log")
 
-            # Check if the page title is neither the YunoHost portail or default nginx page
+            # Check if the page title is neither the YunoHost portail or default NGINX page
             if [ "$page_title" = "YunoHost Portal" ]
             then
                 log_debug "The connection attempt fall on the YunoHost portal."
                 fell_on_sso_portal=1
-                # Falling on nginx default page is an error.
-            elif echo "$page_title" | grep -q "Welcome to nginx"
+                # Falling on NGINX default page is an error.
+            elif echo "$page_title" | grep -q "Welcome to NGINX"
             then
-                log_error "The connection attempt fall on nginx default page."
+                log_error "The connection attempt fall on NGINX default page."
                 curl_error=1
             fi
         fi
 
-        echo -e "Test url: $check_domain$curl_check_path
-Real url: $(cat "./curl_print" | cut --delimiter=';' --fields=2)
+        echo -e "Test URL: $check_domain$curl_check_path
+Real URL: $(cat "./curl_print" | cut --delimiter=';' --fields=2)
 HTTP code: $http_code
 Page title: $page_title
 Page extract:\n$page_extract" > $TEST_CONTEXT/curl_result
@@ -277,7 +277,7 @@ Page extract:\n$page_extract" > $TEST_CONTEXT/curl_result
 
     curl --location --insecure --silent $check_domain$check_path../html/alias_traversal.html \
         | grep "title" | grep --quiet "alias_traversal test" \
-        && log_error "Issue alias_traversal detected ! Please see here https://github.com/YunoHost/example_ynh/pull/45 to fix that." \
+        && log_error "Issue alias_traversal detected! Please see here https://github.com/YunoHost/example_ynh/pull/45 to fix that." \
         && SET_RESULT "failure" alias_traversal
 
     [ "$curl_error" -eq 0 ] || return 1
@@ -324,7 +324,7 @@ TEST_INSTALL () {
     local is_public="1"
     [ "$install_type" = "subdir"  ] && { start_test "Installation in a sub path";      local check_path=/path; }
     [ "$install_type" = "root"    ] && { start_test "Installation on the root";                                }
-    [ "$install_type" = "nourl"   ] && { start_test "Installation without url access"; local check_path="";    }
+    [ "$install_type" = "nourl"   ] && { start_test "Installation without URL access"; local check_path="";    }
     [ "$install_type" = "private" ] && { start_test "Installation in private mode";    local is_public="0";    }
     local snapname=snap_${install_type}install
 
@@ -628,7 +628,7 @@ TEST_CHANGE_URL () {
             continue
         fi
 
-        log_small_title "Changing the url from $current_domain$current_path to $new_domain$new_path..." \
+        log_small_title "Changing the URL from $current_domain$current_path to $new_domain$new_path..." \
             && _RUN_YUNOHOST_CMD "app change-url $app_id -d $new_domain -p $new_path" \
             && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $new_domain $new_path
 
@@ -692,7 +692,7 @@ ACTIONS_CONFIG_PANEL () {
         toml_file="$package_path/actions.toml"
         if [ ! -e "$toml_file" ]
         then
-            log_error "No actions.toml found !"
+            log_error "No actions.toml found!"
             return 1
         fi
     elif [ "$test_type" == "config_panel" ]
@@ -702,7 +702,7 @@ ACTIONS_CONFIG_PANEL () {
         toml_file="$package_path/config_panel.toml"
         if [ ! -e "$toml_file" ]
         then
-            log_error "No config_panel.toml found !"
+            log_error "No config_panel.toml found!"
             return 1
         fi
     fi
