@@ -185,7 +185,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
             log_debug "Running curl $check_domain$curl_check_path"
 
-            # Call curl to try to access to the URL of the app
+            # Call cURL to try to access to the URL of the app
             curl --location --insecure --silent --show-error \
                 --header "Host: $check_domain" \
                 --resolve $DOMAIN:80:$LXC_IP \
