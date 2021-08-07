@@ -3,6 +3,7 @@ import json
 import os
 import time
 
+
 def load_tests(test_folder):
 
     for test in sorted(os.listdir(test_folder + "/tests")):
@@ -10,7 +11,34 @@ def load_tests(test_folder):
         j = json.load(open(test_folder + "/tests/" + test))
         j["id"] = os.path.basename(test).split(".")[0]
         j["results"] = json.load(open(test_folder + "/results/" + j["id"] + ".json"))
+        j["notes"] = list(test_notes(j))
+
         yield j
+
+
+# We'll laterdisplay the result of these sort of "meta" or "tranversal" checks performed during each checks
+# regarding nginx path traversal issue or install dir permissions... we want to display those in the summary
+# Also we want to display the number of warnings for linter results
+def test_notes(test):
+
+    # (We ignore these for upgrades from older commits)
+    if test["test_type"] == "TEST_UPGRADE" and test["test_arg"]:
+        return
+
+    if test["test_type"] == "PACKAGE_LINTER" and test['results']['main_result'] == 'success' and test['results'].get("warning"):
+        yield '\033[93m%s warnings\033[0m' % len(test['results'].get("warning"))
+
+    if test['results'].get("witness"):
+        yield '\033[91mMissing witness file\033[0m'
+
+    if test['results'].get("alias_traversal"):
+        yield '\033[91mNginx path traversal issue\033[0m'
+
+    if test['results'].get("too_many_warnings"):
+        yield '\033[93mBad UX because shitload of warnings\033[0m'
+
+    if test['results'].get("install_dir_permissions"):
+        yield '\033[91mUnsafe install dir permissions\033[0m'
 
 
 levels = []
@@ -124,7 +152,7 @@ def level_7(tests):
 
     linter_tests = [t for t in tests if t["test_type"] == "PACKAGE_LINTER"]
     too_many_warnings = any(t["results"].get("too_many_warnings") for t in tests)
-    
+
     return all(t["results"]["main_result"] == "success" for t in tests) \
         and linter_tests != [] \
         and not too_many_warnings \
@@ -184,6 +212,10 @@ for test in tests:
         print("------------- %s -------------" % latest_test_serie)
 
     result = OK if test["results"]["main_result"] == "success" else FAIL
+
+    if test["notes"]:
+        result += "(%s)" % ', '.join(test["notes"])
+
     print("{test: <30}{result}".format(test=test_display_name, result=result))
 
 print()
@@ -226,7 +258,8 @@ summary = {
         "test_arg": t["test_arg"],
         "test_serie": t["test_serie"],
         "main_result": t["results"]["main_result"],
-        "test_duration": t["results"]["test_duration"]
+        "test_duration": t["results"]["test_duration"],
+        "test_notes": t["notes"]
     } for t in tests],
     "level_results": {level.level: level.passed for level in levels[1:]},
     "level": global_level.level

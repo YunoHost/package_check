@@ -89,6 +89,7 @@ _INSTALL_APP () {
     if LXC_EXEC "su nobody -s /bin/bash -c \"test -r /var/www/$app_id || test -w /var/www/$app_id || test -x /var/www/$app_id\""
     then
         log_error "It looks like anybody can read/enter /var/www/$app_id, which ain't super great from a security point of view ... Config files or other files may contain secrets or information that should in most case not be world-readable. You should remove all 'others' permissions with 'chmod o-rwx', and setup appropriate, exclusive permissions to the appropriate owner/group with chmod/chown."
+        SET_RESULT "failure" install_dir_permissions
     fi
 
     return $ret
