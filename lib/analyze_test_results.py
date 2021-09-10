@@ -268,7 +268,7 @@ def export_as_image(text, output):
 </body>
 </html>"""
 
-    imgkit.from_string(text, output)
+    imgkit.from_string(text, output, options={"crop-w": 600, "quiet": ""})
 
 
 test_context = sys.argv[1]
