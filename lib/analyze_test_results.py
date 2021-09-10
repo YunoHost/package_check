@@ -2,7 +2,7 @@ import sys
 import json
 import os
 import time
-
+import imgkit
 
 def load_tests(test_folder):
 
@@ -26,19 +26,19 @@ def test_notes(test):
         return
 
     if test["test_type"] == "PACKAGE_LINTER" and test['results']['main_result'] == 'success' and test['results'].get("warning"):
-        yield '\033[93m%s warnings\033[0m' % len(test['results'].get("warning"))
+        yield '<style=warning>%s warnings</style>' % len(test['results'].get("warning"))
 
     if test['results'].get("witness"):
-        yield '\033[91mMissing witness file\033[0m'
+        yield '<style=danger>Missing witness file</style>'
 
     if test['results'].get("alias_traversal"):
-        yield '\033[91mNginx path traversal issue\033[0m'
+        yield '<style=danger>Nginx path traversal issue</style>'
 
     if test['results'].get("too_many_warnings"):
-        yield '\033[93mBad UX because shitload of warnings\033[0m'
+        yield '<style=warning>Bad UX because shitload of warnings</style>'
 
     if test['results'].get("install_dir_permissions"):
-        yield '\033[91mUnsafe install dir permissions\033[0m'
+        yield '<style=danger>Unsafe install dir permissions</style>'
 
 
 levels = []
@@ -184,67 +184,102 @@ def level_9(tests):
         and "App.qualify_for_level_9" in linter_tests[0]["results"]["success"]
 
 
+def make_summary():
+
+    test_types = {
+        "PACKAGE_LINTER": "Package linter",
+        "TEST_INSTALL": "Install",
+        "TEST_UPGRADE": "Upgrade",
+        "TEST_BACKUP_RESTORE": "Backup/restore",
+        "TEST_CHANGE_URL": "Change url",
+        "TEST_PORT_ALREADY_USED": "Port already used",
+        "ACTIONS_CONFIG_PANEL": "Config/panel"
+    }
+
+    latest_test_serie = "default"
+    yield ""
+    for test in tests:
+        test_display_name = test_types[test["test_type"]]
+        if test["test_arg"]:
+            test_display_name += " (%s)" % test["test_arg"][:8]
+        test_display_name += ":"
+        if test["test_serie"] != latest_test_serie:
+            latest_test_serie = test["test_serie"]
+            yield "------------- %s -------------" % latest_test_serie
+
+        result = " <style=success>OK</style>" if test["results"]["main_result"] == "success" else "<style=danger>fail</style>"
+
+        if test["notes"]:
+            result += "(%s)" % ', '.join(test["notes"])
+
+        yield "{test: <30}{result}".format(test=test_display_name, result=result)
+
+    yield ""
+    yield "Level results"
+    yield "============="
+
+    stop_global_level_bump = False
+
+    global global_level
+    global_level = level_0
+
+    for level in levels[1:]:
+        level.passed = level(tests)
+
+        if not level.passed:
+            stop_global_level_bump = True
+
+        if not stop_global_level_bump:
+            global_level = level
+            display = "<style=success>OK</style>"
+        else:
+            display = " ok " if level.passed else ""
+
+        yield "Level {i} {descr: <40} {result}".format(i=level.level,
+                                                       descr="(%s)" % level.descr[:38],
+                                                       result=display)
+
+    yield ""
+    yield "<style=bold>Global level for this application: %s (%s)</style>" % (global_level.level, global_level.descr)
+    yield ""
+
+
+def render_for_terminal(text):
+    return text \
+            .replace("<style=success>", "\033[1m\033[92m") \
+            .replace("<style=warning>", "\033[93m") \
+            .replace("<style=danger>", "\033[91m") \
+            .replace("</style>", "\033[0m")
+
+
+def export_as_image(text, output):
+    text = text \
+            .replace("<style=success>", '<span style="color: chartreuse; font-weight: bold;">') \
+            .replace("<style=warning>", '<span style="color: gold;">') \
+            .replace("<style=danger>", '<span style="color: red;">') \
+            .replace("</style>", '</span>')
+
+    text = f"""
+<html style="color: #eee; background-color: #222; font-family: monospace">
+<body>
+<pre>
+{text}
+</pre>
+</body>
+</html>"""
+
+    imgkit.from_string(text, output)
+
+
 test_context = sys.argv[1]
 tests = list(load_tests(test_context))
 
-test_types = {
-    "PACKAGE_LINTER": "Package linter",
-    "TEST_INSTALL": "Install",
-    "TEST_UPGRADE": "Upgrade",
-    "TEST_BACKUP_RESTORE": "Backup/restore",
-    "TEST_CHANGE_URL": "Change url",
-    "TEST_PORT_ALREADY_USED": "Port already used",
-    "ACTIONS_CONFIG_PANEL": "Config/panel"
-}
+global_level = None
 
-OK = ' \033[1m\033[92mOK\033[0m '
-FAIL = '\033[91mfail\033[0m'
+summary = '\n'.join(make_summary())
+print(render_for_terminal(summary))
 
-latest_test_serie = "default"
-print()
-for test in tests:
-    test_display_name = test_types[test["test_type"]]
-    if test["test_arg"]:
-        test_display_name += " (%s)" % test["test_arg"][:8]
-    test_display_name += ":"
-    if test["test_serie"] != latest_test_serie:
-        latest_test_serie = test["test_serie"]
-        print("------------- %s -------------" % latest_test_serie)
-
-    result = OK if test["results"]["main_result"] == "success" else FAIL
-
-    if test["notes"]:
-        result += "(%s)" % ', '.join(test["notes"])
-
-    print("{test: <30}{result}".format(test=test_display_name, result=result))
-
-print()
-print("Level results")
-print("=============")
-
-stop_global_level_bump = False
-
-global_level = level_0
-
-for level in levels[1:]:
-    level.passed = level(tests)
-
-    if not level.passed:
-        stop_global_level_bump = True
-
-    if not stop_global_level_bump:
-        global_level = level
-        display = OK
-    else:
-        display = " ok " if level.passed else ""
-
-    print("Level {i} {descr: <40} {result}".format(i=level.level,
-        descr="(%s)"%level.descr[:38], result=display))
-
-print()
-print("\033[1mGlobal level for this application: %s (%s)\033[0m" % (global_level.level, global_level.descr))
-print()
-
+export_as_image(summary, test_context + "/summary.jpg")
 
 summary = {
     "app": open(test_context + "/app_id").read().strip(),
