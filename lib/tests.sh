@@ -588,7 +588,7 @@ TEST_CHANGE_URL () {
     # Without modify the domain, root to path, path to path and path to root.
     # And then, same with a domain change
     local i=0
-    for i in $(seq 1 6)
+    for i in $(seq 1 8)
     do
         # Same domain, root to path
         if [ $i -eq 1 ]; then
@@ -609,14 +609,24 @@ TEST_CHANGE_URL () {
         elif [ $i -eq 4 ]; then
             local new_path=/path
             local new_domain=$DOMAIN
+        
+        # Other domain, same path
+        elif [ $i -eq 5 ]; then
+            local new_path=/path
+            local new_domain=$SUBDOMAIN
 
         # Other domain, path to path
-        elif [ $i -eq 5 ]; then
+        elif [ $i -eq 6 ]; then
             local new_path=/path_2
             local new_domain=$DOMAIN
 
         # Other domain, path to root
-        elif [ $i -eq 6 ]; then
+        elif [ $i -eq 7 ]; then
+            local new_path=/
+            local new_domain=$SUBDOMAIN
+
+        # Other domain, same path
+        elif [ $i -eq 8 ]; then
             local new_path=/
             local new_domain=$DOMAIN
         fi
