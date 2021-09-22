@@ -284,7 +284,7 @@ print(render_for_terminal(summary))
 if os.path.exists("/usr/bin/wkhtmltoimage"):
     export_as_image(summary, test_context + "/summary.png")
     if os.path.exists("/usr/bin/optipnge"):
-        os.system(f"/usr/bin/optipng {test_context}/summary.png")
+        os.system(f"/usr/bin/optipng --quiet '{test_context}/summary.png'")
 else:
     print("(Protip™ for CI admin: you should 'apt install wkhtmltopdf optipng --no-install-recommends' to enable result summary export to .png)")
 
