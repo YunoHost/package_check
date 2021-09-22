@@ -210,7 +210,7 @@ def make_summary():
         result = " <style=success>OK</style>" if test["results"]["main_result"] == "success" else "<style=danger>fail</style>"
 
         if test["notes"]:
-            result += "(%s)" % ', '.join(test["notes"])
+            result += "  (%s)" % ', '.join(test["notes"])
 
         yield "{test: <30}{result}".format(test=test_display_name, result=result)
 
@@ -231,7 +231,7 @@ def make_summary():
 
         if not stop_global_level_bump:
             global_level = level
-            display = "<style=success>OK</style>"
+            display = " <style=success>OK</style>"
         else:
             display = " ok " if level.passed else ""
 
@@ -249,6 +249,7 @@ def render_for_terminal(text):
             .replace("<style=success>", "\033[1m\033[92m") \
             .replace("<style=warning>", "\033[93m") \
             .replace("<style=danger>", "\033[91m") \
+            .replace("<style=bold>", "\033[1m") \
             .replace("</style>", "\033[0m")
 
 
@@ -257,6 +258,7 @@ def export_as_image(text, output):
             .replace("<style=success>", '<span style="color: chartreuse; font-weight: bold;">') \
             .replace("<style=warning>", '<span style="color: gold;">') \
             .replace("<style=danger>", '<span style="color: red;">') \
+            .replace("<style=bold>", '<span style="font-weight: bold;">') \
             .replace("</style>", '</span>')
 
     text = f"""
@@ -279,7 +281,10 @@ global_level = None
 summary = '\n'.join(make_summary())
 print(render_for_terminal(summary))
 
-export_as_image(summary, test_context + "/summary.jpg")
+if os.path.exists("/usr/bin/wkhtmltoimage"):
+    export_as_image(summary, test_context + "/summary.jpg")
+else:
+    print("(Protip™ for CI admin: you should 'apt install wkhtmltopdf --no-install-recommends' to enable result summary export to .jpg)")
 
 summary = {
     "app": open(test_context + "/app_id").read().strip(),
