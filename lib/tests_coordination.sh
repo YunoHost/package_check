@@ -296,7 +296,7 @@ run_all_tests() {
     log_title "Tests summary"
 
     python3 lib/analyze_test_results.py $TEST_CONTEXT 2>./results.json
-    [[ -e "$TEST_CONTEXT/summary.jpg" ]] && cp "$TEST_CONTEXT/summary.jpg" ./summary.jpg || rm -f summary.jpg
+    [[ -e "$TEST_CONTEXT/summary.png" ]] && cp "$TEST_CONTEXT/summary.png" ./summary.png || rm -f summary.png
 
     # Restore the started time for the timer
     starttime=$complete_start_timer
