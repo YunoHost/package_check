@@ -152,10 +152,16 @@ def level_7(tests):
 
     linter_tests = [t for t in tests if t["test_type"] == "PACKAGE_LINTER"]
     too_many_warnings = any(t["results"].get("too_many_warnings") for t in tests)
+    unsafe_install_dir_perms = any(t["results"].get("install_dir_permissions") for t in tests)
+    alias_traversal = any(t["results"].get("alias_traversal") for t in tests)
+    witness = any(t["results"].get("witness") for t in tests)
 
     return all(t["results"]["main_result"] == "success" for t in tests) \
         and linter_tests != [] \
+        and not witness \
+        and not alias_traversal \
         and not too_many_warnings \
+        and not unsafe_install_dir_perms \
         and "App.qualify_for_level_7" in linter_tests[0]["results"]["success"]
 
 
