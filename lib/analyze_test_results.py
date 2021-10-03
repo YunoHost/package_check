@@ -151,10 +151,13 @@ def level_7(tests):
     """
 
     linter_tests = [t for t in tests if t["test_type"] == "PACKAGE_LINTER"]
-    too_many_warnings = any(t["results"].get("too_many_warnings") for t in tests)
-    unsafe_install_dir_perms = any(t["results"].get("install_dir_permissions") for t in tests)
-    alias_traversal = any(t["results"].get("alias_traversal") for t in tests)
-    witness = any(t["results"].get("witness") for t in tests)
+    
+    # For runtime warnings, ignore stuff happening during upgrades from previous versions
+    tests_on_which_to_check_for_runtime_warnings = [t for t in tests if not (t["test_type"] == "TEST_UPGRADE" and t["test_arg"])]
+    too_many_warnings = any(t["results"].get("too_many_warnings") for t in tests_on_which_to_check_for_runtime_warnings)
+    unsafe_install_dir_perms = any(t["results"].get("install_dir_permissions") for t in tests_on_which_to_check_for_runtime_warnings)
+    alias_traversal = any(t["results"].get("alias_traversal") for t in tests_on_which_to_check_for_runtime_warnings)
+    witness = any(t["results"].get("witness") for t in tests_on_which_to_check_for_runtime_warnings)
 
     return all(t["results"]["main_result"] == "success" for t in tests) \
         and linter_tests != [] \
