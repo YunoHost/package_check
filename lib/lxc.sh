@@ -23,7 +23,7 @@ LXC_CREATE () {
             -c limits.cpu.allowance=80% \
             >>/proc/self/fd/3
     else
-        log_critical "Can't find base image $LXC_BASE, run ./package_check --rebuild"
+        log_critical "Can't find base image $LXC_BASE, run ./package_check.sh --rebuild"
     fi
     [[ "${PIPESTATUS[0]}" -eq 0 ]] || exit 1
 
