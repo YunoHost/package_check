@@ -80,6 +80,7 @@ parse_check_process() {
         # during tests
         local install_args=$(       extract_check_process_section "^; Manifest"     "^; " $test_serie_rawconf | sed 's/\s*(.*)$//g' | tr -d '"' | tr '\n' '&')
         local preinstall_template=$(extract_check_process_section "^; pre-install"  "^; " $test_serie_rawconf)
+        local preupgrade_template=$(extract_check_process_section "^; pre-upgrade"  "^; " $test_serie_rawconf)
         local action_infos=$(       extract_check_process_section "^; Actions"      "^; " $test_serie_rawconf)
         local configpanel_infos=$(  extract_check_process_section "^; Config_panel" "^; " $test_serie_rawconf)
 
@@ -130,9 +131,10 @@ parse_check_process() {
                 --arg test_type "$test_type" \
                 --arg test_arg "$test_arg" \
                 --arg preinstall_template "$preinstall_template" \
+                --arg preupgrade_template "$preupgrade_template" \
                 --arg install_args "${_install_args//\"}" \
                 --argjson extra "$extra" \
-                '{ $test_serie, $test_type, $test_arg, $preinstall_template, $install_args, $extra }' \
+                '{ $test_serie, $test_type, $test_arg, $preinstall_template, $preupgrade_template, $install_args, $extra }' \
                 > "$TEST_CONTEXT/tests/$test_id.json"
         }
 

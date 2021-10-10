@@ -32,14 +32,39 @@ _PREINSTALL () {
         local preinstall_script="$TEST_CONTEXT/preinstall.sh"
         echo "$preinstall_template" > "$preinstall_script"
         # Hydrate the template with variables
-        sed -i "s/\$USER/$TEST_USER/" "$preinstall_script"
-        sed -i "s/\$DOMAIN/$DOMAIN/" "$preinstall_script"
-        sed -i "s/\$SUBDOMAIN/$SUBDOMAIN/" "$preinstall_script"
-        sed -i "s/\$PASSWORD/$YUNO_PWD/" "$preinstall_script"
+        sed -i "s/\$USER/$TEST_USER/g" "$preinstall_script"
+        sed -i "s/\$DOMAIN/$DOMAIN/g" "$preinstall_script"
+        sed -i "s/\$SUBDOMAIN/$SUBDOMAIN/g" "$preinstall_script"
+        sed -i "s/\$PASSWORD/$YUNO_PWD/g" "$preinstall_script"
         # Copy the pre-install script into the container.
         lxc file push "$preinstall_script" "$LXC_NAME/preinstall.sh"
         # Then execute the script to execute the pre-install commands.
         LXC_EXEC "bash /preinstall.sh"
+    fi
+}
+
+_PREUPGRADE () {
+    local preupgrade_template="$(jq -r '.preupgrade_template' $current_test_infos)"
+    local commit=${1:-HEAD}
+
+    # Exec the pre-upgrade instruction, if there one
+    if [ -n "$preupgrade_template" ]
+    then
+        log_small_title "Running pre-upgrade steps"
+        # Copy all the instructions into a script
+        local preupgrade_script="$TEST_CONTEXT/preupgrade.sh"
+        echo "$preupgrade_template" >> "$preupgrade_script"
+        # Hydrate the template with variables
+        sed -i "s/\$USER/$TEST_USER/g" "$preupgrade_script"
+        sed -i "s/\$DOMAIN/$DOMAIN/g" "$preupgrade_script"
+        sed -i "s/\$SUBDOMAIN/$SUBDOMAIN/g" "$preupgrade_script"
+        sed -i "s/\$PASSWORD/$YUNO_PWD/g" "$preupgrade_script"
+        sed -i "s/\$FROM_COMMIT/$commit/g" "$preupgrade_script"
+        # Copy the pre-upgrade script into the container.
+        lxc file push "$preupgrade_script" "$LXC_NAME/preupgrade.sh"
+        # Then execute the script to execute the pre-upgrade commands.
+        LXC_EXEC "bash /preupgrade.sh"
+        return $?
     fi
 }
 
@@ -433,6 +458,10 @@ TEST_UPGRADE () {
 
     log_small_title "Upgrade..."
 
+    _PREUPGRADE "${commit}"
+    ret=$?
+    [ $ret -eq 0 ] || { log_error "Pre-upgrade instruction failed"; return 1; }
+
     # Upgrade the application in a LXC container
     _RUN_YUNOHOST_CMD "app upgrade $app_id --file /app_folder --force" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "upgrade"
@@ -516,7 +545,7 @@ TEST_BACKUP_RESTORE () {
             _RUN_YUNOHOST_CMD "backup create -n Backup_test --apps $app_id"
             ret=$?
         fi
-    
+
         [ $ret -eq 0 ] || { main_result=1; break_before_continue; continue; }
 
         # Grab the backup archive into the LXC container, and keep a copy
@@ -546,7 +575,7 @@ TEST_BACKUP_RESTORE () {
 
                 # Place the copy of the backup archive in the container.
                 lxc file push -r $TEST_CONTEXT/ynh_backups/archives $LXC_NAME/home/yunohost.backup/
-            
+
                 _PREINSTALL
 
                 log_small_title "Restore on a fresh YunoHost system..."
@@ -609,7 +638,7 @@ TEST_CHANGE_URL () {
         elif [ $i -eq 4 ]; then
             local new_path=/path
             local new_domain=$DOMAIN
-        
+
         # Other domain, same path
         elif [ $i -eq 5 ]; then
             local new_path=/path
