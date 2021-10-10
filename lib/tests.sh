@@ -310,7 +310,7 @@ PACKAGE_LINTER () {
     ./package_linter/package_linter.py "$package_path" | tee -a "$complete_log"
     ./package_linter/package_linter.py "$package_path" --json | tee -a "$complete_log" > $current_test_results
 
-    return $?
+    return ${PIPESTATUS[0]}
 }
 
 TEST_INSTALL () {
