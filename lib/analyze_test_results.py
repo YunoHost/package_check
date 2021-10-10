@@ -28,6 +28,9 @@ def test_notes(test):
     if test["test_type"] == "PACKAGE_LINTER" and test['results']['main_result'] == 'success' and test['results'].get("warning"):
         yield '<style=warning>%s warnings</style>' % len(test['results'].get("warning"))
 
+    if test["test_type"] == "PACKAGE_LINTER" and test['results']['main_result'] == 'success' and test['results'].get("info"):
+        yield '%s possible improvements' % len(set(test['results'].get("info")))
+
     if test['results'].get("witness"):
         yield '<style=danger>Missing witness file</style>'
 
