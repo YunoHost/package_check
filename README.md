@@ -151,6 +151,12 @@ If the `build_base_lxc.sh` script detects that you are trying a cross container 
 		echo ", before each installation of the app."
 	; pre-upgrade
 		set -euxo pipefail
+		if [ "$FROM_COMMIT" == '65c382d138596fcb32b4c97c39398815a1dcd4e8' ]
+		then
+			resolve=127.0.0.1:443:$DOMAIN
+			# Example of request using curl
+			curl -X POST --data '{"some-key": "some-value"}' https://$DOMAIN/$PATH --resolve "$resolve"
+		fi
 	; Manifest
         # You need to provide default values for installation parameters ...
         # EXCEPT for special args: domain, path, admin, and is_public
