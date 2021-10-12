@@ -286,7 +286,7 @@ run_all_tests() {
     current_test_number=1
 
     # The list of test contains for example "TEST_UPGRADE some_commit_id
-    for testfile in $(ls $TEST_CONTEXT/tests/*.json);
+    for testfile in "$TEST_CONTEXT"/tests/*.json;
     do
         TEST_LAUNCHER $testfile
         current_test_number=$((current_test_number+1))
@@ -384,7 +384,7 @@ SET_RESULT() {
 
 at_least_one_install_succeeded () {
 
-    for TEST in $(ls $TEST_CONTEXT/tests/*.json)
+    for TEST in "$TEST_CONTEXT"/tests/*.json
     do
         local test_id=$(basename $TEST | cut -d. -f1)
         jq -e '. | select(.test_type == "TEST_INSTALL")' $TEST >/dev/null \
