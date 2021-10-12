@@ -39,7 +39,7 @@ function parse_args() {
     local getopts_built_arg=()
 
     # Read the array value per value
-    for i in `seq 0 $(( ${#arguments[@]} -1 ))`
+    for i in $(seq 0 $(( ${#arguments[@]} -1 )))
     do
         if [[ "${arguments[$i]}" =~ "--branch=" ]]
         then
@@ -132,7 +132,7 @@ function cleanup()
 
 if [[ $force_stop == 1 ]]
 then
-    package_check_pid="$(cat "./pcheck.lock" 2> /dev/null | cut -d: -f3)"
+    package_check_pid="$(cat $lock_file 2> /dev/null | cut -d: -f3)"
     if [ -n "$package_check_pid" ]; then
         kill -15 $package_check_pid
     fi
@@ -145,7 +145,7 @@ fi
 #=================================================
 
 # If the lock file exist and corresponding process still exists
-if test -e "$lock_file" && ps --pid "$(cat pcheck.lock | cut -d: -f3)" | grep --quiet "$(cat pcheck.lock | cut -d: -f3)"
+if test -e "$lock_file" && ps --pid "$(cat $lock_file | cut -d: -f3)" | grep --quiet "$(cat $lock_file | cut -d: -f3)"
 then
     if [ $interactive -eq 1 ]; then
         echo "The lock file $lock_file already exists."
@@ -168,7 +168,7 @@ echo "start:$(date +%s):$$" > "$lock_file"
 #==========================
 # Cleanup
 # N.B. the traps are added AFTER the lock is taken
-# because we don't want to mess with with the lock and LXC
+# because we don't want to mess with the lock and LXC
 # it we ain't the process with the lock...
 #==========================
 
