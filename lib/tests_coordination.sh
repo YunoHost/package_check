@@ -4,7 +4,7 @@ source lib/lxc.sh
 source lib/tests.sh
 source lib/witness.sh
 
-complete_log="./Complete.log"
+readonly complete_log="./Complete-${LXC_NAME}.log"
 
 # Purge some log files
 rm -f "$complete_log" && touch "$complete_log"
@@ -295,7 +295,7 @@ run_all_tests() {
     # Print the final results of the tests
     log_title "Tests summary"
 
-    python3 lib/analyze_test_results.py $TEST_CONTEXT 2>./results.json
+    python3 lib/analyze_test_results.py $TEST_CONTEXT 2> ./results-${LXC_NAME}.json
     [[ -e "$TEST_CONTEXT/summary.png" ]] && cp "$TEST_CONTEXT/summary.png" ./summary.png || rm -f summary.png
 
     # Restore the started time for the timer
