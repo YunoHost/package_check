@@ -173,7 +173,7 @@ echo "start:$(date +%s):$$" > "$lock_file"
 #==========================
 
 trap cleanup EXIT
-trap 'exit 2' TERM KILL
+trap 'exit 2' TERM
 
 #==========================
 # Main code
