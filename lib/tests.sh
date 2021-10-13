@@ -196,7 +196,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
                 --write-out "%{http_code};%{url_effective}\n" \
                 --output "$curl_output" \
                 $check_domain$curl_check_path \
-                > "./curl_print"
+                > "$TEST_CONTEXT/curl_print"
 
             # Analyze the result of curl command
             if [ $? -ne 0 ]
@@ -205,7 +205,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
                 curl_error=1
             fi
 
-            http_code=$(cat "./curl_print" | cut -d ';' -f1)
+            http_code=$(cat "$TEST_CONTEXT/curl_print" | cut -d ';' -f1)
 
             log_debug "HTTP code: $http_code"
 
@@ -245,7 +245,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
         fi
 
         echo -e "Test URL: $check_domain$curl_check_path
-Real URL: $(cat "./curl_print" | cut --delimiter=';' --fields=2)
+Real URL: $(cat "$TEST_CONTEXT/curl_print" | cut --delimiter=';' --fields=2)
 HTTP code: $http_code
 Page title: $page_title
 Page extract:\n$page_extract" > $TEST_CONTEXT/curl_result
