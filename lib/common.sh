@@ -14,10 +14,11 @@ DIST=${DIST:-buster}
 # Yunohost version: stable, testing or unstable
 YNH_BRANCH=${YNH_BRANCH:-stable}
 
+WORKER_ID=${WORKER_ID:-0}
 LXC_BASE="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-base"
-LXC_NAME="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-test"
+LXC_NAME="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-test-${WORKER_ID}"
 
-readonly lock_file="./pcheck.lock"
+readonly lock_file="./pcheck-${WORKER_ID}.lock"
 
 DEFAULT_PHP_VERSION="7.3"
 [[ "$DIST" == "bullseye" ]] && DEFAULT_PHP_VERSION="7.4"

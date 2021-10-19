@@ -187,16 +187,18 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
             log_debug "Running curl $check_domain$curl_check_path"
 
             # Call cURL to try to access to the URL of the app
-            curl --location --insecure --silent --show-error \
-                --header "Host: $check_domain" \
+            LXC_EXEC "curl --location --insecure --silent --show-error \
+                --header 'Host: $check_domain' \
                 --resolve $DOMAIN:80:$LXC_IP \
                 --resolve $DOMAIN:443:$LXC_IP \
                 --resolve $SUBDOMAIN:80:$LXC_IP \
                 --resolve $SUBDOMAIN:443:$LXC_IP \
-                --write-out "%{http_code};%{url_effective}\n" \
-                --output "$curl_output" \
-                $check_domain$curl_check_path \
-                > "./curl_print"
+                --write-out '%{http_code};%{url_effective}\n' \
+                --output './curl_output' \
+                $check_domain$curl_check_path" \
+                > "$TEST_CONTEXT/curl_print"
+            
+            LXC_EXEC "cat ./curl_output" > $curl_output
 
             # Analyze the result of curl command
             if [ $? -ne 0 ]
@@ -205,7 +207,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
                 curl_error=1
             fi
 
-            http_code=$(cat "./curl_print" | cut -d ';' -f1)
+            http_code=$(cat "$TEST_CONTEXT/curl_print" | cut -d ';' -f1)
 
             log_debug "HTTP code: $http_code"
 
@@ -245,7 +247,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
         fi
 
         echo -e "Test URL: $check_domain$curl_check_path
-Real URL: $(cat "./curl_print" | cut --delimiter=';' --fields=2)
+Real URL: $(cat "$TEST_CONTEXT/curl_print" | cut --delimiter=';' --fields=2)
 HTTP code: $http_code
 Page title: $page_title
 Page extract:\n$page_extract" > $TEST_CONTEXT/curl_result

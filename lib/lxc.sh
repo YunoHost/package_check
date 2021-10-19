@@ -25,7 +25,12 @@ LXC_CREATE () {
     else
         log_critical "Can't find base image $LXC_BASE, run ./package_check.sh --rebuild"
     fi
-    [[ "${PIPESTATUS[0]}" -eq 0 ]] || exit 1
+    
+    pipestatus="${PIPESTATUS[0]}"
+    location=$(lxc list --format json | jq -e --arg LXC_NAME $LXC_NAME '.[] | select(.name==$LXC_NAME) | .location' | tr -d '"')
+    [[ "$location" != "none" ]] && log_info "... on $location"
+
+    [[ "$pipestatus" -eq 0 ]] || exit 1
 
     _LXC_START_AND_WAIT $LXC_NAME
     set_witness_files
