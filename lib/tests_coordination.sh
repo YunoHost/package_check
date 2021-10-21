@@ -208,15 +208,17 @@ guess_test_configuration() {
         local test_arg="$2"
         test_id="$((test_id+1))"
         local extra="{}"
+        local preupgrade_template=""
 
         jq -n \
             --arg test_serie "default" \
             --arg test_type "$test_type" \
             --arg test_arg "$test_arg" \
             --arg preinstall_template "" \
+            --arg preupgrade_template "$preupgrade_template" \
             --arg install_args "$install_args" \
             --argjson extra "$extra" \
-            '{ $test_serie, $test_type, $test_arg, $preinstall_template, $install_args, $extra }' \
+            '{ $test_serie, $test_type, $test_arg, $preinstall_template, $preupgrade_template, $install_args, $extra }' \
             > "$TEST_CONTEXT/tests/$test_id.json"
     }
 
