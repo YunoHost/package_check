@@ -195,7 +195,7 @@ _LXC_START_AND_WAIT() {
 
 CLEAN_SWAPFILES() {
     # Restart it if needed
-    if [ "$(lxc info $LXC_NAME | grep Status | awk '{print $2}')" != "Running" ]; then
+    if [ "$(lxc info $LXC_NAME | grep Status | awk '{print $2}')" != "RUNNING" ]; then
         lxc start $LXC_NAME
         _LXC_START_AND_WAIT $LXC_NAME
     fi
