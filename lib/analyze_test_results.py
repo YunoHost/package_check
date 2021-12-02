@@ -130,7 +130,7 @@ def level_5(tests):
 
     return not alias_traversal_detected \
         and linter_tests != [] \
-        and linter_tests[0]["results"]["main_result"] == "success"
+        and linter_tests[0]["results"]["error"] == []
 
 
 @level(6, "App is in a community-operated git org")
@@ -154,7 +154,7 @@ def level_7(tests):
     """
 
     linter_tests = [t for t in tests if t["test_type"] == "PACKAGE_LINTER"]
-    
+
     # For runtime warnings, ignore stuff happening during upgrades from previous versions
     tests_on_which_to_check_for_runtime_warnings = [t for t in tests if not (t["test_type"] == "TEST_UPGRADE" and t["test_arg"])]
     too_many_warnings = any(t["results"].get("too_many_warnings") for t in tests_on_which_to_check_for_runtime_warnings)
