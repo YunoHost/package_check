@@ -58,7 +58,7 @@ CREATE_LXC_SNAPSHOT () {
     # Remove swap files to avoid killing the CI with huge snapshots.
     CLEAN_SWAPFILES
     
-    timeout 30 lxc stop --timeout 15 $LXC_NAME 2>/dev/null
+    LXC_STOP $LXC_NAME
 
     # Check if the snapshot already exist
     if ! LXC_SNAPSHOT_EXISTS "$snapname"
@@ -79,7 +79,8 @@ LOAD_LXC_SNAPSHOT () {
     # Remove swap files before restoring the snapshot.
     CLEAN_SWAPFILES
 
-    timeout 30 lxc stop --timeout 15 $LXC_NAME 2>/dev/null
+    LXC_STOP $LXC_NAME
+
     lxc restore $LXC_NAME $snapname
     lxc start $LXC_NAME
     _LXC_START_AND_WAIT $LXC_NAME
@@ -109,9 +110,16 @@ LXC_EXEC () {
 }
 
 LXC_STOP () {
+    local container_to_stop=$1
     # (We also use timeout 30 in front of the command because sometime lxc
     # commands can hang forever despite the --timeout >_>...)
-    timeout 30 lxc stop --timeout 15 $LXC_NAME 2>/dev/null
+    timeout 30 lxc stop --timeout 15 $container_to_stop 2>/dev/null
+
+    # If the command times out, then add the option --force
+    if [ $? -eq 124 ]; then
+        timeout 30 lxc stop --timeout 15 $container_to_stop --force 2>/dev/null
+    fi
+
 }
 
 LXC_RESET () {
@@ -121,7 +129,8 @@ LXC_RESET () {
         CLEAN_SWAPFILES
     fi 
 
-    timeout 30 lxc stop --timeout 15 $LXC_NAME --force 2>/dev/null
+    LXC_STOP $LXC_NAME
+
     lxc delete $LXC_NAME --force 2>/dev/null
 }
 
@@ -130,7 +139,7 @@ _LXC_START_AND_WAIT() {
 
 	restart_container()
 	{
-        timeout 30 lxc stop --timeout 15 $1 2>/dev/null
+        LXC_STOP $1
 		lxc start "$1"
 	}
 

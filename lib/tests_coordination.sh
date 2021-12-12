@@ -366,7 +366,7 @@ TEST_LAUNCHER () {
     # End the timer for the test
     stop_timer 2
 
-    LXC_STOP
+    LXC_STOP $LXC_NAME
 
     # Update the lock file with the date of the last finished test.
     # $$ is the PID of package_check itself.
