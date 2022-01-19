@@ -96,6 +96,13 @@ Then test your packages :
 ./package_check.sh your_app_ynh
 ```
 
+## Run package check in a VirtualBox VM via Vagrant
+
+We add script to run package check in a VirtualBox. More information here:
+
+* [vagrant/README.md](https://github.com/YunoHost/package_check/tree/master/vagrant)
+
+
 ## You can start a container on a different architecture with some hacks
 
 Install the package `qemu-user-static` and `binfmt-support`, then list of all available images :

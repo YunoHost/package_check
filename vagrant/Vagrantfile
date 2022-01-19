@@ -1,0 +1,25 @@
+# https://docs.vagrantup.com
+# https://github.com/YunoHost/package_check
+
+
+Vagrant.configure("2") do |config|
+
+    # https://app.vagrantup.com/ubuntu/boxes/focal64
+    config.vm.box = "ubuntu/focal64"
+
+    config.vm.provider "virtualbox" do |vb|
+      vb.name = "package_check"
+      vb.cpus = 4
+      vb.memory = "2048"
+    end
+
+    # https://www.vagrantup.com/docs/synced-folders/basic_usage
+    config.vm.synced_folder "../", "/home/vagrant/package_check/"
+
+    # https://www.vagrantup.com/docs/provisioning/shell
+    config.vm.provision "shell", inline: <<-SHELL
+        pwd
+        id
+        ./package_check/vagrant/scripts/provision.sh
+    SHELL
+end
