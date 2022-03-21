@@ -9,13 +9,18 @@ print_help() {
     cat << EOF
  Usage: package_check.sh [OPTION]... PACKAGE_TO_CHECK
 
-    -b, --branch=BRANCH  Specify a branch to check.
-    -i, --interactive    Wait for the user to continue before each remove.
-    -s, --force-stop     Force the stop of running package_check
-    -r, --rebuild        (Re)Build the base container
-                         (N.B.: you're not supposed to use this option, images
-                         are supposed to be fetch from devbaseimgs.yunohost.org automatically)
-    -h, --help           Display this help
+    -b, --branch=BRANCH     Specify a branch to check.
+    -a, --arch=ARCH         
+    -d, --dist=DIST         
+    -y, --ynh-branch=BRANCH 
+    -i, --interactive           Wait for the user to continue before each remove
+    -e, --interactive-on-errors Wait for the user to continue on errors
+    -s, --force-stop            Force the stop of running package_check
+    -r, --rebuild               (Re)Build the base container
+                                (N.B.: you're not supposed to use this option,
+                                images are supposed to be fetch from
+                                devbaseimgs.yunohost.org automatically)
+    -h, --help                  Display this help
 EOF
 exit 0
 }
@@ -31,6 +36,7 @@ exit 0
 
 gitbranch=""
 interactive=0
+interactive_on_errors=0
 rebuild=0
 force_stop=0
 
@@ -65,7 +71,7 @@ function parse_args() {
                 # Initialize the index of getopts
                 OPTIND=1
                 # Parse with getopts only if the argument begin by -
-                getopts ":b:irsh" parameter || true
+                getopts ":b:iresh" parameter || true
                 case $parameter in
                     b)
                         # --branch=branch-name
@@ -75,6 +81,11 @@ function parse_args() {
                     i)
                         # --interactive
                         interactive=1
+                        shift_value=1
+                        ;;
+                    e)
+                        # --interactive-on-errors
+                        interactive_on_errors=1
                         shift_value=1
                         ;;
                     r)
