@@ -131,6 +131,8 @@ LXC_RESET () {
 
     LXC_STOP $LXC_NAME
 
+    swapoff "$(lxc storage get default source)/containers/$LXC_NAME/rootfs/swap" 2>/dev/null
+
     lxc delete $LXC_NAME --force 2>/dev/null
 }
 
