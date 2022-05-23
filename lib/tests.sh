@@ -377,7 +377,7 @@ TEST_INSTALL () {
     # Remove and reinstall the application
     _REMOVE_APP \
         && log_small_title "Reinstalling after removal." \
-        &&_INSTALL_APP "path=$check_path" "is_public=$is_public" \
+        && _INSTALL_APP "path=$check_path" "is_public=$is_public" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "$install_type"
 
     return $?
