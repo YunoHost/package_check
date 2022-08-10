@@ -131,8 +131,10 @@ LXC_RESET () {
 
     LXC_STOP $LXC_NAME
 
-    local current_storage=$(lxc list $LXC_NAME --format json --columns b | jq '.[].expanded_devices.root.pool')
-    swapoff "$(lxc storage get $current_storage source)/containers/$LXC_NAME/rootfs/swap" 2>/dev/null
+    if lxc info $LXC_NAME >/dev/null 2>/dev/null; then
+        local current_storage=$(lxc list $LXC_NAME --format json --columns b | jq '.[].expanded_devices.root.pool')
+        swapoff "$(lxc storage get $current_storage source)/containers/$LXC_NAME/rootfs/swap" 2>/dev/null
+    fi 
 
     lxc delete $LXC_NAME --force 2>/dev/null
 }
