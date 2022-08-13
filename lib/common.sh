@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Yunohost install parameters
+# YunoHost install parameters
 YUNO_PWD="admin"
 DOMAIN="domain.tld"
 SUBDOMAIN="sub.$DOMAIN"
@@ -11,7 +11,7 @@ TEST_USER="package_checker"
 ARCH=${ARCH:-amd64}
 DIST=${DIST:-bullseye}
 
-# Yunohost version: stable, testing or unstable
+# YunoHost version: stable, testing or unstable
 YNH_BRANCH=${YNH_BRANCH:-stable}
 
 WORKER_ID=${WORKER_ID:-0}

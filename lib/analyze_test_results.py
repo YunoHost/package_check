@@ -136,7 +136,7 @@ def level_5(tests):
 @level(6, "App is in a community-operated git org")
 def level_6(tests):
     """
-    The app is in the Yunohost-Apps organization
+    The app is in the YunoHost-Apps organization
     (the linter will report a warning named "is_in_github_org" if it's not)
     """
 
