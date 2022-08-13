@@ -6,7 +6,7 @@
 
 LXC_CREATE () {
     log_info "Launching new LXC $LXC_NAME ..."
-    # Check if we can launch container from yunohost remote image
+    # Check if we can launch container from YunoHost remote image
     if lxc remote list | grep -q "yunohost" && lxc image list yunohost:$LXC_BASE | grep -q -w $LXC_BASE; then
         lxc launch yunohost:$LXC_BASE $LXC_NAME \
             -c security.nesting=true \
