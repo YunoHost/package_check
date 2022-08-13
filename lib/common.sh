@@ -9,7 +9,7 @@ TEST_USER="package_checker"
 [[ -e "./config" ]] && source "./config"
 
 ARCH=${ARCH:-amd64}
-DIST=${DIST:-buster}
+DIST=${DIST:-bullseye}
 
 # Yunohost version: stable, testing or unstable
 YNH_BRANCH=${YNH_BRANCH:-stable}
@@ -20,8 +20,7 @@ LXC_NAME="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-test-${WORKER_ID}"
 
 readonly lock_file="./pcheck-${WORKER_ID}.lock"
 
-DEFAULT_PHP_VERSION="7.3"
-[[ "$DIST" == "bullseye" ]] && DEFAULT_PHP_VERSION="7.4"
+DEFAULT_PHP_VERSION="7.4"
 
 #=================================================
 # LXC helpers

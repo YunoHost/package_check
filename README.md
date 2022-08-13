@@ -101,13 +101,13 @@ Then test your packages :
 Install the package `qemu-user-static` and `binfmt-support`, then list of all available images :
 
 ```
-lxc image list images:debian/buster
+lxc image list images:debian/bullseye
 ```
 
 Export the image of the architecture you want to run (for example armhf):
 
 ```
-lxc image export images:debian/buster/armhf
+lxc image export images:debian/bullseye/armhf
 ```
 
 This command will create two files.
