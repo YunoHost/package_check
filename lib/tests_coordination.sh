@@ -138,7 +138,7 @@ parse_check_process() {
                 > "$TEST_CONTEXT/tests/$test_id.json"
         }
 
-        test_serie="default"
+        test_serie=${tests_serie//;; }
 
         is_test_enabled pkg_linter     && add_test "PACKAGE_LINTER"
         is_test_enabled setup_root     && add_test "TEST_INSTALL" "root"
