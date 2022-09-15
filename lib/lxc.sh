@@ -204,7 +204,7 @@ _LXC_START_AND_WAIT() {
 		fi
 	done
 
-    LXC_IP=$(lxc exec $1 -- hostname -I | grep -E -o "\<[0-9.]{8,}\>")
+    LXC_IP=$(lxc exec $1 -- hostname -I | cut -d' ' -f1 | grep -E -o "\<[0-9.]{8,}\>")
 }
 
 CLEAN_SWAPFILES() {
