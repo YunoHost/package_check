@@ -138,26 +138,7 @@ parse_check_process() {
                 > "$TEST_CONTEXT/tests/$test_id.json"
         }
 
-        # For not-the-main-test-serie, we only consider testing the install and
-        # upgrade from previous commits
-        if [[ "$test_serie_id" != "1" ]]
-        then
-            test_serie=${tests_serie//;; }
-
-            is_test_enabled setup_root     && add_test "TEST_INSTALL" "root"
-            is_test_enabled setup_sub_dir  && add_test "TEST_INSTALL" "subdir"
-            is_test_enabled setup_nourl    && add_test "TEST_INSTALL" "nourl"
-            while IFS= read -r LINE;
-            do
-                commit="$(echo $LINE | grep -o "from_commit=.*" | awk -F= '{print $2}')"
-                [ -n "$commit" ] || continue
-                add_test "TEST_UPGRADE" "$commit"
-            done < <(grep "^upgrade=1" "$TEST_CONTEXT/check_process.tests_infos")
-
-            continue
-        else
-            test_serie="default"
-        fi
+        test_serie=${tests_serie//;; }
 
         is_test_enabled pkg_linter     && add_test "PACKAGE_LINTER"
         is_test_enabled setup_root     && add_test "TEST_INSTALL" "root"
