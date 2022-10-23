@@ -39,7 +39,7 @@ ynh_lxc_pc_exec () {
 
 ynh_lxc_pc_witness_file_create () {
 	[ "$2" = "file" ] && local action="touch" || local action="mkdir -p"
-	ynh_lxc_run_inside $action $1
+	ynh_lxc_run_inside --name=$LXC_NAME --command="$action $1"
 }
 
 ynh_lxc_pc_witness_files_set () {
@@ -75,12 +75,12 @@ ynh_lxc_pc_witness_files_set () {
 	ynh_lxc_pc_witness_file_create "/etc/systemd/system/witnessfile.service" file
 
 	# Database
-	ynh_lxc_run_inside mysqladmin --wait status > /dev/null 2>&1
-	echo "CREATE DATABASE witnessdb" | ynh_lxc_run_inside mysql --wait > /dev/null 2>&1
+	ynh_lxc_run_inside --name=$LXC_NAME --command="mysqladmin --wait status > /dev/null 2>&1"
+	echo "CREATE DATABASE witnessdb" | ynh_lxc_run_inside --name=$LXC_NAME --command="mysql --wait > /dev/null 2>&1"
 }
 
 ynh_lxc_pc_witness_file_check () {
-	if ynh_lxc_run_inside test ! -e "$1"
+	if ynh_lxc_run_inside --name=$LXC_NAME --command="test ! -e \"$1\""
 	then
 		log_error "The file $1 is missing ! Something gone wrong !"
 		SET_RESULT "failure" witness
@@ -119,7 +119,7 @@ ynh_lxc_pc_witness_files_check () {
 	ynh_lxc_pc_witness_file_check "/etc/systemd/system/witnessfile.service"
 
 	# Database
-	if ! ynh_lxc_run_inside mysqlshow witnessdb > /dev/null 2>&1
+	if ! ynh_lxc_run_inside --name=$LXC_NAME --command="mysqlshow witnessdb > /dev/null 2>&1"
 	then
 		log_error "The database witnessdb is missing ! Something gone wrong !"
 		SET_RESULT "failure" witness

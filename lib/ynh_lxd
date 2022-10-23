@@ -17,8 +17,23 @@ ynh_lxc_stop () {
 
 }
 
+# Run a command inside an LXC container
+#
+# usage: ynh_lxc_run_inside --name=name --command=command
+# | arg: -n, --name=		- name of the LXC
+# | arg: -c, --command=		- command to execute
+#
+# Requires YunoHost version *.*.* or higher.
 ynh_lxc_run_inside () {
-	lxc exec $LXC_NAME -- "$@"
+	# Declare an array to define the options of this helper.
+	local legacy_args=nc
+	local -A args_array=([n]=name= [c]=command=)
+	local name
+	local command
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	lxc exec $name -- /bin/bash -c "$command"
 }
 
 

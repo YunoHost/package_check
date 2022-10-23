@@ -530,7 +530,7 @@ TEST_BACKUP_RESTORE () {
 
         # Remove the previous residual backups
         rm -rf $TEST_CONTEXT/ynh_backups
-        ynh_lxc_run_inside rm -rf /home/yunohost.backup/archives
+        ynh_lxc_run_inside --name=$LXC_NAME --command="rm -rf /home/yunohost.backup/archives"
 
         # BACKUP
         # Made a backup if the installation succeed
@@ -573,7 +573,7 @@ TEST_BACKUP_RESTORE () {
                 ynh_lxc_snapshot_load snap0
 
                 # Remove the previous residual backups
-                ynh_lxc_run_inside rm -rf /home/yunohost.backup/archives
+                ynh_lxc_run_inside --name=$LXC_NAME --command="rm -rf /home/yunohost.backup/archives"
 
                 # Place the copy of the backup archive in the container.
                 lxc file push -r $TEST_CONTEXT/ynh_backups/archives $LXC_NAME/home/yunohost.backup/
