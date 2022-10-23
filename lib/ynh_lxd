@@ -163,12 +163,12 @@ ynh_lxc_swapfiles_clean () {
 
 # Check if a snapshot exist for an LXC container
 #
-# usage: ynh_lxc_snapshot_exists --name=$LXC_NAME --snapname=--name=name --snapname=snapname
+# usage: ynh_lxc_snapshot_exists --name=name --snapname=snapname
 # | arg: -n, --name=		- name of the LXC
 # | arg: -s, --snapname=	- name of the snapshot
 #
 # Requires YunoHost version *.*.* or higher.
-ynh_lxc_snapshot_exists --name=$LXC_NAME --snapname=() {
+ynh_lxc_snapshot_exists () {
 	# Declare an array to define the options of this helper.
 	local legacy_args=ns
 	local -A args_array=([n]=name= [s]=snapname=)
