@@ -255,7 +255,7 @@ ynh_lxc_pc_snapshot_create () {
 	ynh_lxc_pc_witness_files_check --name=$name >&2
 
 	# Remove swap files to avoid killing the CI with huge snapshots.
-	ynh_lxc_swapfiles_clean
+	ynh_lxc_swapfiles_clean --name=$name
 	
 	ynh_lxc_stop --name=$name
 
