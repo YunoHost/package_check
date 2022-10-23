@@ -161,7 +161,7 @@ ynh_lxc_pc_snapshot_create () {
 	# Remove swap files to avoid killing the CI with huge snapshots.
 	CLEAN_SWAPFILES
 	
-	LXC_STOP $LXC_NAME
+	ynh_lxc_stop $LXC_NAME
 
 	# Check if the snapshot already exist
 	if ! ynh_lxc_snapshot_exists "$snapname"
@@ -175,19 +175,6 @@ ynh_lxc_pc_snapshot_create () {
 	stop_timer 1
 }
 
-LXC_STOP () {
-	local container_to_stop=$1
-	# (We also use timeout 30 in front of the command because sometime lxc
-	# commands can hang forever despite the --timeout >_>...)
-	timeout 30 lxc stop --timeout 15 $container_to_stop 2>/dev/null
-
-	# If the command times out, then add the option --force
-	if [ $? -eq 124 ]; then
-		timeout 30 lxc stop --timeout 15 $container_to_stop --force 2>/dev/null
-	fi
-
-}
-
 LXC_RESET () {
 	# If the container exists
 	if lxc info $LXC_NAME >/dev/null 2>/dev/null; then
@@ -195,7 +182,7 @@ LXC_RESET () {
 		CLEAN_SWAPFILES
 	fi 
 
-	LXC_STOP $LXC_NAME
+	ynh_lxc_stop $LXC_NAME
 
 	if lxc info $LXC_NAME >/dev/null 2>/dev/null; then
 		local current_storage=$(lxc list $LXC_NAME --format json --columns b | jq '.[].expanded_devices.root.pool')
@@ -210,7 +197,7 @@ _LXC_START_AND_WAIT() {
 
 	restart_container()
 	{
-		LXC_STOP $1
+		ynh_lxc_stop $1
 		lxc start "$1"
 	}
 

@@ -4,6 +4,19 @@
 # LXD HELPERS
 #=================================================
 
+ynh_lxc_stop () {
+	local container_to_stop=$1
+	# (We also use timeout 30 in front of the command because sometime lxc
+	# commands can hang forever despite the --timeout >_>...)
+	timeout 30 lxc stop --timeout 15 $container_to_stop 2>/dev/null
+
+	# If the command times out, then add the option --force
+	if [ $? -eq 124 ]; then
+		timeout 30 lxc stop --timeout 15 $container_to_stop --force 2>/dev/null
+	fi
+
+}
+
 ynh_lxc_snapshot_exists () {
 	local snapname=$1
 	lxc list --format json \
@@ -19,7 +32,7 @@ ynh_lxc_snapshot_load () {
 	# Remove swap files before restoring the snapshot.
 	CLEAN_SWAPFILES
 
-	LXC_STOP $LXC_NAME
+	ynh_lxc_stop $LXC_NAME
 
 	lxc restore $LXC_NAME $snapname
 	lxc start $LXC_NAME
