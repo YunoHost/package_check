@@ -25,42 +25,42 @@ ynh_lxc_pc_exec () {
 	return $returncode
 }
 
+ynh_lxc_pc_witness_file_create () {
+	[ "$2" = "file" ] && local action="touch" || local action="mkdir -p"
+	RUN_INSIDE_LXC $action $1
+}
+
 ynh_lxc_pc_witness_files_set () {
 	# Create files to check if the remove script does not remove them accidentally
 	log_debug "Create witness files..."
 
-	create_witness_file () {
-		[ "$2" = "file" ] && local action="touch" || local action="mkdir -p"
-		RUN_INSIDE_LXC $action $1
-	}
-
 	# Nginx conf
-	create_witness_file "/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf" file
-	create_witness_file "/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf" file
+	ynh_lxc_pc_witness_file_create "/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf" file
+	ynh_lxc_pc_witness_file_create "/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf" file
 
 	# /etc
-	create_witness_file "/etc/witnessfile" file
+	ynh_lxc_pc_witness_file_create "/etc/witnessfile" file
 
 	# /opt directory
-	create_witness_file "/opt/witnessdir" directory
+	ynh_lxc_pc_witness_file_create "/opt/witnessdir" directory
 
 	# /var/www directory
-	create_witness_file "/var/www/witnessdir" directory
+	ynh_lxc_pc_witness_file_create "/var/www/witnessdir" directory
 
 	# /home/yunohost.app/
-	create_witness_file "/home/yunohost.app/witnessdir" directory
+	ynh_lxc_pc_witness_file_create "/home/yunohost.app/witnessdir" directory
 
 	# /var/log
-	create_witness_file "/var/log/witnessfile" file
+	ynh_lxc_pc_witness_file_create "/var/log/witnessfile" file
 
 	# Config fpm
-	create_witness_file "/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf" file
+	ynh_lxc_pc_witness_file_create "/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf" file
 
 	# Config logrotate
-	create_witness_file "/etc/logrotate.d/witnessfile" file
+	ynh_lxc_pc_witness_file_create "/etc/logrotate.d/witnessfile" file
 
 	# Config systemd
-	create_witness_file "/etc/systemd/system/witnessfile.service" file
+	ynh_lxc_pc_witness_file_create "/etc/systemd/system/witnessfile.service" file
 
 	# Database
 	RUN_INSIDE_LXC mysqladmin --wait status > /dev/null 2>&1
