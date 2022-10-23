@@ -4,6 +4,28 @@
 # LXD HELPERS
 #=================================================
 
+# Check if a LXC container exists
+#
+# usage: ynh_lxc_exists --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_exists () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	if ! lxc list --format json | jq -e --arg name $name '.[] | select(.name==$name) | .name' >/dev/null
+	then
+		return 1
+	else
+		return 0
+	fi
+}
+
 # Stopping an LXC container
 #
 # usage: ynh_lxc_stop --name=name
@@ -213,7 +235,11 @@ ynh_lxc_snapshot_exists () {
 	# Manage arguments with getopts
 	ynh_handle_getopts_args "$@"
 
-	lxc list --format json | jq -e --arg name $name --arg snapname $snapname '.[] | select(.name==$name) | .snapshots[] | select(.name==$snapname)' >/dev/null
+	# If the container exists
+	if ynh_lxc_exists --name=$name
+	then
+		lxc list --format json | jq -e --arg name $name --arg snapname $snapname '.[] | select(.name==$name) | .snapshots[] | select(.name==$snapname)' >/dev/null
+	fi
 }
 
 # Create a snapshot of an LXC container
@@ -291,14 +317,16 @@ ynh_lxc_reset () {
 	ynh_handle_getopts_args "$@"
 
 	# If the container exists
-	if lxc info $name >/dev/null 2>/dev/null; then
-		# Remove swap files before deletting the continer
+	if ynh_lxc_exists --name=$name
+	then
+		# Remove swap files before deleting the container
 		ynh_lxc_swapfiles_clean --name=$name
 	fi 
 
 	ynh_lxc_stop --name=$name
 
-	if lxc info $name >/dev/null 2>/dev/null; then
+	if ynh_lxc_exists --name=$name
+	then
 		local current_storage=$(lxc list $name --format json --columns b | jq '.[].expanded_devices.root.pool')
 		swapoff "$(lxc storage get $current_storage source)/containers/$name/rootfs/swap" 2>/dev/null
 	fi 
