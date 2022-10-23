@@ -216,6 +216,38 @@ ynh_lxc_snapshot_exists () {
 	lxc list --format json | jq -e --arg name $name --arg snapname $snapname '.[] | select(.name==$name) | .snapshots[] | select(.name==$snapname)' >/dev/null
 }
 
+# Create a snapshot of an LXC container
+#
+# usage: ynh_lxc_snapshot_create --name=name --snapname=snapname
+# | arg: -n, --name=		- name of the LXC
+# | arg: -s, --snapname=	- name of the snapshot
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_snapshot_create () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=ns
+	local -A args_array=([n]=name= [s]=snapname=)
+	local name
+	local snapname
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	# Remove swap files to avoid killing the CI with huge snapshots.
+	ynh_lxc_swapfiles_clean --name=$name
+	
+	ynh_lxc_stop --name=$name
+
+	# Check if the snapshot already exist
+	if ! ynh_lxc_snapshot_exists --name=$name --snapname="$snapname"
+	then
+		log_info "(Creating snapshot $snapname ...)"
+		lxc snapshot $name $snapname
+	else
+		log_info "(Recreating snapshot $snapname ...)"
+		lxc snapshot $name $snapname --reuse
+	fi
+}
+
 # Load a snapshot of an LXC container
 #
 # usage: ynh_lxc_snapshot_load --name=name --snapname=snapname

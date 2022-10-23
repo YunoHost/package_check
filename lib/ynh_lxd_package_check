@@ -237,17 +237,7 @@ ynh_lxc_pc_snapshot_create () {
 	# Check all the witness files, to verify if them still here
 	ynh_lxc_pc_witness_files_check --name=$name >&2
 
-	# Remove swap files to avoid killing the CI with huge snapshots.
-	ynh_lxc_swapfiles_clean --name=$name
-	
-	ynh_lxc_stop --name=$name
-
-	# Check if the snapshot already exist
-	if ! ynh_lxc_snapshot_exists --name=$name --snapname="$snapname"
-	then
-		log_info "(Creating snapshot $snapname ...)"
-		lxc snapshot $name $snapname
-	fi
+	ynh_lxc_snapshot_create --name=$name --snapname=$snapname
 
 	_ynh_lxc_start_and_wait --name=$name
 
