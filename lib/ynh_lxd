@@ -90,6 +90,30 @@ ynh_lxc_is_stopped () {
 	fi
 }
 
+# Start an LXC container
+#
+# usage: ynh_lxc_start --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_start () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	# If the container exists
+	if ynh_lxc_exists --name=$name
+	then
+		if ! ynh_lxc_is_started --name=$name
+		then
+			lxc start $name
+		fi
+	fi
+}
+
 # Stopping an LXC container
 #
 # usage: ynh_lxc_stop --name=name
@@ -148,7 +172,7 @@ _ynh_lxc_restart_container () {
 	ynh_handle_getopts_args "$@"
 
 	ynh_lxc_stop --name=$name
-	lxc start "$name"
+	ynh_lxc_start --name=$name
 }
 
 # Keep sure the LXC is started
@@ -276,7 +300,7 @@ ynh_lxc_swapfiles_clean () {
 
 	# Restart it if needed
 	if [ "$(lxc info $name | grep Status | awk '{print tolower($2)}')" != "running" ]; then
-		lxc start $name
+		ynh_lxc_start --name=$name
 		_ynh_lxc_start_and_wait --name=$name
 	fi
 	lxc exec $name -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done'
@@ -362,7 +386,7 @@ ynh_lxc_snapshot_load () {
 	ynh_lxc_stop --name=$name
 
 	lxc restore $name $snapname
-	lxc start $name
+	ynh_lxc_start --name=$name
 	_ynh_lxc_start_and_wait --name=$name
 }
 
