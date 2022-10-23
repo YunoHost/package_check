@@ -37,9 +37,26 @@ ynh_lxc_pc_exec () {
 	return $returncode
 }
 
+# Create a witness in an LXC container
+#
+# usage: ynh_lxc_pc_witness_file_create --name=name --witness=witness --type=type
+# | arg: -n, --name=		- name of the LXC
+# | arg: -w, --witness=		- witness to create
+# | arg: -t, --type=		- type of witness, can be file or directory
+#
+# Requires YunoHost version *.*.* or higher.
 ynh_lxc_pc_witness_file_create () {
-	[ "$2" = "file" ] && local action="touch" || local action="mkdir -p"
-	ynh_lxc_run_inside --name=$LXC_NAME --command="$action $1"
+	# Declare an array to define the options of this helper.
+	local legacy_args=nwt
+	local -A args_array=([n]=name= [w]=witness= [t]=type=)
+	local name
+	local witness
+	local type
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	[ "$type" = "file" ] && local action="touch" || local action="mkdir -p"
+	ynh_lxc_run_inside --name=$name --command="$action $witness"
 }
 
 ynh_lxc_pc_witness_files_set () {
@@ -47,32 +64,32 @@ ynh_lxc_pc_witness_files_set () {
 	log_debug "Create witness files..."
 
 	# Nginx conf
-	ynh_lxc_pc_witness_file_create "/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf" file
-	ynh_lxc_pc_witness_file_create "/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf" file
+	ynh_lxc_pc_witness_file_create --name=$LXC_NAME --witness="/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf" --type=file
+	ynh_lxc_pc_witness_file_create --name=$LXC_NAME --witness="/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf" --type=file
 
 	# /etc
-	ynh_lxc_pc_witness_file_create "/etc/witnessfile" file
+	ynh_lxc_pc_witness_file_create --name=$LXC_NAME --witness="/etc/witnessfile" --type=file
 
 	# /opt directory
-	ynh_lxc_pc_witness_file_create "/opt/witnessdir" directory
+	ynh_lxc_pc_witness_file_create --name=$LXC_NAME --witness="/opt/witnessdir" --type=directory
 
 	# /var/www directory
-	ynh_lxc_pc_witness_file_create "/var/www/witnessdir" directory
+	ynh_lxc_pc_witness_file_create --name=$LXC_NAME --witness="/var/www/witnessdir" --type=directory
 
 	# /home/yunohost.app/
-	ynh_lxc_pc_witness_file_create "/home/yunohost.app/witnessdir" directory
+	ynh_lxc_pc_witness_file_create --name=$LXC_NAME --witness="/home/yunohost.app/witnessdir" --type=directory
 
 	# /var/log
-	ynh_lxc_pc_witness_file_create "/var/log/witnessfile" file
+	ynh_lxc_pc_witness_file_create --name=$LXC_NAME --witness="/var/log/witnessfile" --type=file
 
 	# Config fpm
-	ynh_lxc_pc_witness_file_create "/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf" file
+	ynh_lxc_pc_witness_file_create --name=$LXC_NAME --witness="/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf" --type=file
 
 	# Config logrotate
-	ynh_lxc_pc_witness_file_create "/etc/logrotate.d/witnessfile" file
+	ynh_lxc_pc_witness_file_create --name=$LXC_NAME --witness="/etc/logrotate.d/witnessfile" --type=file
 
 	# Config systemd
-	ynh_lxc_pc_witness_file_create "/etc/systemd/system/witnessfile.service" file
+	ynh_lxc_pc_witness_file_create --name=$LXC_NAME --witness="/etc/systemd/system/witnessfile.service" --type=file
 
 	# Database
 	ynh_lxc_run_inside --name=$LXC_NAME --command="mysqladmin --wait status > /dev/null 2>&1"
