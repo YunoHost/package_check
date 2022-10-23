@@ -257,13 +257,13 @@ run_all_tests() {
     LXC_RESET
     LXC_CREATE
     # Be sure that the container is running
-    LXC_EXEC "true"
+    ynh_lxc_pc_exec "true"
 
     # Print the version of YunoHost from the LXC container
     log_small_title "YunoHost versions"
-    LXC_EXEC "yunohost --version"
-    LXC_EXEC "yunohost --version --output-as json" | jq -r .yunohost.version >> $TEST_CONTEXT/ynh_version
-    LXC_EXEC "yunohost --version --output-as json" | jq -r .yunohost.repo >> $TEST_CONTEXT/ynh_branch
+    ynh_lxc_pc_exec "yunohost --version"
+    ynh_lxc_pc_exec "yunohost --version --output-as json" | jq -r .yunohost.version >> $TEST_CONTEXT/ynh_version
+    ynh_lxc_pc_exec "yunohost --version --output-as json" | jq -r .yunohost.repo >> $TEST_CONTEXT/ynh_branch
     echo $ARCH > $TEST_CONTEXT/architecture
     echo $app_id > $TEST_CONTEXT/app_id
 

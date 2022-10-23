@@ -4,6 +4,27 @@
 # PACKAGE_CHECK HELPERS
 #=================================================
 
+ynh_lxc_pc_exec () {
+	# Start the lxc container and execute the given command in it
+	local cmd=$1
+
+	_LXC_START_AND_WAIT $LXC_NAME
+
+	start_timer
+
+	# Execute the command given in argument in the container and log its results.
+	lxc exec $LXC_NAME --env PACKAGE_CHECK_EXEC=1 -t -- /bin/bash -c "$cmd" | tee -a "$complete_log" $current_test_log
+
+	# Store the return code of the command
+	local returncode=${PIPESTATUS[0]}
+
+	log_debug "Return code: $returncode"
+
+	stop_timer 1
+	# Return the exit code of the ssh command
+	return $returncode
+}
+
 LXC_CREATE () {
 	log_info "Launching new LXC $LXC_NAME ..."
 	# Check if we can launch container from YunoHost remote image
@@ -84,29 +105,6 @@ LOAD_LXC_SNAPSHOT () {
 	lxc restore $LXC_NAME $snapname
 	lxc start $LXC_NAME
 	_LXC_START_AND_WAIT $LXC_NAME
-}
-
-#=================================================
-
-LXC_EXEC () {
-	# Start the lxc container and execute the given command in it
-	local cmd=$1
-
-	_LXC_START_AND_WAIT $LXC_NAME
-
-	start_timer
-
-	# Execute the command given in argument in the container and log its results.
-	lxc exec $LXC_NAME --env PACKAGE_CHECK_EXEC=1 -t -- /bin/bash -c "$cmd" | tee -a "$complete_log" $current_test_log
-
-	# Store the return code of the command
-	local returncode=${PIPESTATUS[0]}
-
-	log_debug "Return code: $returncode"
-
-	stop_timer 1
-	# Return the exit code of the ssh command
-	return $returncode
 }
 
 LXC_STOP () {
