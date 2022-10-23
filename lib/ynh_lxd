@@ -17,6 +17,10 @@ ynh_lxc_stop () {
 
 }
 
+ynh_lxc_run_inside () {
+	lxc exec $LXC_NAME -- "$@"
+}
+
 
 _ynh_lxc_start_and_wait () {
 
