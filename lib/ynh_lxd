@@ -128,13 +128,34 @@ ynh_lxc_stop () {
 	# Manage arguments with getopts
 	ynh_handle_getopts_args "$@"
 
-	# (We also use timeout 30 in front of the command because sometime lxc
-	# commands can hang forever despite the --timeout >_>...)
-	timeout 30 lxc stop --timeout 15 $name 2>/dev/null
+	# If the container exists
+	if ynh_lxc_exists --name=$name
+	then
+		ynh_print_info --message="Stopping LXC $name"
+		wait_period=0
+		while ! ynh_lxc_is_stopped --name=$name
+		do
+			lxc stop $name
+			wait_period=$(($wait_period+10))
+			if [ $wait_period -gt 30 ];then
+				break
+			else
+				sleep 1
+			fi
+		done
 
-	# If the command times out, then add the option --force
-	if [ $? -eq 124 ]; then
-		timeout 30 lxc stop --timeout 15 $name --force 2>/dev/null
+		# If the command times out, then add the option --force
+		wait_period=0
+		while ! ynh_lxc_is_stopped --name=$name
+		do
+			lxc stop $name --force
+			wait_period=$(($wait_period+10))
+			if [ $wait_period -gt 30 ];then
+				break
+			else
+				sleep 5
+			fi
+		done
 	fi
 }
 
