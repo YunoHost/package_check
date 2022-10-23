@@ -233,29 +233,40 @@ ynh_lxc_pc_create () {
 	lxc snapshot $name snap0
 }
 
-ynh_lxc_pc_snapshot_create () {
-	# Create a temporary snapshot
-
-	local snapname=$1
+# Create a snapshot of an LXC container
+#
+# usage: ynh_lxc_pc_snapshot_create --name=LXC_NAME --snapname= --name=name --snapname=snapname
+# | arg: -n, --name=		- name of the LXC
+# | arg: -s, --snapname=	- name of the snapshot
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_pc_snapshot_create --name=LXC_NAME --snapname= () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=ns
+	local -A args_array=([n]=name= [s]=snapname=)
+	local name
+	local snapname
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
 
 	start_timer
 
 	# Check all the witness files, to verify if them still here
-	ynh_lxc_pc_witness_files_check --name=$LXC_NAME >&2
+	ynh_lxc_pc_witness_files_check --name=$name >&2
 
 	# Remove swap files to avoid killing the CI with huge snapshots.
 	ynh_lxc_swapfiles_clean
 	
-	ynh_lxc_stop $LXC_NAME
+	ynh_lxc_stop $name
 
 	# Check if the snapshot already exist
 	if ! ynh_lxc_snapshot_exists "$snapname"
 	then
 		log_info "(Creating snapshot $snapname ...)"
-		lxc snapshot $LXC_NAME $snapname
+		lxc snapshot $name $snapname
 	fi
 
-	_ynh_lxc_start_and_wait $LXC_NAME
+	_ynh_lxc_start_and_wait $name
 
 	stop_timer 1
 }
