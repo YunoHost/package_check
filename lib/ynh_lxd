@@ -47,14 +47,25 @@ ynh_lxc_run_inside () {
 	lxc exec $name -- /bin/bash -c "$command"
 }
 
+# Restart a container
+#
+# usage: _ynh_lxc_restart_container --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+_ynh_lxc_restart_container () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	ynh_lxc_stop --name=$name
+	lxc start "$name"
+}
 
 _ynh_lxc_start_and_wait () {
-
-	restart_container()
-	{
-		ynh_lxc_stop --name=$1
-		lxc start "$1"
-	}
 
 	# Try to start the container 3 times.
 	local max_try=3
@@ -75,7 +86,7 @@ _ynh_lxc_start_and_wait () {
 				log_debug 'Failed to start the container ... restarting ...'
 				failstart=1
 
-				restart_container "$1"
+				_ynh_lxc_restart_container --name="$1"
 			fi
 
 			sleep 1s
@@ -91,7 +102,7 @@ _ynh_lxc_start_and_wait () {
 				log_debug 'Failed to access the internet ... restarting'
 				failstart=1
 
-				restart_container "$1"
+				_ynh_lxc_restart_container --name="$1"
 			fi
 
 			sleep 1s
