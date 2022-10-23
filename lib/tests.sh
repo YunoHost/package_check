@@ -18,7 +18,7 @@ _RUN_YUNOHOST_CMD() {
         | grep --line-buffered -v 'processing action'
 
     returncode=${PIPESTATUS[0]}
-    ynh_lxc_pc_witness_files_check && return $returncode || return 2
+    ynh_lxc_pc_witness_files_check --name=$LXC_NAME && return $returncode || return 2
 }
 
 _PREINSTALL () {

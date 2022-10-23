@@ -132,39 +132,52 @@ ynh_lxc_pc_witness_file_check () {
 	fi
 }
 
-ynh_lxc_pc_witness_files_check () {
+# Check witness in an LXC container
+#
+# usage: ynh_lxc_pc_witness_files_check --name=$LXC_NAME --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_pc_witness_files_check --name=$LXC_NAME () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
 	# Check all the witness files, to verify if them still here
 
 	# Nginx conf
-	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf"
-	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf"
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf"
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf"
 
 	# /etc
-	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/etc/witnessfile"
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/etc/witnessfile"
 
 	# /opt directory
-	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/opt/witnessdir"
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/opt/witnessdir"
 
 	# /var/www directory
-	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/var/www/witnessdir"
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/var/www/witnessdir"
 
 	# /home/yunohost.app/
-	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/home/yunohost.app/witnessdir"
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/home/yunohost.app/witnessdir"
 
 	# /var/log
-	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/var/log/witnessfile"
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/var/log/witnessfile"
 
 	# Config fpm
-	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf"
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf"
 
 	# Config logrotate
-	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/etc/logrotate.d/witnessfile"
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/etc/logrotate.d/witnessfile"
 
 	# Config systemd
-	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/etc/systemd/system/witnessfile.service"
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/etc/systemd/system/witnessfile.service"
 
 	# Database
-	if ! ynh_lxc_run_inside --name=$LXC_NAME --command="mysqlshow witnessdb > /dev/null 2>&1"
+	if ! ynh_lxc_run_inside --name=$name --command="mysqlshow witnessdb > /dev/null 2>&1"
 	then
 		log_error "The database witnessdb is missing ! Something gone wrong !"
 		SET_RESULT "failure" witness
@@ -213,7 +226,7 @@ ynh_lxc_pc_snapshot_create () {
 	start_timer
 
 	# Check all the witness files, to verify if them still here
-	ynh_lxc_pc_witness_files_check >&2
+	ynh_lxc_pc_witness_files_check --name=$LXC_NAME >&2
 
 	# Remove swap files to avoid killing the CI with huge snapshots.
 	ynh_lxc_swapfiles_clean
