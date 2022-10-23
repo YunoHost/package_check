@@ -20,7 +20,7 @@ ynh_lxc_pc_exec () {
 	# Manage arguments with getopts
 	ynh_handle_getopts_args "$@"
 
-	_ynh_lxc_start_and_wait $name
+	_ynh_lxc_start_and_wait --name=$name
 
 	start_timer
 
@@ -228,7 +228,7 @@ ynh_lxc_pc_create () {
 
 	[[ "$pipestatus" -eq 0 ]] || exit 1
 
-	_ynh_lxc_start_and_wait $name
+	_ynh_lxc_start_and_wait --name=$name
 	ynh_lxc_pc_witness_files_set --name=$name
 	lxc snapshot $name snap0
 }
@@ -266,7 +266,7 @@ ynh_lxc_pc_snapshot_create () {
 		lxc snapshot $name $snapname
 	fi
 
-	_ynh_lxc_start_and_wait $name
+	_ynh_lxc_start_and_wait --name=$name
 
 	stop_timer 1
 }
