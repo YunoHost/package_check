@@ -132,7 +132,7 @@ _LOAD_SNAPSHOT_OR_INSTALL_APP () {
         LOAD_LXC_SNAPSHOT snap0 \
             && _PREINSTALL \
             && _INSTALL_APP "path=$check_path" \
-            && CREATE_LXC_SNAPSHOT $snapname
+            && ynh_lxc_pc_snapshot_create $snapname
     else
         # Or uses an existing snapshot
         log_info "(Reusing existing snapshot $snapname)" \
@@ -372,7 +372,7 @@ TEST_INSTALL () {
     [ "$install_type" != "private" ] \
         && ! LXC_SNAPSHOT_EXISTS $snapname \
         && log_debug "Create a snapshot after app install" \
-        && CREATE_LXC_SNAPSHOT $snapname
+        && ynh_lxc_pc_snapshot_create $snapname
 
     # Remove and reinstall the application
     _REMOVE_APP \

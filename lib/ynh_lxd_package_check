@@ -156,7 +156,7 @@ LXC_SNAPSHOT_EXISTS() {
 			>/dev/null
 }
 
-CREATE_LXC_SNAPSHOT () {
+ynh_lxc_pc_snapshot_create () {
 	# Create a temporary snapshot
 
 	local snapname=$1
