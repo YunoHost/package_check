@@ -67,44 +67,44 @@ ynh_lxc_pc_witness_files_set () {
 	echo "CREATE DATABASE witnessdb" | RUN_INSIDE_LXC mysql --wait > /dev/null 2>&1
 }
 
+ynh_lxc_pc_witness_file_check () {
+	if RUN_INSIDE_LXC test ! -e "$1"
+	then
+		log_error "The file $1 is missing ! Something gone wrong !"
+		SET_RESULT "failure" witness
+	fi
+}
+
 ynh_lxc_pc_witness_files_check () {
 	# Check all the witness files, to verify if them still here
 
-	check_file_exist () {
-		if RUN_INSIDE_LXC test ! -e "$1"
-		then
-			log_error "The file $1 is missing ! Something gone wrong !"
-			SET_RESULT "failure" witness
-		fi
-	}
-
 	# Nginx conf
-	check_file_exist "/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf"
-	check_file_exist "/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf"
+	ynh_lxc_pc_witness_file_check "/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf"
+	ynh_lxc_pc_witness_file_check "/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf"
 
 	# /etc
-	check_file_exist "/etc/witnessfile"
+	ynh_lxc_pc_witness_file_check "/etc/witnessfile"
 
 	# /opt directory
-	check_file_exist "/opt/witnessdir"
+	ynh_lxc_pc_witness_file_check "/opt/witnessdir"
 
 	# /var/www directory
-	check_file_exist "/var/www/witnessdir"
+	ynh_lxc_pc_witness_file_check "/var/www/witnessdir"
 
 	# /home/yunohost.app/
-	check_file_exist "/home/yunohost.app/witnessdir"
+	ynh_lxc_pc_witness_file_check "/home/yunohost.app/witnessdir"
 
 	# /var/log
-	check_file_exist "/var/log/witnessfile"
+	ynh_lxc_pc_witness_file_check "/var/log/witnessfile"
 
 	# Config fpm
-	check_file_exist "/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf"
+	ynh_lxc_pc_witness_file_check "/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf"
 
 	# Config logrotate
-	check_file_exist "/etc/logrotate.d/witnessfile"
+	ynh_lxc_pc_witness_file_check "/etc/logrotate.d/witnessfile"
 
 	# Config systemd
-	check_file_exist "/etc/systemd/system/witnessfile.service"
+	ynh_lxc_pc_witness_file_check "/etc/systemd/system/witnessfile.service"
 
 	# Database
 	if ! RUN_INSIDE_LXC mysqlshow witnessdb > /dev/null 2>&1
@@ -115,7 +115,7 @@ ynh_lxc_pc_witness_files_check () {
 	fi
 }
 
-LXC_CREATE () {
+ynh_lxc_pc_create () {
 	log_info "Launching new LXC $LXC_NAME ..."
 	# Check if we can launch container from YunoHost remote image
 	if lxc remote list | grep -q "yunohost" && lxc image list yunohost:$LXC_BASE | grep -q -w $LXC_BASE; then
