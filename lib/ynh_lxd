@@ -344,12 +344,10 @@ ynh_lxc_swapfiles_clean () {
 	# Manage arguments with getopts
 	ynh_handle_getopts_args "$@"
 
-	# Restart it if needed
-	if [ "$(lxc info $name | grep Status | awk '{print tolower($2)}')" != "running" ]; then
-		_ynh_lxc_start_and_wait --name=$name
-	fi
-	lxc exec $name -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done'
-	lxc exec $name -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do rm -f $swapfile; done'
+	_ynh_lxc_start_and_wait --name=$name
+
+	ynh_lxc_run_inside --name=$name --command='for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done'
+	ynh_lxc_run_inside --name=$name --command='for swapfile in $(ls /swap_* 2>/dev/null); do rm -f $swapfile; done'
 }
 
 # Check if a snapshot exist for an LXC container
