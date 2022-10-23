@@ -68,6 +68,28 @@ ynh_lxc_is_started () {
 	fi
 }
 
+# Check if an LXC container is stopped
+#
+# usage: ynh_lxc_is_stopped --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_is_stopped () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	if [ "$(ynh_lxc_status --name=$name)" == Stopped ]
+	then
+		return 0
+	else
+		return 1
+	fi
+}
+
 # Stopping an LXC container
 #
 # usage: ynh_lxc_stop --name=name
