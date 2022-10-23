@@ -134,11 +134,11 @@ ynh_lxc_pc_witness_file_check () {
 
 # Check witness in an LXC container
 #
-# usage: ynh_lxc_pc_witness_files_check --name=$LXC_NAME --name=name
+# usage: ynh_lxc_pc_witness_files_check --name=name
 # | arg: -n, --name=	- name of the LXC
 #
 # Requires YunoHost version *.*.* or higher.
-ynh_lxc_pc_witness_files_check --name=$LXC_NAME () {
+ynh_lxc_pc_witness_files_check () {
 	# Declare an array to define the options of this helper.
 	local legacy_args=n
 	local -A args_array=([n]=name=)
