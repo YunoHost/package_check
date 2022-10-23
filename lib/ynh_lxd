@@ -12,3 +12,17 @@ ynh_lxc_snapshot_exists () {
 			>/dev/null
 }
 
+ynh_lxc_snapshot_load () {
+	local snapname=$1
+	log_debug "Loading snapshot $snapname ..."
+
+	# Remove swap files before restoring the snapshot.
+	CLEAN_SWAPFILES
+
+	LXC_STOP $LXC_NAME
+
+	lxc restore $LXC_NAME $snapname
+	lxc start $LXC_NAME
+	_LXC_START_AND_WAIT $LXC_NAME
+}
+

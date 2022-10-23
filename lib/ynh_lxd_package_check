@@ -175,20 +175,6 @@ ynh_lxc_pc_snapshot_create () {
 	stop_timer 1
 }
 
-LOAD_LXC_SNAPSHOT () {
-	local snapname=$1
-	log_debug "Loading snapshot $snapname ..."
-
-	# Remove swap files before restoring the snapshot.
-	CLEAN_SWAPFILES
-
-	LXC_STOP $LXC_NAME
-
-	lxc restore $LXC_NAME $snapname
-	lxc start $LXC_NAME
-	_LXC_START_AND_WAIT $LXC_NAME
-}
-
 LXC_STOP () {
 	local container_to_stop=$1
 	# (We also use timeout 30 in front of the command because sometime lxc
