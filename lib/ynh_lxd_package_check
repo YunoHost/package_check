@@ -25,6 +25,48 @@ ynh_lxc_pc_exec () {
 	return $returncode
 }
 
+ynh_lxc_pc_witness_files_set () {
+	# Create files to check if the remove script does not remove them accidentally
+	log_debug "Create witness files..."
+
+	create_witness_file () {
+		[ "$2" = "file" ] && local action="touch" || local action="mkdir -p"
+		RUN_INSIDE_LXC $action $1
+	}
+
+	# Nginx conf
+	create_witness_file "/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf" file
+	create_witness_file "/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf" file
+
+	# /etc
+	create_witness_file "/etc/witnessfile" file
+
+	# /opt directory
+	create_witness_file "/opt/witnessdir" directory
+
+	# /var/www directory
+	create_witness_file "/var/www/witnessdir" directory
+
+	# /home/yunohost.app/
+	create_witness_file "/home/yunohost.app/witnessdir" directory
+
+	# /var/log
+	create_witness_file "/var/log/witnessfile" file
+
+	# Config fpm
+	create_witness_file "/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf" file
+
+	# Config logrotate
+	create_witness_file "/etc/logrotate.d/witnessfile" file
+
+	# Config systemd
+	create_witness_file "/etc/systemd/system/witnessfile.service" file
+
+	# Database
+	RUN_INSIDE_LXC mysqladmin --wait status > /dev/null 2>&1
+	echo "CREATE DATABASE witnessdb" | RUN_INSIDE_LXC mysql --wait > /dev/null 2>&1
+}
+
 LXC_CREATE () {
 	log_info "Launching new LXC $LXC_NAME ..."
 	# Check if we can launch container from YunoHost remote image
@@ -54,7 +96,7 @@ LXC_CREATE () {
 	[[ "$pipestatus" -eq 0 ]] || exit 1
 
 	_LXC_START_AND_WAIT $LXC_NAME
-	set_witness_files
+	ynh_lxc_pc_witness_files_set
 	lxc snapshot $LXC_NAME snap0
 }
 
@@ -217,48 +259,6 @@ CLEAN_SWAPFILES() {
 
 RUN_INSIDE_LXC() {
 	lxc exec $LXC_NAME -- "$@"
-}
-
-set_witness_files () {
-	# Create files to check if the remove script does not remove them accidentally
-	log_debug "Create witness files..."
-
-	create_witness_file () {
-		[ "$2" = "file" ] && local action="touch" || local action="mkdir -p"
-		RUN_INSIDE_LXC $action $1
-	}
-
-	# Nginx conf
-	create_witness_file "/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf" file
-	create_witness_file "/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf" file
-
-	# /etc
-	create_witness_file "/etc/witnessfile" file
-
-	# /opt directory
-	create_witness_file "/opt/witnessdir" directory
-
-	# /var/www directory
-	create_witness_file "/var/www/witnessdir" directory
-
-	# /home/yunohost.app/
-	create_witness_file "/home/yunohost.app/witnessdir" directory
-
-	# /var/log
-	create_witness_file "/var/log/witnessfile" file
-
-	# Config fpm
-	create_witness_file "/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf" file
-
-	# Config logrotate
-	create_witness_file "/etc/logrotate.d/witnessfile" file
-
-	# Config systemd
-	create_witness_file "/etc/systemd/system/witnessfile.service" file
-
-	# Database
-	RUN_INSIDE_LXC mysqladmin --wait status > /dev/null 2>&1
-	echo "CREATE DATABASE witnessdb" | RUN_INSIDE_LXC mysql --wait > /dev/null 2>&1
 }
 
 check_witness_files () {
