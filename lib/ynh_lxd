@@ -17,6 +17,74 @@ ynh_lxc_stop () {
 
 }
 
+
+_ynh_lxc_start_and_wait () {
+
+	restart_container()
+	{
+		ynh_lxc_stop $1
+		lxc start "$1"
+	}
+
+	# Try to start the container 3 times.
+	local max_try=3
+	local i=0
+	while [ $i -lt $max_try ]
+	do
+		i=$(( i +1 ))
+		local failstart=0
+
+		# Wait for container to start, we are using systemd to check this,
+		# for the sake of brevity.
+		for j in $(seq 1 10); do
+			if lxc exec "$1" -- systemctl isolate multi-user.target >/dev/null 2>/dev/null; then
+				break
+			fi
+
+			if [ "$j" == "10" ]; then
+				log_debug 'Failed to start the container ... restarting ...'
+				failstart=1
+
+				restart_container "$1"
+			fi
+
+			sleep 1s
+		done
+
+		# Wait for container to access the internet
+		for j in $(seq 1 10); do
+			if lxc exec "$1" -- curl -s http://wikipedia.org > /dev/null 2>/dev/null; then
+				break
+			fi
+
+			if [ "$j" == "10" ]; then
+				log_debug 'Failed to access the internet ... restarting'
+				failstart=1
+
+				restart_container "$1"
+			fi
+
+			sleep 1s
+		done
+
+		# Has started and has access to the internet
+		if [ $failstart -eq 0 ]
+		then
+			break
+		fi
+
+		# Fail if the container failed to start
+		if [ $i -eq $max_try ] && [ $failstart -eq 1 ]
+		then
+			log_error "The container miserably failed to start or to connect to the internet"
+			lxc info --show-log $1
+			return 1
+		fi
+	done
+
+	LXC_IP=$(lxc exec $1 -- hostname -I | cut -d' ' -f1 | grep -E -o "\<[0-9.]{8,}\>")
+}
+
 ynh_lxc_snapshot_exists () {
 	local snapname=$1
 	lxc list --format json \
@@ -36,7 +104,7 @@ ynh_lxc_snapshot_load () {
 
 	lxc restore $LXC_NAME $snapname
 	lxc start $LXC_NAME
-	_LXC_START_AND_WAIT $LXC_NAME
+	_ynh_lxc_start_and_wait $LXC_NAME
 }
 
 ynh_lxc_reset () {
