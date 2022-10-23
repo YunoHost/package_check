@@ -124,7 +124,7 @@ parse_args
 function cleanup()
 {
     trap '' SIGINT # Disable ctrl+c in this function
-    ynh_lxc_reset
+    ynh_lxc_reset --name=$LXC_NAME
 
     [ -n "$TEST_CONTEXT" ] && rm -rf "$TEST_CONTEXT"
     [ -n "$lock_file" ] && rm -f "$lock_file"

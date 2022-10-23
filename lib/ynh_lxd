@@ -208,20 +208,32 @@ ynh_lxc_snapshot_load () {
 	_ynh_lxc_start_and_wait --name=$name
 }
 
+# Reset an LXC container
+#
+# usage: ynh_lxc_reset --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
 ynh_lxc_reset () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
 	# If the container exists
-	if lxc info $LXC_NAME >/dev/null 2>/dev/null; then
+	if lxc info $name >/dev/null 2>/dev/null; then
 		# Remove swap files before deletting the continer
-		ynh_lxc_swapfiles_clean --name=$LXC_NAME
+		ynh_lxc_swapfiles_clean --name=$name
 	fi 
 
-	ynh_lxc_stop --name=$LXC_NAME
+	ynh_lxc_stop --name=$name
 
-	if lxc info $LXC_NAME >/dev/null 2>/dev/null; then
-		local current_storage=$(lxc list $LXC_NAME --format json --columns b | jq '.[].expanded_devices.root.pool')
-		swapoff "$(lxc storage get $current_storage source)/containers/$LXC_NAME/rootfs/swap" 2>/dev/null
+	if lxc info $name >/dev/null 2>/dev/null; then
+		local current_storage=$(lxc list $name --format json --columns b | jq '.[].expanded_devices.root.pool')
+		swapoff "$(lxc storage get $current_storage source)/containers/$name/rootfs/swap" 2>/dev/null
 	fi 
 
-	lxc delete $LXC_NAME --force 2>/dev/null
+	lxc delete $name --force 2>/dev/null
 }
-
