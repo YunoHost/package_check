@@ -109,10 +109,25 @@ ynh_lxc_pc_witness_files_set () {
 	ynh_lxc_run_inside --name=$name --command="echo \"CREATE DATABASE witnessdb\" | mysql --wait > /dev/null 2>&1"
 }
 
+# Check if a witness exists in an LXC container
+#
+# usage: ynh_lxc_pc_witness_file_check --name=name --witness=witness
+# | arg: -n, --name=		- name of the LXC
+# | arg: -w, --witness=		- witness to create
+#
+# Requires YunoHost version *.*.* or higher.
 ynh_lxc_pc_witness_file_check () {
-	if ynh_lxc_run_inside --name=$LXC_NAME --command="test ! -e \"$1\""
+	# Declare an array to define the options of this helper.
+	local legacy_args=nw
+	local -A args_array=([n]=name= [w]=witness=)
+	local name
+	local witness
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	if ynh_lxc_run_inside --name=$name --command="test ! -e \"$witness\""
 	then
-		log_error "The file $1 is missing ! Something gone wrong !"
+		log_error "The file $witness is missing ! Something gone wrong !"
 		SET_RESULT "failure" witness
 	fi
 }
@@ -121,32 +136,32 @@ ynh_lxc_pc_witness_files_check () {
 	# Check all the witness files, to verify if them still here
 
 	# Nginx conf
-	ynh_lxc_pc_witness_file_check "/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf"
-	ynh_lxc_pc_witness_file_check "/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf"
+	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf"
+	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf"
 
 	# /etc
-	ynh_lxc_pc_witness_file_check "/etc/witnessfile"
+	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/etc/witnessfile"
 
 	# /opt directory
-	ynh_lxc_pc_witness_file_check "/opt/witnessdir"
+	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/opt/witnessdir"
 
 	# /var/www directory
-	ynh_lxc_pc_witness_file_check "/var/www/witnessdir"
+	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/var/www/witnessdir"
 
 	# /home/yunohost.app/
-	ynh_lxc_pc_witness_file_check "/home/yunohost.app/witnessdir"
+	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/home/yunohost.app/witnessdir"
 
 	# /var/log
-	ynh_lxc_pc_witness_file_check "/var/log/witnessfile"
+	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/var/log/witnessfile"
 
 	# Config fpm
-	ynh_lxc_pc_witness_file_check "/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf"
+	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf"
 
 	# Config logrotate
-	ynh_lxc_pc_witness_file_check "/etc/logrotate.d/witnessfile"
+	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/etc/logrotate.d/witnessfile"
 
 	# Config systemd
-	ynh_lxc_pc_witness_file_check "/etc/systemd/system/witnessfile.service"
+	ynh_lxc_pc_witness_file_check --name=$LXC_NAME --witness="/etc/systemd/system/witnessfile.service"
 
 	# Database
 	if ! ynh_lxc_run_inside --name=$LXC_NAME --command="mysqlshow witnessdb > /dev/null 2>&1"
