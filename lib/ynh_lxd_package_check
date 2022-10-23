@@ -203,25 +203,8 @@ ynh_lxc_pc_create () {
 
 	log_info "Launching new LXC $name ..."
 	# Check if we can launch container from YunoHost remote image
-	if lxc remote list | grep -q "yunohost" && lxc image list yunohost:$image | grep -q -w $image; then
-		lxc launch yunohost:$image $name \
-			-c security.nesting=true \
-			-c security.privileged=true \
-			-c limits.memory=80% \
-			-c limits.cpu.allowance=80% \
-			>>/proc/self/fd/3
-	# Check if we can launch container from a local image
-	elif lxc image list $image | grep -q -w $image; then
-		lxc launch $image $name \
-			-c security.nesting=true \
-			-c security.privileged=true \
-			-c limits.memory=80% \
-			-c limits.cpu.allowance=80% \
-			>>/proc/self/fd/3
-	else
-		log_critical "Can't find base image $image, run ./package_check.sh --rebuild"
-	fi
-	
+	ynh_lxc_launch --image=$image --name=$name
+
 	pipestatus="${PIPESTATUS[0]}"
 	location=$(lxc list --format json | jq -e --arg name $name '.[] | select(.name==$name) | .location' | tr -d '"')
 	[[ "$location" != "none" ]] && log_info "... on $location"

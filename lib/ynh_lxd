@@ -138,6 +138,42 @@ _ynh_lxc_start_and_wait () {
 	LXC_IP=$(lxc exec $name -- hostname -I | cut -d' ' -f1 | grep -E -o "\<[0-9.]{8,}\>")
 }
 
+# Launch a new LXC from an image
+#
+# usage: ynh_lxc_launch --image=image --name=name
+# | arg: -i, --image=	- image to create from
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_launch (){
+	# Declare an array to define the options of this helper.
+	local legacy_args=in
+	local -A args_array=([i]=image= [n]=name=)
+	local image
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	if lxc remote list | grep -q "yunohost" && lxc image list yunohost:$image | grep -q -w $image; then
+		lxc launch yunohost:$image $name \
+			-c security.nesting=true \
+			-c security.privileged=true \
+			-c limits.memory=80% \
+			-c limits.cpu.allowance=80% \
+			>>/proc/self/fd/3
+	# Check if we can launch container from a local image
+	elif lxc image list $image | grep -q -w $image; then
+		lxc launch $image $name \
+			-c security.nesting=true \
+			-c security.privileged=true \
+			-c limits.memory=80% \
+			-c limits.cpu.allowance=80% \
+			>>/proc/self/fd/3
+	else
+		log_critical "Can't find base image $image, run ./package_check.sh --rebuild"
+	fi
+}
+
 # Clean the swapfiles of an LXC container
 #
 # usage: ynh_lxc_swapfiles_clean --name=name
