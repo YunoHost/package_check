@@ -213,7 +213,7 @@ ynh_lxc_pc_create () {
 
 	_ynh_lxc_start_and_wait --name=$name
 	ynh_lxc_pc_witness_files_set --name=$name
-	lxc snapshot $name snap0
+	ynh_lxc_snapshot_create --name=$name --snapname=snap0
 }
 
 # Create a snapshot of an LXC container
