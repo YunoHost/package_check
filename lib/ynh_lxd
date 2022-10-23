@@ -369,7 +369,17 @@ ynh_lxc_snapshot_exists () {
 	# If the container exists
 	if ynh_lxc_exists --name=$name
 	then
-		lxc list --format json | jq -e --arg name $name --arg snapname $snapname '.[] | select(.name==$name) | .snapshots[] | select(.name==$snapname)' >/dev/null
+		if lxc list --format json | jq -e --arg name $name --arg snapname $snapname '.[] | select(.name==$name) | .snapshots' >/dev/null
+		then
+			if lxc list --format json | jq -e --arg name $name --arg snapname $snapname '.[] | select(.name==$name) | .snapshots[] | select(.name==$snapname)' >/dev/null
+			then
+				return 0
+			else
+				return 1
+			fi
+		else
+			return 1
+		fi
 	fi
 }
 
