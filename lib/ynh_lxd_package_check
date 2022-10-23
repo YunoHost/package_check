@@ -257,7 +257,7 @@ ynh_lxc_pc_snapshot_create () {
 	# Remove swap files to avoid killing the CI with huge snapshots.
 	ynh_lxc_swapfiles_clean
 	
-	ynh_lxc_stop $name
+	ynh_lxc_stop --name=$name
 
 	# Check if the snapshot already exist
 	if ! ynh_lxc_snapshot_exists "$snapname"

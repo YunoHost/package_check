@@ -4,17 +4,28 @@
 # LXD HELPERS
 #=================================================
 
+# Stopping an LXC container
+#
+# usage: ynh_lxc_stop --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
 ynh_lxc_stop () {
-	local container_to_stop=$1
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
 	# (We also use timeout 30 in front of the command because sometime lxc
 	# commands can hang forever despite the --timeout >_>...)
-	timeout 30 lxc stop --timeout 15 $container_to_stop 2>/dev/null
+	timeout 30 lxc stop --timeout 15 $name 2>/dev/null
 
 	# If the command times out, then add the option --force
 	if [ $? -eq 124 ]; then
-		timeout 30 lxc stop --timeout 15 $container_to_stop --force 2>/dev/null
+		timeout 30 lxc stop --timeout 15 $name --force 2>/dev/null
 	fi
-
 }
 
 # Run a command inside an LXC container
@@ -41,7 +52,7 @@ _ynh_lxc_start_and_wait () {
 
 	restart_container()
 	{
-		ynh_lxc_stop $1
+		ynh_lxc_stop --name=$1
 		lxc start "$1"
 	}
 
@@ -129,7 +140,7 @@ ynh_lxc_snapshot_load () {
 	# Remove swap files before restoring the snapshot.
 	ynh_lxc_swapfiles_clean
 
-	ynh_lxc_stop $LXC_NAME
+	ynh_lxc_stop --name=$LXC_NAME
 
 	lxc restore $LXC_NAME $snapname
 	lxc start $LXC_NAME
@@ -143,7 +154,7 @@ ynh_lxc_reset () {
 		ynh_lxc_swapfiles_clean
 	fi 
 
-	ynh_lxc_stop $LXC_NAME
+	ynh_lxc_stop --name=$LXC_NAME
 
 	if lxc info $LXC_NAME >/dev/null 2>/dev/null; then
 		local current_storage=$(lxc list $LXC_NAME --format json --columns b | jq '.[].expanded_devices.root.pool')
