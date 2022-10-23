@@ -308,6 +308,28 @@ ynh_lxc_launch (){
 	fi
 }
 
+# Delete a lxc container
+#
+# usage: ynh_lxc_delete --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_delete () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	if ynh_lxc_exists --name=$name
+	then
+		lxc delete $name --force
+	else
+		return 1
+	fi
+}
+
 # Clean the swapfiles of an LXC container
 #
 # usage: ynh_lxc_swapfiles_clean --name=name
