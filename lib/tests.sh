@@ -13,7 +13,7 @@ _RUN_YUNOHOST_CMD() {
     lxc file push -p -r "$package_path" $LXC_NAME/app_folder --quiet
 
     # --output-as none is to disable the json-like output for some commands like backup create
-    ynh_lxc_pc_exec "yunohost --output-as none --debug $1" \
+    ynh_lxc_pc_exec --name=$LXC_NAME --command="yunohost --output-as none --debug $1" \
         | grep --line-buffered -v --extended-regexp '^[0-9]+\s+.{1,15}DEBUG' \
         | grep --line-buffered -v 'processing action'
 
@@ -39,7 +39,7 @@ _PREINSTALL () {
         # Copy the pre-install script into the container.
         lxc file push "$preinstall_script" "$LXC_NAME/preinstall.sh"
         # Then execute the script to execute the pre-install commands.
-        ynh_lxc_pc_exec "bash /preinstall.sh"
+        ynh_lxc_pc_exec --name=$LXC_NAME --command="bash /preinstall.sh"
     fi
 }
 
@@ -63,7 +63,7 @@ _PREUPGRADE () {
         # Copy the pre-upgrade script into the container.
         lxc file push "$preupgrade_script" "$LXC_NAME/preupgrade.sh"
         # Then execute the script to execute the pre-upgrade commands.
-        ynh_lxc_pc_exec "bash /preupgrade.sh"
+        ynh_lxc_pc_exec --name=$LXC_NAME --command="bash /preupgrade.sh"
         return $?
     fi
 }
@@ -111,7 +111,7 @@ _INSTALL_APP () {
     local ret=$?
     [ $ret -eq 0 ] && log_debug "Installation successful." || log_error "Installation failed."
 
-    if ynh_lxc_pc_exec "su nobody -s /bin/bash -c \"test -r /var/www/$app_id || test -w /var/www/$app_id || test -x /var/www/$app_id\""
+    if ynh_lxc_pc_exec --name=$LXC_NAME --command="su nobody -s /bin/bash -c \"test -r /var/www/$app_id || test -w /var/www/$app_id || test -x /var/www/$app_id\""
     then
         log_error "It looks like anybody can read/enter /var/www/$app_id, which ain't super great from a security point of view ... Config files or other files may contain secrets or information that should in most case not be world-readable. You should remove all 'others' permissions with 'chmod o-rwx', and setup appropriate, exclusive permissions to the appropriate owner/group with chmod/chown."
         SET_RESULT "failure" install_dir_permissions
@@ -212,7 +212,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
             log_debug "Running curl $check_domain$curl_check_path"
 
             # Call cURL to try to access to the URL of the app
-            ynh_lxc_pc_exec "curl --location --insecure --silent --show-error \
+            ynh_lxc_pc_exec --name=$LXC_NAME --command="curl --location --insecure --silent --show-error \
                 --header 'Host: $check_domain' \
                 --resolve $DOMAIN:80:$LXC_IP \
                 --resolve $DOMAIN:443:$LXC_IP \
@@ -223,7 +223,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
                 $check_domain$curl_check_path" \
                 > "$TEST_CONTEXT/curl_print"
             
-            ynh_lxc_pc_exec "cat ./curl_output" > $curl_output
+            ynh_lxc_pc_exec --name=$LXC_NAME --command="cat ./curl_output" > $curl_output
 
             # Analyze the result of curl command
             if [ $? -ne 0 ]
@@ -284,12 +284,12 @@ Page extract:\n$page_extract" > $TEST_CONTEXT/curl_result
         # If we had a 50x error, try to display service info and logs to help debugging
         if [[ $curl_error -ne 0 ]] && echo "5" | grep -q "${http_code:0:1}"
         then
-            ynh_lxc_pc_exec "systemctl --all" | grep "$app_id_to_check.*service"
-            for SERVICE in $(ynh_lxc_pc_exec "systemctl -all" | grep -o "$app_id_to_check.*service")
+            ynh_lxc_pc_exec --name=$LXC_NAME --command="systemctl --all" | grep "$app_id_to_check.*service"
+            for SERVICE in $(ynh_lxc_pc_exec --name=$LXC_NAME --command="systemctl -all" | grep -o "$app_id_to_check.*service")
             do
-                ynh_lxc_pc_exec "journalctl --no-pager --no-hostname -n 30 -u $SERVICE";
+                ynh_lxc_pc_exec --name=$LXC_NAME --command="journalctl --no-pager --no-hostname -n 30 -u $SERVICE";
             done
-            ynh_lxc_pc_exec "tail -v -n 15 \$(find /var/log/{nginx/,php*,$app_id_to_check} -mmin -3)"
+            ynh_lxc_pc_exec --name=$LXC_NAME --command="tail -v -n 15 \$(find /var/log/{nginx/,php*,$app_id_to_check} -mmin -3)"
         fi
     done
 
@@ -490,7 +490,7 @@ TEST_PORT_ALREADY_USED () {
     lxc file push $TEST_CONTEXT/netcat.service $LXC_NAME/etc/systemd/system/netcat.service
 
     # Then start this service to block this port.
-    ynh_lxc_pc_exec "systemctl enable --now netcat"
+    ynh_lxc_pc_exec --name=$LXC_NAME --command="systemctl enable --now netcat"
 
     _PREINSTALL
 

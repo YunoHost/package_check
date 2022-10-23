@@ -4,16 +4,28 @@
 # PACKAGE_CHECK HELPERS
 #=================================================
 
+# Start an LXC and execute a command in it
+#
+# usage: ynh_lxc_pc_exec --name=name --command=command
+# | arg: -n, --name=		- name of the LXC
+# | arg: -c, --command=		- command to execute
+#
+# Requires YunoHost version *.*.* or higher.
 ynh_lxc_pc_exec () {
-	# Start the lxc container and execute the given command in it
-	local cmd=$1
+	# Declare an array to define the options of this helper.
+	local legacy_args=nc
+	local -A args_array=([n]=name= [c]=command=)
+	local name
+	local command
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
 
-	_ynh_lxc_start_and_wait $LXC_NAME
+	_ynh_lxc_start_and_wait $name
 
 	start_timer
 
 	# Execute the command given in argument in the container and log its results.
-	lxc exec $LXC_NAME --env PACKAGE_CHECK_EXEC=1 -t -- /bin/bash -c "$cmd" | tee -a "$complete_log" $current_test_log
+	lxc exec $name --env PACKAGE_CHECK_EXEC=1 -t -- /bin/bash -c "$command" | tee -a "$complete_log" $current_test_log
 
 	# Store the return code of the command
 	local returncode=${PIPESTATUS[0]}
