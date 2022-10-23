@@ -255,7 +255,7 @@ run_all_tests() {
     # Reset and create a fresh container to work with
     check_lxd_setup
     ynh_lxc_reset
-    ynh_lxc_pc_create
+    ynh_lxc_pc_create --image=$LXC_BASE --name=$LXC_NAME
     # Be sure that the container is running
     ynh_lxc_pc_exec --name=$LXC_NAME --command="true"
 

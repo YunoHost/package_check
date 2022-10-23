@@ -185,37 +185,52 @@ ynh_lxc_pc_witness_files_check () {
 	fi
 }
 
+# Create a new LXC from an image
+#
+# usage: ynh_lxc_pc_create --image=image --name=name
+# | arg: -i, --image=	- image to create from
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
 ynh_lxc_pc_create () {
-	log_info "Launching new LXC $LXC_NAME ..."
+	# Declare an array to define the options of this helper.
+	local legacy_args=in
+	local -A args_array=([i]=image= [n]=name=)
+	local image
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	log_info "Launching new LXC $name ..."
 	# Check if we can launch container from YunoHost remote image
-	if lxc remote list | grep -q "yunohost" && lxc image list yunohost:$LXC_BASE | grep -q -w $LXC_BASE; then
-		lxc launch yunohost:$LXC_BASE $LXC_NAME \
+	if lxc remote list | grep -q "yunohost" && lxc image list yunohost:$image | grep -q -w $image; then
+		lxc launch yunohost:$image $name \
 			-c security.nesting=true \
 			-c security.privileged=true \
 			-c limits.memory=80% \
 			-c limits.cpu.allowance=80% \
 			>>/proc/self/fd/3
 	# Check if we can launch container from a local image
-	elif lxc image list $LXC_BASE | grep -q -w $LXC_BASE; then
-		lxc launch $LXC_BASE $LXC_NAME \
+	elif lxc image list $image | grep -q -w $image; then
+		lxc launch $image $name \
 			-c security.nesting=true \
 			-c security.privileged=true \
 			-c limits.memory=80% \
 			-c limits.cpu.allowance=80% \
 			>>/proc/self/fd/3
 	else
-		log_critical "Can't find base image $LXC_BASE, run ./package_check.sh --rebuild"
+		log_critical "Can't find base image $image, run ./package_check.sh --rebuild"
 	fi
 	
 	pipestatus="${PIPESTATUS[0]}"
-	location=$(lxc list --format json | jq -e --arg LXC_NAME $LXC_NAME '.[] | select(.name==$LXC_NAME) | .location' | tr -d '"')
+	location=$(lxc list --format json | jq -e --arg name $name '.[] | select(.name==$name) | .location' | tr -d '"')
 	[[ "$location" != "none" ]] && log_info "... on $location"
 
 	[[ "$pipestatus" -eq 0 ]] || exit 1
 
-	_ynh_lxc_start_and_wait $LXC_NAME
-	ynh_lxc_pc_witness_files_set --name=$LXC_NAME
-	lxc snapshot $LXC_NAME snap0
+	_ynh_lxc_start_and_wait $name
+	ynh_lxc_pc_witness_files_set --name=$name
+	lxc snapshot $name snap0
 }
 
 ynh_lxc_pc_snapshot_create () {
