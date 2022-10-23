@@ -180,18 +180,32 @@ ynh_lxc_snapshot_exists () {
 	lxc list --format json | jq -e --arg name $name --arg snapname $snapname '.[] | select(.name==$name) | .snapshots[] | select(.name==$snapname)' >/dev/null
 }
 
+# Load a snapshot of an LXC container
+#
+# usage: ynh_lxc_snapshot_load --name=name --snapname=snapname
+# | arg: -n, --name=		- name of the LXC
+# | arg: -s, --snapname=	- name of the snapshot
+#
+# Requires YunoHost version *.*.* or higher.
 ynh_lxc_snapshot_load () {
-	local snapname=$1
+	# Declare an array to define the options of this helper.
+	local legacy_args=ns
+	local -A args_array=([n]=name= [s]=snapname=)
+	local name
+	local snapname
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
 	log_debug "Loading snapshot $snapname ..."
 
 	# Remove swap files before restoring the snapshot.
-	ynh_lxc_swapfiles_clean --name=$LXC_NAME
+	ynh_lxc_swapfiles_clean --name=$name
 
-	ynh_lxc_stop --name=$LXC_NAME
+	ynh_lxc_stop --name=$name
 
-	lxc restore $LXC_NAME $snapname
-	lxc start $LXC_NAME
-	_ynh_lxc_start_and_wait --name=$LXC_NAME
+	lxc restore $name $snapname
+	lxc start $name
+	_ynh_lxc_start_and_wait --name=$name
 }
 
 ynh_lxc_reset () {

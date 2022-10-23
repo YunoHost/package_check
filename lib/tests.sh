@@ -129,14 +129,14 @@ _LOAD_SNAPSHOT_OR_INSTALL_APP () {
     if ! ynh_lxc_snapshot_exists --name=$LXC_NAME --snapname=$snapname
     then
         log_warning "Expected to find an existing snapshot $snapname but it doesn't exist yet .. will attempt to create it"
-        ynh_lxc_snapshot_load snap0 \
+        ynh_lxc_snapshot_load --name=$LXC_NAME --snapname=snap0 \
             && _PREINSTALL \
             && _INSTALL_APP "path=$check_path" \
             && ynh_lxc_pc_snapshot_create --name=LXC_NAME --snapname=$snapname
     else
         # Or uses an existing snapshot
         log_info "(Reusing existing snapshot $snapname)" \
-            && ynh_lxc_snapshot_load $snapname
+            && ynh_lxc_snapshot_load --name=$LXC_NAME --snapname=$snapname
     fi
 }
 
@@ -356,7 +356,7 @@ TEST_INSTALL () {
     [ "$install_type" = "private" ] && { start_test "Installation in private mode";    local is_public="0";    }
     local snapname=snap_${install_type}install
 
-    ynh_lxc_snapshot_load snap0
+    ynh_lxc_snapshot_load --name=$LXC_NAME --snapname=snap0
 
     _PREINSTALL
 
@@ -392,7 +392,7 @@ _TEST_MULTI_INSTANCE () {
 
     local check_path="$(default_install_path)"
 
-    ynh_lxc_snapshot_load snap0
+    ynh_lxc_snapshot_load --name=$LXC_NAME --snapname=snap0
 
     log_small_title "First installation: path=$SUBDOMAIN$check_path" \
         && _LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path" \
@@ -436,7 +436,7 @@ TEST_UPGRADE () {
         cp -a "$package_path" "${package_path}_back"
         (cd "$package_path"; git checkout --force --quiet "$commit")
 
-        ynh_lxc_snapshot_load snap0
+        ynh_lxc_snapshot_load --name=$LXC_NAME --snapname=snap0
 
         _PREINSTALL
 
@@ -481,7 +481,7 @@ TEST_PORT_ALREADY_USED () {
     local check_port="$1"
     local check_path="$(default_install_path)"
 
-    ynh_lxc_snapshot_load snap0
+    ynh_lxc_snapshot_load --name=$LXC_NAME --snapname=snap0
 
     # Build a service with netcat for use this port before the app.
     echo -e "[Service]\nExecStart=/bin/netcat -l -k -p $check_port\n
@@ -570,7 +570,7 @@ TEST_BACKUP_RESTORE () {
             elif [ $j -eq 1 ]
             then
 
-                ynh_lxc_snapshot_load snap0
+                ynh_lxc_snapshot_load --name=$LXC_NAME --snapname=snap0
 
                 # Remove the previous residual backups
                 ynh_lxc_run_inside --name=$LXC_NAME --command="rm -rf /home/yunohost.backup/archives"
