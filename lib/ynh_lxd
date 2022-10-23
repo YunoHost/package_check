@@ -26,6 +26,26 @@ ynh_lxc_exists () {
 	fi
 }
 
+# Return LXC container status
+#
+# usage: ynh_lxc_status --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_status () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	if ynh_lxc_exists --name=$name
+	then
+		lxc list --format json | jq -r --arg name $name '.[] | select(.name==$name) | .state | .status'
+	fi
+}
+
 # Stopping an LXC container
 #
 # usage: ynh_lxc_stop --name=name
