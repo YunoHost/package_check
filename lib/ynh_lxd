@@ -4,3 +4,11 @@
 # LXD HELPERS
 #=================================================
 
+ynh_lxc_snapshot_exists () {
+	local snapname=$1
+	lxc list --format json \
+		| jq -e --arg LXC_NAME $LXC_NAME --arg snapname $snapname \
+		'.[] | select(.name==$LXC_NAME) | .snapshots[] | select(.name==$snapname)' \
+			>/dev/null
+}
+

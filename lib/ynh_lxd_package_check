@@ -148,14 +148,6 @@ ynh_lxc_pc_create () {
 	lxc snapshot $LXC_NAME snap0
 }
 
-LXC_SNAPSHOT_EXISTS() {
-	local snapname=$1
-	lxc list --format json \
-		| jq -e --arg LXC_NAME $LXC_NAME --arg snapname $snapname \
-		'.[] | select(.name==$LXC_NAME) | .snapshots[] | select(.name==$snapname)' \
-			>/dev/null
-}
-
 ynh_lxc_pc_snapshot_create () {
 	# Create a temporary snapshot
 
@@ -172,7 +164,7 @@ ynh_lxc_pc_snapshot_create () {
 	LXC_STOP $LXC_NAME
 
 	# Check if the snapshot already exist
-	if ! LXC_SNAPSHOT_EXISTS "$snapname"
+	if ! ynh_lxc_snapshot_exists "$snapname"
 	then
 		log_info "(Creating snapshot $snapname ...)"
 		lxc snapshot $LXC_NAME $snapname

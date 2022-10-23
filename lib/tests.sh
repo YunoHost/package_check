@@ -126,7 +126,7 @@ _LOAD_SNAPSHOT_OR_INSTALL_APP () {
     local _install_type="$(path_to_install_type $check_path)"
     local snapname="snap_${_install_type}install"
 
-    if ! LXC_SNAPSHOT_EXISTS $snapname
+    if ! ynh_lxc_snapshot_exists $snapname
     then
         log_warning "Expected to find an existing snapshot $snapname but it doesn't exist yet .. will attempt to create it"
         LOAD_LXC_SNAPSHOT snap0 \
@@ -370,7 +370,7 @@ TEST_INSTALL () {
 
     # Create the snapshot that'll be used by other tests later
     [ "$install_type" != "private" ] \
-        && ! LXC_SNAPSHOT_EXISTS $snapname \
+        && ! ynh_lxc_snapshot_exists $snapname \
         && log_debug "Create a snapshot after app install" \
         && ynh_lxc_pc_snapshot_create $snapname
 
