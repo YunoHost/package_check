@@ -1,8 +1,8 @@
 #!/bin/bash
 
-source lib/lxc.sh
+source lib/ynh_lxd
+source lib/ynh_lxd_package_check
 source lib/tests.sh
-source lib/witness.sh
 
 readonly complete_log="./Complete-${WORKER_ID}.log"
 
