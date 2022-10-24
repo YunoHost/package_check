@@ -415,6 +415,31 @@ ynh_lxc_snapshot_create () {
 	fi
 }
 
+# Delete a snapshot of an LXC container
+#
+# usage: ynh_lxc_snapshot_delete --name=name --snapname=snapname
+# | arg: -n, --name=		- name of the LXC
+# | arg: -s, --snapname=	- name of the snapshot
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_snapshot_delete () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=ns
+	local -A args_array=([n]=name= [s]=snapname=)
+	local name
+	local snapname
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	if ynh_lxc_snapshot_exists --name="$name" --snapname="$snapname"
+	then
+		lxc delete $name/$snapname
+		return 0
+	else
+		return 1
+	fi
+}
+
 # Load a snapshot of an LXC container
 #
 # usage: ynh_lxc_snapshot_load --name=name --snapname=snapname
