@@ -456,15 +456,20 @@ ynh_lxc_snapshot_load () {
 	# Manage arguments with getopts
 	ynh_handle_getopts_args "$@"
 
-	log_debug "Loading snapshot $snapname ..."
+	if ynh_lxc_snapshot_exists --name="$name" --snapname="$snapname"
+	then
+		log_debug "Loading snapshot $snapname ..."
 
-	# Remove swap files before restoring the snapshot.
-	ynh_lxc_swapfiles_clean --name=$name
+		# Remove swap files before restoring the snapshot.
+		ynh_lxc_swapfiles_clean --name=$name
 
-	ynh_lxc_stop --name=$name
+		ynh_lxc_stop --name=$name
 
-	lxc restore $name $snapname
-	_ynh_lxc_start_and_wait --name=$name
+		lxc restore $name $snapname
+		_ynh_lxc_start_and_wait --name=$name
+	else
+		return 1
+	fi
 }
 
 # Reset an LXC container
