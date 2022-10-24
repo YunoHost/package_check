@@ -491,15 +491,9 @@ ynh_lxc_reset () {
 	then
 		# Remove swap files before deleting the container
 		ynh_lxc_swapfiles_clean --name=$name
-	fi 
-
-	ynh_lxc_stop --name=$name
-
-	if ynh_lxc_exists --name=$name
-	then
+		ynh_lxc_stop --name=$name
 		local current_storage=$(lxc list $name --format json --columns b | jq '.[].expanded_devices.root.pool')
 		swapoff "$(lxc storage get $current_storage source)/containers/$name/rootfs/swap" 2>/dev/null
+		ynh_lxc_delete --name=$name
 	fi 
-
-	lxc delete $name --force 2>/dev/null
 }
