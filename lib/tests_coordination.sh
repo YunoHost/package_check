@@ -3,6 +3,7 @@
 source lib/ynh_lxd
 source lib/ynh_lxd_package_check
 source lib/tests.sh
+source /usr/share/yunohost/helpers
 
 readonly complete_log="./Complete-${WORKER_ID}.log"
 

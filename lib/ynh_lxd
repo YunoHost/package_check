@@ -178,6 +178,37 @@ ynh_lxc_run_inside () {
 	lxc exec $name -- /bin/bash -c "$command"
 }
 
+# Check an LXC container can start
+#
+# usage: ynh_lxc_check_container_start --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_check_container_start () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	ynh_print_info --message="Test du conteneur $name"
+	ynh_lxc_start --name=$name	# Démarre le conteneur
+
+	wait_period=0
+	while ! ynh_lxc_is_started --name=$name
+	do
+		wait_period=$(($wait_period+10))
+		if [ $wait_period -gt 20 ];then
+			break
+		else
+			sleep 5
+		fi
+	done
+
+	ynh_lxc_is_started --name=$name
+}
+
 # Restart a container
 #
 # usage: _ynh_lxc_restart_container --name=name
@@ -293,18 +324,16 @@ ynh_lxc_launch (){
 			-c security.nesting=true \
 			-c security.privileged=true \
 			-c limits.memory=80% \
-			-c limits.cpu.allowance=80% \
-			>>/proc/self/fd/3
+			-c limits.cpu.allowance=80%  | tee -a /proc/self/fd/3
 	# Check if we can launch container from a local image
 	elif lxc image list $image | grep -q -w $image; then
 		lxc launch $image $name \
 			-c security.nesting=true \
 			-c security.privileged=true \
 			-c limits.memory=80% \
-			-c limits.cpu.allowance=80% \
-			>>/proc/self/fd/3
+			-c limits.cpu.allowance=80%  | tee -a /proc/self/fd/3
 	else
-		log_critical "Can't find base image $image, run ./package_check.sh --rebuild"
+		log_critical "Can't find base image $image"
 	fi
 }
 
@@ -470,6 +499,44 @@ ynh_lxc_snapshot_load () {
 	else
 		return 1
 	fi
+}
+
+# Clone an LXC container
+#
+# usage: ynh_lxc_clone --source=source --destination=destination
+# | arg: -s, --source=		  - source LXC
+# | arg: -d, --destination=	 - destination LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_clone () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=sd
+	local -A args_array=([s]=source= [d]=destination=)
+	local source
+	local destination
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"	
+
+	if ynh_lxc_exists --name=$destination
+	then
+		ynh_print_info --message="Deleting LXC container $destination"
+		ynh_secure_remove --file="/var/lib/lxd/snapshots/$destination/snap0.tar.gz"
+		ynh_lxc_reset --name=$destination
+	fi
+
+	ynh_print_info --message="Cloning LXC container from $source to $destination"
+	lxc copy "$source" "$destination"
+
+	ynh_lxc_check_container_start --name=$destination
+	STATUS=$?
+	if [ $STATUS -eq 1 ]; then
+		ynh_print_info --message="LXC container $destination is broken."
+	else
+		ynh_print_info --message=" LXC container $destination is working."
+		ynh_print_info --message= "Creating snapshot of LXC container $destination"
+		ynh_lxc_snapshot_create --name="$destination" --snapname="snap0"
+	fi
+	return $STATUS
 }
 
 # Reset an LXC container

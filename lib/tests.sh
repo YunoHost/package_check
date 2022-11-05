@@ -132,7 +132,7 @@ _LOAD_SNAPSHOT_OR_INSTALL_APP () {
         ynh_lxc_snapshot_load --name=$LXC_NAME --snapname=snap0 \
             && _PREINSTALL \
             && _INSTALL_APP "path=$check_path" \
-            && ynh_lxc_pc_snapshot_create --name=LXC_NAME --snapname=$snapname
+            && ynh_lxc_pc_snapshot_create --name=$LXC_NAME --snapname=$snapname
     else
         # Or uses an existing snapshot
         log_info "(Reusing existing snapshot $snapname)" \
@@ -372,7 +372,7 @@ TEST_INSTALL () {
     [ "$install_type" != "private" ] \
         && ! ynh_lxc_snapshot_exists --name=$LXC_NAME --snapname=$snapname \
         && log_debug "Create a snapshot after app install" \
-        && ynh_lxc_pc_snapshot_create --name=LXC_NAME --snapname=$snapname
+        && ynh_lxc_pc_snapshot_create --name=$LXC_NAME --snapname=$snapname
 
     # Remove and reinstall the application
     _REMOVE_APP \
