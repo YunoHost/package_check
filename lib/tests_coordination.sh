@@ -313,7 +313,9 @@ TEST_LAUNCHER () {
     # Execute the test
     $test_type $test_arg
 
-    [ $? -eq 0 ] && SET_RESULT "success" main_result || SET_RESULT "failure" main_result
+    local test_result=$?
+
+    [ $test_result -eq 0 ] && SET_RESULT "success" main_result || SET_RESULT "failure" main_result
 
     # Check that we don't have this message characteristic of a file that got manually modified,
     # which should not happen during tests because no human modified the file ...
@@ -383,7 +385,7 @@ at_least_one_install_succeeded () {
 
 break_before_continue () {
 
-    if [ $interactive -eq 1 ]
+    if [ $interactive -eq 1 ] || [ $interactive_on_errors -eq 1 ] && [ ! $test_result -eq 0 ]
     then
         echo "To enter a shell on the lxc:"
         echo "     lxc exec $LXC_NAME bash"
