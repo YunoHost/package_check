@@ -87,6 +87,7 @@ parse_check_process() {
         echo "$install_args" | tr '&' '\n' | grep -q "^path="      ||install_args+="path=&"
         echo "$install_args" | tr '&' '\n' | grep -q "^admin="     ||install_args+="admin=&"
         echo "$install_args" | tr '&' '\n' | grep -q "^is_public=" ||install_args+="is_public=&"
+        echo "$install_args" | tr '&' '\n' | grep -q "^init_main_permission=" ||install_args+="init_main_permission=&"
 
         extract_check_process_section "^; Checks"       "^; " $test_serie_rawconf > $TEST_CONTEXT/check_process.tests_infos
 
@@ -193,16 +194,16 @@ guess_test_configuration() {
             > "$TEST_CONTEXT/tests/$test_id.json"
     }
 
-    local install_args=$(python3 "./lib/manifest_parsing.py" "$package_path/manifest.json" | cut -d ':' -f1,2 | tr ':' '=' | tr '\n' '&')
+    local install_args=$(python3 "./lib/default_install_args.py" "$package_path"/manifest.*)
 
     add_test "PACKAGE_LINTER"
     add_test "TEST_INSTALL" "root"
     add_test "TEST_INSTALL" "subdir"
-    if echo $install_args | grep -q "is_public="
+    if echo $install_args | grep -q "is_public=\|init_main_permission="
     then
         add_test "TEST_INSTALL" "private"
     fi
-    if grep multi_instance "$package_path/manifest.json" | grep -q true
+    if grep multi_instance "$package_path"/manifest.* | grep -q true
     then
         add_test "TEST_INSTALL" "multi"
     fi
@@ -220,7 +221,12 @@ run_all_tests() {
     mkdir -p $TEST_CONTEXT/results
     mkdir -p $TEST_CONTEXT/logs
 
-    readonly app_id="$(jq -r .id $package_path/manifest.json)"
+    if [ -e $package_path/manifest.json ]
+    then
+        readonly app_id="$(jq -r .id $package_path/manifest.json)"
+    else
+        readonly app_id="$(grep '^id = ' $package_path/manifest.toml | tr -d '" ' | awk -F= '{print $2}')"
+    fi
 
     # Parse the check_process only if it's exist
     check_process="$package_path/check_process"

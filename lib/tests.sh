@@ -76,13 +76,14 @@ _INSTALL_APP () {
 
     # We have default values for domain, admin and is_public, but these
     # may still be overwritten by the args ($@)
-    for arg_override in "domain=$SUBDOMAIN" "admin=$TEST_USER" "is_public=1" "$@"
+    for arg_override in "domain=$SUBDOMAIN" "admin=$TEST_USER" "is_public=1" "init_main_permission=visitors" "$@"
     do
         key="$(echo $arg_override | cut -d '=' -f 1)"
         value="$(echo $arg_override | cut -d '=' -f 2-)"
 
         # (Legacy stuff ... We don't override is_public if its type is not boolean)
-        [[ "$key" == "is_public" ]] \
+        [[ -e $package_path/manifest.json ]] \ 
+            && [[ "$key" == "is_public" ]] \
             && [[ "$(jq -r '.arguments.install[] | select(.name=="is_public") | .type' $package_path/manifest.json)" != "boolean" ]] \
             && continue
 
@@ -90,14 +91,27 @@ _INSTALL_APP () {
     done
 
     # Note : we do this at this stage and not during the parsing of check_process
-    # because this also applies to upgrades ...
-    # For all manifest arg
-    for ARG in $(jq -r '.arguments.install[].name' $package_path/manifest.json)
+    # because this also applies to upgrades ... ie older version may have different args and default values
+
+    # Fetch and loop over all manifest arg
+    if [[ -e $package_path/manifest.json ]] 
+    then
+        local manifest_args="$(jq -r '.arguments.install[].name' $package_path/manifest.json)"
+    else
+        local manifest_args="$(grep '^\s*\[install\.' $package_path/manifest.toml | tr -d '[]' | awk -F. '{print $2}')"
+    fi
+
+    for ARG in $manifest_args
     do
         # If the argument is not yet in install args, add its default value
         if ! echo "$install_args" | grep -q -E "\<$ARG="
         then
-            local default_value=$(jq -e -r --arg ARG $ARG '.arguments.install[] | select(.name==$ARG) | .default' $package_path/manifest.json)
+            if [[ -e $package_path/manifest.json ]] 
+            then
+                local default_value=$(jq -e -r --arg ARG $ARG '.arguments.install[] | select(.name==$ARG) | .default' $package_path/manifest.json)
+            else
+                local default_value=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); d = t['install']['$ARG'].get('default'); assert d is not None, 'Missing default value'; print(d)" < manifest.toml)
+            fi
             [[ $? -eq 0 ]] || { log_error "Missing install arg $ARG ?"; return 1; }
             [[ ${install_args: -1} == '&' ]] || install_args+="&"
             install_args+="$ARG=$default_value"
@@ -177,7 +191,14 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
     # private by default For "regular" apps (with a is_public arg) they are
     # installed as public, and we precisely want to check they are publicly
     # accessible *without* tweaking skipped_uris...
-    if [ "$install_type" != 'private' ] && [[ -z "$(jq -r '.arguments.install[] | select(.name=="is_public")' $package_path/manifest.json)" ]]
+    if [[ -e $package_path/manifest.json ]]
+    then
+        local has_public_arg=$([[ -n "$(jq -r '.arguments.install[] | select(.name=="is_public")' $package_path/manifest.json)" ]] && echo true || echo false)
+    else
+        local has_public_arg=$(grep -q '\[install.init_main_permission\]' manifest.toml && echo true || echo false)
+    fi
+    
+    if [ "$install_type" != 'private' ] && [[ $has_public_arg == "false" ]]
     then
         log_debug "Forcing public access using a skipped_uris setting"
         # Add a skipped_uris on / for the app
@@ -350,10 +371,11 @@ TEST_INSTALL () {
 
     local check_path="/"
     local is_public="1"
+    local init_main_permission="visitors"
     [ "$install_type" = "subdir"  ] && { start_test "Installation in a sub path";      local check_path=/path; }
     [ "$install_type" = "root"    ] && { start_test "Installation on the root";                                }
     [ "$install_type" = "nourl"   ] && { start_test "Installation without URL access"; local check_path="";    }
-    [ "$install_type" = "private" ] && { start_test "Installation in private mode";    local is_public="0";    }
+    [ "$install_type" = "private" ] && { start_test "Installation in private mode";    local is_public="0"; local init_main_permission="all_users";    }
     local snapname=snap_${install_type}install
 
     LOAD_LXC_SNAPSHOT snap0
@@ -361,7 +383,7 @@ TEST_INSTALL () {
     _PREINSTALL
 
     # Install the application in a LXC container
-    _INSTALL_APP "path=$check_path" "is_public=$is_public" \
+    _INSTALL_APP "path=$check_path" "is_public=$is_public" "init_main_permission=$init_main_permission" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "$install_type" \
 
     local install=$?
@@ -377,7 +399,7 @@ TEST_INSTALL () {
     # Remove and reinstall the application
     _REMOVE_APP \
         && log_small_title "Reinstalling after removal." \
-        && _INSTALL_APP "path=$check_path" "is_public=$is_public" \
+        && _INSTALL_APP "path=$check_path" "is_public=$is_public"  "init_main_permission=$init_main_permission" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "$install_type"
 
     return $?
