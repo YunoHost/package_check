@@ -13,12 +13,12 @@ _RUN_YUNOHOST_CMD() {
     lxc file push -p -r "$package_path" $LXC_NAME/app_folder --quiet
 
     # --output-as none is to disable the json-like output for some commands like backup create
-    LXC_EXEC "yunohost --output-as none --debug $1" \
+    ynh_lxc_pc_exec --name=$LXC_NAME --command="yunohost --output-as none --debug $1" \
         | grep --line-buffered -v --extended-regexp '^[0-9]+\s+.{1,15}DEBUG' \
         | grep --line-buffered -v 'processing action'
 
     returncode=${PIPESTATUS[0]}
-    check_witness_files && return $returncode || return 2
+    ynh_lxc_pc_witness_files_check --name=$LXC_NAME && return $returncode || return 2
 }
 
 _PREINSTALL () {
@@ -39,7 +39,7 @@ _PREINSTALL () {
         # Copy the pre-install script into the container.
         lxc file push "$preinstall_script" "$LXC_NAME/preinstall.sh"
         # Then execute the script to execute the pre-install commands.
-        LXC_EXEC "bash /preinstall.sh"
+        ynh_lxc_pc_exec --name=$LXC_NAME --command="bash /preinstall.sh"
     fi
 }
 
@@ -63,7 +63,7 @@ _PREUPGRADE () {
         # Copy the pre-upgrade script into the container.
         lxc file push "$preupgrade_script" "$LXC_NAME/preupgrade.sh"
         # Then execute the script to execute the pre-upgrade commands.
-        LXC_EXEC "bash /preupgrade.sh"
+        ynh_lxc_pc_exec --name=$LXC_NAME --command="bash /preupgrade.sh"
         return $?
     fi
 }
@@ -111,7 +111,7 @@ _INSTALL_APP () {
     local ret=$?
     [ $ret -eq 0 ] && log_debug "Installation successful." || log_error "Installation failed."
 
-    if LXC_EXEC "su nobody -s /bin/bash -c \"test -r /var/www/$app_id || test -w /var/www/$app_id || test -x /var/www/$app_id\""
+    if ynh_lxc_pc_exec --name=$LXC_NAME --command="su nobody -s /bin/bash -c \"test -r /var/www/$app_id || test -w /var/www/$app_id || test -x /var/www/$app_id\""
     then
         log_error "It looks like anybody can read/enter /var/www/$app_id, which ain't super great from a security point of view ... Config files or other files may contain secrets or information that should in most case not be world-readable. You should remove all 'others' permissions with 'chmod o-rwx', and setup appropriate, exclusive permissions to the appropriate owner/group with chmod/chown."
         SET_RESULT "failure" install_dir_permissions
@@ -126,17 +126,17 @@ _LOAD_SNAPSHOT_OR_INSTALL_APP () {
     local _install_type="$(path_to_install_type $check_path)"
     local snapname="snap_${_install_type}install"
 
-    if ! LXC_SNAPSHOT_EXISTS $snapname
+    if ! ynh_lxc_snapshot_exists --name=$LXC_NAME --snapname=$snapname
     then
         log_warning "Expected to find an existing snapshot $snapname but it doesn't exist yet .. will attempt to create it"
-        LOAD_LXC_SNAPSHOT snap0 \
+        ynh_lxc_snapshot_load --name=$LXC_NAME --snapname=snap0 \
             && _PREINSTALL \
             && _INSTALL_APP "path=$check_path" \
-            && CREATE_LXC_SNAPSHOT $snapname
+            && ynh_lxc_pc_snapshot_create --name=$LXC_NAME --snapname=$snapname
     else
         # Or uses an existing snapshot
         log_info "(Reusing existing snapshot $snapname)" \
-            && LOAD_LXC_SNAPSHOT $snapname
+            && ynh_lxc_snapshot_load --name=$LXC_NAME --snapname=$snapname
     fi
 }
 
@@ -212,7 +212,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
             log_debug "Running curl $check_domain$curl_check_path"
 
             # Call cURL to try to access to the URL of the app
-            LXC_EXEC "curl --location --insecure --silent --show-error \
+            ynh_lxc_pc_exec --name=$LXC_NAME --command="curl --location --insecure --silent --show-error \
                 --header 'Host: $check_domain' \
                 --resolve $DOMAIN:80:$LXC_IP \
                 --resolve $DOMAIN:443:$LXC_IP \
@@ -223,7 +223,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
                 $check_domain$curl_check_path" \
                 > "$TEST_CONTEXT/curl_print"
             
-            LXC_EXEC "cat ./curl_output" > $curl_output
+            ynh_lxc_pc_exec --name=$LXC_NAME --command="cat ./curl_output" > $curl_output
 
             # Analyze the result of curl command
             if [ $? -ne 0 ]
@@ -284,12 +284,12 @@ Page extract:\n$page_extract" > $TEST_CONTEXT/curl_result
         # If we had a 50x error, try to display service info and logs to help debugging
         if [[ $curl_error -ne 0 ]] && echo "5" | grep -q "${http_code:0:1}"
         then
-            LXC_EXEC "systemctl --all" | grep "$app_id_to_check.*service"
-            for SERVICE in $(LXC_EXEC "systemctl -all" | grep -o "$app_id_to_check.*service")
+            ynh_lxc_pc_exec --name=$LXC_NAME --command="systemctl --all" | grep "$app_id_to_check.*service"
+            for SERVICE in $(ynh_lxc_pc_exec --name=$LXC_NAME --command="systemctl -all" | grep -o "$app_id_to_check.*service")
             do
-                LXC_EXEC "journalctl --no-pager --no-hostname -n 30 -u $SERVICE";
+                ynh_lxc_pc_exec --name=$LXC_NAME --command="journalctl --no-pager --no-hostname -n 30 -u $SERVICE";
             done
-            LXC_EXEC "tail -v -n 15 \$(find /var/log/{nginx/,php*,$app_id_to_check} -mmin -3)"
+            ynh_lxc_pc_exec --name=$LXC_NAME --command="tail -v -n 15 \$(find /var/log/{nginx/,php*,$app_id_to_check} -mmin -3)"
         fi
     done
 
@@ -356,7 +356,7 @@ TEST_INSTALL () {
     [ "$install_type" = "private" ] && { start_test "Installation in private mode";    local is_public="0";    }
     local snapname=snap_${install_type}install
 
-    LOAD_LXC_SNAPSHOT snap0
+    ynh_lxc_snapshot_load --name=$LXC_NAME --snapname=snap0
 
     _PREINSTALL
 
@@ -370,9 +370,9 @@ TEST_INSTALL () {
 
     # Create the snapshot that'll be used by other tests later
     [ "$install_type" != "private" ] \
-        && ! LXC_SNAPSHOT_EXISTS $snapname \
+        && ! ynh_lxc_snapshot_exists --name=$LXC_NAME --snapname=$snapname \
         && log_debug "Create a snapshot after app install" \
-        && CREATE_LXC_SNAPSHOT $snapname
+        && ynh_lxc_pc_snapshot_create --name=$LXC_NAME --snapname=$snapname
 
     # Remove and reinstall the application
     _REMOVE_APP \
@@ -392,7 +392,7 @@ _TEST_MULTI_INSTANCE () {
 
     local check_path="$(default_install_path)"
 
-    LOAD_LXC_SNAPSHOT snap0
+    ynh_lxc_snapshot_load --name=$LXC_NAME --snapname=snap0
 
     log_small_title "First installation: path=$SUBDOMAIN$check_path" \
         && _LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path" \
@@ -436,7 +436,7 @@ TEST_UPGRADE () {
         cp -a "$package_path" "${package_path}_back"
         (cd "$package_path"; git checkout --force --quiet "$commit")
 
-        LOAD_LXC_SNAPSHOT snap0
+        ynh_lxc_snapshot_load --name=$LXC_NAME --snapname=snap0
 
         _PREINSTALL
 
@@ -481,7 +481,7 @@ TEST_PORT_ALREADY_USED () {
     local check_port="$1"
     local check_path="$(default_install_path)"
 
-    LOAD_LXC_SNAPSHOT snap0
+    ynh_lxc_snapshot_load --name=$LXC_NAME --snapname=snap0
 
     # Build a service with netcat for use this port before the app.
     echo -e "[Service]\nExecStart=/bin/netcat -l -k -p $check_port\n
@@ -490,7 +490,7 @@ TEST_PORT_ALREADY_USED () {
     lxc file push $TEST_CONTEXT/netcat.service $LXC_NAME/etc/systemd/system/netcat.service
 
     # Then start this service to block this port.
-    LXC_EXEC "systemctl enable --now netcat"
+    ynh_lxc_pc_exec --name=$LXC_NAME --command="systemctl enable --now netcat"
 
     _PREINSTALL
 
@@ -530,7 +530,7 @@ TEST_BACKUP_RESTORE () {
 
         # Remove the previous residual backups
         rm -rf $TEST_CONTEXT/ynh_backups
-        RUN_INSIDE_LXC rm -rf /home/yunohost.backup/archives
+        ynh_lxc_run_inside --name=$LXC_NAME --command="rm -rf /home/yunohost.backup/archives"
 
         # BACKUP
         # Made a backup if the installation succeed
@@ -570,10 +570,10 @@ TEST_BACKUP_RESTORE () {
             elif [ $j -eq 1 ]
             then
 
-                LOAD_LXC_SNAPSHOT snap0
+                ynh_lxc_snapshot_load --name=$LXC_NAME --snapname=snap0
 
                 # Remove the previous residual backups
-                RUN_INSIDE_LXC rm -rf /home/yunohost.backup/archives
+                ynh_lxc_run_inside --name=$LXC_NAME --command="rm -rf /home/yunohost.backup/archives"
 
                 # Place the copy of the backup archive in the container.
                 lxc file push -r $TEST_CONTEXT/ynh_backups/archives $LXC_NAME/home/yunohost.backup/

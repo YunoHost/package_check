@@ -1,0 +1,566 @@
+#!/bin/bash
+
+#=================================================
+# LXD HELPERS
+#=================================================
+
+# Check if a LXC container exists
+#
+# usage: ynh_lxc_exists --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_exists () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	if ! lxc list --format json | jq -e --arg name $name '.[] | select(.name==$name) | .name' >/dev/null
+	then
+		return 1
+	else
+		return 0
+	fi
+}
+
+# Return LXC container status
+#
+# usage: ynh_lxc_status --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_status () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	if ynh_lxc_exists --name=$name
+	then
+		lxc list --format json | jq -r --arg name $name '.[] | select(.name==$name) | .state | .status'
+	fi
+}
+
+# Check if an LXC container is running
+#
+# usage: ynh_lxc_is_started --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_is_started () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	if [ "$(ynh_lxc_status --name=$name)" == Running ]
+	then
+		return 0
+	else
+		return 1
+	fi
+}
+
+# Check if an LXC container is stopped
+#
+# usage: ynh_lxc_is_stopped --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_is_stopped () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	if [ "$(ynh_lxc_status --name=$name)" == Stopped ]
+	then
+		return 0
+	else
+		return 1
+	fi
+}
+
+# Start an LXC container
+#
+# usage: ynh_lxc_start --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_start () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	# If the container exists
+	if ynh_lxc_exists --name=$name
+	then
+		if ! ynh_lxc_is_started --name=$name
+		then
+			lxc start $name
+		fi
+	fi
+}
+
+# Stopping an LXC container
+#
+# usage: ynh_lxc_stop --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_stop () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	# If the container exists
+	if ynh_lxc_exists --name=$name
+	then
+		ynh_print_info --message="Stopping LXC $name"
+		wait_period=0
+		while ! ynh_lxc_is_stopped --name=$name
+		do
+			lxc stop $name
+			wait_period=$(($wait_period+10))
+			if [ $wait_period -gt 30 ];then
+				break
+			else
+				sleep 1
+			fi
+		done
+
+		# If the command times out, then add the option --force
+		wait_period=0
+		while ! ynh_lxc_is_stopped --name=$name
+		do
+			lxc stop $name --force
+			wait_period=$(($wait_period+10))
+			if [ $wait_period -gt 30 ];then
+				break
+			else
+				sleep 5
+			fi
+		done
+	fi
+}
+
+# Run a command inside an LXC container
+#
+# usage: ynh_lxc_run_inside --name=name --command=command
+# | arg: -n, --name=		- name of the LXC
+# | arg: -c, --command=		- command to execute
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_run_inside () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=nc
+	local -A args_array=([n]=name= [c]=command=)
+	local name
+	local command
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	lxc exec $name -- /bin/bash -c "$command"
+}
+
+# Check an LXC container can start
+#
+# usage: ynh_lxc_check_container_start --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_check_container_start () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	ynh_print_info --message="Test du conteneur $name"
+	ynh_lxc_start --name=$name	# Démarre le conteneur
+
+	wait_period=0
+	while ! ynh_lxc_is_started --name=$name
+	do
+		wait_period=$(($wait_period+10))
+		if [ $wait_period -gt 20 ];then
+			break
+		else
+			sleep 5
+		fi
+	done
+
+	ynh_lxc_is_started --name=$name
+}
+
+# Restart a container
+#
+# usage: _ynh_lxc_restart_container --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+_ynh_lxc_restart_container () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	ynh_lxc_stop --name=$name
+	ynh_lxc_start --name=$name
+}
+
+# Keep sure the LXC is started
+#
+# usage: _ynh_lxc_start_and_wait --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+_ynh_lxc_start_and_wait () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	# Try to start the container 3 times.
+	ynh_lxc_start --name=$name
+	local max_try=3
+	local i=0
+	while [ $i -lt $max_try ]
+	do
+		i=$(( i +1 ))
+		local failstart=0
+
+		# Wait for container to start, we are using systemd to check this,
+		# for the sake of brevity.
+		for j in $(seq 1 10); do
+			if ynh_lxc_run_inside --name=$name --command="systemctl isolate multi-user.target >/dev/null 2>/dev/null"
+			then
+				break
+			fi
+
+			if [ "$j" == "10" ]; then
+				log_debug 'Failed to start the container ... restarting ...'
+				failstart=1
+
+				_ynh_lxc_restart_container --name="$name"
+			fi
+
+			sleep 1s
+		done
+
+		# Wait for container to access the internet
+		for j in $(seq 1 10); do
+			if ynh_lxc_run_inside --name=$name --command="curl -s http://wikipedia.org > /dev/null 2>/dev/null"
+			then
+				break
+			fi
+
+			if [ "$j" == "10" ]; then
+				log_debug 'Failed to access the internet ... restarting'
+				failstart=1
+
+				_ynh_lxc_restart_container --name="$name"
+			fi
+
+			sleep 1s
+		done
+
+		# Has started and has access to the internet
+		if [ $failstart -eq 0 ]
+		then
+			break
+		fi
+
+		# Fail if the container failed to start
+		if [ $i -eq $max_try ] && [ $failstart -eq 1 ]
+		then
+			log_error "The container miserably failed to start or to connect to the internet"
+			lxc info --show-log $name
+			return 1
+		fi
+	done
+
+	LXC_IP=$(ynh_lxc_run_inside --name=$name --command="hostname -I | cut -d' ' -f1 | grep -E -o \"\<[0-9.]{8,}\>\"")
+}
+
+# Launch a new LXC from an image
+#
+# usage: ynh_lxc_launch --image=image --name=name
+# | arg: -i, --image=	- image to create from
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_launch (){
+	# Declare an array to define the options of this helper.
+	local legacy_args=in
+	local -A args_array=([i]=image= [n]=name=)
+	local image
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	if lxc remote list | grep -q "yunohost" && lxc image list yunohost:$image | grep -q -w $image; then
+		lxc launch yunohost:$image $name \
+			-c security.nesting=true \
+			-c security.privileged=true \
+			-c limits.memory=80% \
+			-c limits.cpu.allowance=80%  | tee -a /proc/self/fd/3
+	# Check if we can launch container from a local image
+	elif lxc image list $image | grep -q -w $image; then
+		lxc launch $image $name \
+			-c security.nesting=true \
+			-c security.privileged=true \
+			-c limits.memory=80% \
+			-c limits.cpu.allowance=80%  | tee -a /proc/self/fd/3
+	else
+		log_critical "Can't find base image $image"
+	fi
+}
+
+# Delete a lxc container
+#
+# usage: ynh_lxc_delete --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_delete () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	if ynh_lxc_exists --name=$name
+	then
+		lxc delete $name --force
+	else
+		return 1
+	fi
+}
+
+# Clean the swapfiles of an LXC container
+#
+# usage: ynh_lxc_swapfiles_clean --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_swapfiles_clean () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	_ynh_lxc_start_and_wait --name=$name
+
+	ynh_lxc_run_inside --name=$name --command='for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done'
+	ynh_lxc_run_inside --name=$name --command='for swapfile in $(ls /swap_* 2>/dev/null); do rm -f $swapfile; done'
+}
+
+# Check if a snapshot exist for an LXC container
+#
+# usage: ynh_lxc_snapshot_exists --name=name --snapname=snapname
+# | arg: -n, --name=		- name of the LXC
+# | arg: -s, --snapname=	- name of the snapshot
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_snapshot_exists () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=ns
+	local -A args_array=([n]=name= [s]=snapname=)
+	local name
+	local snapname
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	# If the container exists
+	if ynh_lxc_exists --name=$name
+	then
+		if lxc list --format json | jq -e --arg name $name --arg snapname $snapname '.[] | select(.name==$name) | .snapshots' >/dev/null
+		then
+			if lxc list --format json | jq -e --arg name $name --arg snapname $snapname '.[] | select(.name==$name) | .snapshots[] | select(.name==$snapname)' >/dev/null
+			then
+				return 0
+			else
+				return 1
+			fi
+		else
+			return 1
+		fi
+	fi
+}
+
+# Create a snapshot of an LXC container
+#
+# usage: ynh_lxc_snapshot_create --name=name --snapname=snapname
+# | arg: -n, --name=		- name of the LXC
+# | arg: -s, --snapname=	- name of the snapshot
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_snapshot_create () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=ns
+	local -A args_array=([n]=name= [s]=snapname=)
+	local name
+	local snapname
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	# Remove swap files to avoid killing the CI with huge snapshots.
+	ynh_lxc_swapfiles_clean --name=$name
+	
+	ynh_lxc_stop --name=$name
+
+	# Check if the snapshot already exist
+	if ! ynh_lxc_snapshot_exists --name=$name --snapname="$snapname"
+	then
+		log_info "(Creating snapshot $snapname ...)"
+		lxc snapshot $name $snapname
+	else
+		log_info "(Recreating snapshot $snapname ...)"
+		lxc snapshot $name $snapname --reuse
+	fi
+}
+
+# Delete a snapshot of an LXC container
+#
+# usage: ynh_lxc_snapshot_delete --name=name --snapname=snapname
+# | arg: -n, --name=		- name of the LXC
+# | arg: -s, --snapname=	- name of the snapshot
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_snapshot_delete () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=ns
+	local -A args_array=([n]=name= [s]=snapname=)
+	local name
+	local snapname
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	if ynh_lxc_snapshot_exists --name="$name" --snapname="$snapname"
+	then
+		lxc delete $name/$snapname
+		return 0
+	else
+		return 1
+	fi
+}
+
+# Load a snapshot of an LXC container
+#
+# usage: ynh_lxc_snapshot_load --name=name --snapname=snapname
+# | arg: -n, --name=		- name of the LXC
+# | arg: -s, --snapname=	- name of the snapshot
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_snapshot_load () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=ns
+	local -A args_array=([n]=name= [s]=snapname=)
+	local name
+	local snapname
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	if ynh_lxc_snapshot_exists --name="$name" --snapname="$snapname"
+	then
+		log_debug "Loading snapshot $snapname ..."
+
+		# Remove swap files before restoring the snapshot.
+		ynh_lxc_swapfiles_clean --name=$name
+
+		ynh_lxc_stop --name=$name
+
+		lxc restore $name $snapname
+		_ynh_lxc_start_and_wait --name=$name
+	else
+		return 1
+	fi
+}
+
+# Clone an LXC container
+#
+# usage: ynh_lxc_clone --source=source --destination=destination
+# | arg: -s, --source=		  - source LXC
+# | arg: -d, --destination=	 - destination LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_clone () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=sd
+	local -A args_array=([s]=source= [d]=destination=)
+	local source
+	local destination
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"	
+
+	if ynh_lxc_exists --name=$destination
+	then
+		ynh_print_info --message="Deleting LXC container $destination"
+		ynh_secure_remove --file="/var/lib/lxd/snapshots/$destination/snap0.tar.gz"
+		ynh_lxc_reset --name=$destination
+	fi
+
+	ynh_print_info --message="Cloning LXC container from $source to $destination"
+	lxc copy "$source" "$destination"
+
+	ynh_lxc_check_container_start --name=$destination
+	STATUS=$?
+	if [ $STATUS -eq 1 ]; then
+		ynh_print_info --message="LXC container $destination is broken."
+	else
+		ynh_print_info --message=" LXC container $destination is working."
+		ynh_print_info --message= "Creating snapshot of LXC container $destination"
+		ynh_lxc_snapshot_create --name="$destination" --snapname="snap0"
+	fi
+	return $STATUS
+}
+
+# Reset an LXC container
+#
+# usage: ynh_lxc_reset --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_reset () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	# If the container exists
+	if ynh_lxc_exists --name=$name
+	then
+		# Remove swap files before deleting the container
+		ynh_lxc_swapfiles_clean --name=$name
+		ynh_lxc_stop --name=$name
+		local current_storage=$(lxc list $name --format json --columns b | jq '.[].expanded_devices.root.pool')
+		swapoff "$(lxc storage get $current_storage source)/containers/$name/rootfs/swap" 2>/dev/null
+		ynh_lxc_delete --name=$name
+	fi 
+}

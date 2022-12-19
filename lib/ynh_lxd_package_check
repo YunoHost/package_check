@@ -1,0 +1,245 @@
+#!/bin/bash
+
+#=================================================
+# PACKAGE_CHECK HELPERS
+#=================================================
+
+# Start an LXC and execute a command in it
+#
+# usage: ynh_lxc_pc_exec --name=name --command=command
+# | arg: -n, --name=		- name of the LXC
+# | arg: -c, --command=		- command to execute
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_pc_exec () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=nc
+	local -A args_array=([n]=name= [c]=command=)
+	local name
+	local command
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	_ynh_lxc_start_and_wait --name=$name
+
+	start_timer
+
+	# Execute the command given in argument in the container and log its results.
+	lxc exec $name --env PACKAGE_CHECK_EXEC=1 -t -- /bin/bash -c "$command" | tee -a "$complete_log" $current_test_log
+
+	# Store the return code of the command
+	local returncode=${PIPESTATUS[0]}
+
+	log_debug "Return code: $returncode"
+
+	stop_timer 1
+	# Return the exit code of the ssh command
+	return $returncode
+}
+
+# Create a witness in an LXC container
+#
+# usage: ynh_lxc_pc_witness_file_create --name=name --witness=witness --type=type
+# | arg: -n, --name=		- name of the LXC
+# | arg: -w, --witness=		- witness to create
+# | arg: -t, --type=		- type of witness, can be file or directory
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_pc_witness_file_create () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=nwt
+	local -A args_array=([n]=name= [w]=witness= [t]=type=)
+	local name
+	local witness
+	local type
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	[ "$type" = "file" ] && local action="touch" || local action="mkdir -p"
+	ynh_lxc_run_inside --name=$name --command="$action $witness"
+}
+
+# Set witness in an LXC container
+#
+# usage: ynh_lxc_pc_witness_files_set --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_pc_witness_files_set () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	# Create files to check if the remove script does not remove them accidentally
+	log_debug "Create witness files..."
+
+	# Nginx conf
+	ynh_lxc_pc_witness_file_create --name=$name --witness="/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf" --type=file
+	ynh_lxc_pc_witness_file_create --name=$name --witness="/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf" --type=file
+
+	# /etc
+	ynh_lxc_pc_witness_file_create --name=$name --witness="/etc/witnessfile" --type=file
+
+	# /opt directory
+	ynh_lxc_pc_witness_file_create --name=$name --witness="/opt/witnessdir" --type=directory
+
+	# /var/www directory
+	ynh_lxc_pc_witness_file_create --name=$name --witness="/var/www/witnessdir" --type=directory
+
+	# /home/yunohost.app/
+	ynh_lxc_pc_witness_file_create --name=$name --witness="/home/yunohost.app/witnessdir" --type=directory
+
+	# /var/log
+	ynh_lxc_pc_witness_file_create --name=$name --witness="/var/log/witnessfile" --type=file
+
+	# Config fpm
+	ynh_lxc_pc_witness_file_create --name=$name --witness="/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf" --type=file
+
+	# Config logrotate
+	ynh_lxc_pc_witness_file_create --name=$name --witness="/etc/logrotate.d/witnessfile" --type=file
+
+	# Config systemd
+	ynh_lxc_pc_witness_file_create --name=$name --witness="/etc/systemd/system/witnessfile.service" --type=file
+
+	# Database
+	ynh_lxc_run_inside --name=$name --command="mysqladmin --wait status > /dev/null 2>&1"
+	ynh_lxc_run_inside --name=$name --command="echo \"CREATE DATABASE witnessdb\" | mysql --wait > /dev/null 2>&1"
+}
+
+# Check if a witness exists in an LXC container
+#
+# usage: ynh_lxc_pc_witness_file_check --name=name --witness=witness
+# | arg: -n, --name=		- name of the LXC
+# | arg: -w, --witness=		- witness to create
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_pc_witness_file_check () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=nw
+	local -A args_array=([n]=name= [w]=witness=)
+	local name
+	local witness
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	if ynh_lxc_run_inside --name=$name --command="test ! -e \"$witness\""
+	then
+		log_error "The file $witness is missing ! Something gone wrong !"
+		SET_RESULT "failure" witness
+	fi
+}
+
+# Check witness in an LXC container
+#
+# usage: ynh_lxc_pc_witness_files_check --name=name
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_pc_witness_files_check () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=n
+	local -A args_array=([n]=name=)
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	# Check all the witness files, to verify if them still here
+
+	# Nginx conf
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf"
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf"
+
+	# /etc
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/etc/witnessfile"
+
+	# /opt directory
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/opt/witnessdir"
+
+	# /var/www directory
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/var/www/witnessdir"
+
+	# /home/yunohost.app/
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/home/yunohost.app/witnessdir"
+
+	# /var/log
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/var/log/witnessfile"
+
+	# Config fpm
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf"
+
+	# Config logrotate
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/etc/logrotate.d/witnessfile"
+
+	# Config systemd
+	ynh_lxc_pc_witness_file_check --name=$name --witness="/etc/systemd/system/witnessfile.service"
+
+	# Database
+	if ! ynh_lxc_run_inside --name=$name --command="mysqlshow witnessdb > /dev/null 2>&1"
+	then
+		log_error "The database witnessdb is missing ! Something gone wrong !"
+		SET_RESULT "failure" witness
+		return 1
+	fi
+}
+
+# Create a new LXC from an image
+#
+# usage: ynh_lxc_pc_create --image=image --name=name
+# | arg: -i, --image=	- image to create from
+# | arg: -n, --name=	- name of the LXC
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_pc_create () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=in
+	local -A args_array=([i]=image= [n]=name=)
+	local image
+	local name
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	log_info "Launching new LXC $name ..."
+	# Check if we can launch container from YunoHost remote image
+	ynh_lxc_launch --image=$image --name=$name
+
+	pipestatus="${PIPESTATUS[0]}"
+	location=$(lxc list --format json | jq -e --arg name $name '.[] | select(.name==$name) | .location' | tr -d '"')
+	[[ "$location" != "none" ]] && log_info "... on $location"
+
+	[[ "$pipestatus" -eq 0 ]] || exit 1
+
+	_ynh_lxc_start_and_wait --name=$name
+	ynh_lxc_pc_witness_files_set --name=$name
+	ynh_lxc_snapshot_create --name=$name --snapname=snap0
+}
+
+# Create a snapshot of an LXC container
+#
+# usage: ynh_lxc_pc_snapshot_create --name=name --snapname=snapname
+# | arg: -n, --name=		- name of the LXC
+# | arg: -s, --snapname=	- name of the snapshot
+#
+# Requires YunoHost version *.*.* or higher.
+ynh_lxc_pc_snapshot_create () {
+	# Declare an array to define the options of this helper.
+	local legacy_args=ns
+	local -A args_array=([n]=name= [s]=snapname=)
+	local name
+	local snapname
+	# Manage arguments with getopts
+	ynh_handle_getopts_args "$@"
+
+	start_timer
+
+	# Check all the witness files, to verify if them still here
+	ynh_lxc_pc_witness_files_check --name=$name >&2
+
+	ynh_lxc_snapshot_create --name=$name --snapname=$snapname
+
+	_ynh_lxc_start_and_wait --name=$name
+
+	stop_timer 1
+}

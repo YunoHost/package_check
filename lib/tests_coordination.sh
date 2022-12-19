@@ -1,8 +1,9 @@
 #!/bin/bash
 
-source lib/lxc.sh
+source lib/ynh_lxd
+source lib/ynh_lxd_package_check
 source lib/tests.sh
-source lib/witness.sh
+source /usr/share/yunohost/helpers
 
 readonly complete_log="./Complete-${WORKER_ID}.log"
 
@@ -254,16 +255,16 @@ run_all_tests() {
 
     # Reset and create a fresh container to work with
     check_lxd_setup
-    LXC_RESET
-    LXC_CREATE
+    ynh_lxc_reset --name=$LXC_NAME
+    ynh_lxc_pc_create --image=$LXC_BASE --name=$LXC_NAME
     # Be sure that the container is running
-    LXC_EXEC "true"
+    ynh_lxc_pc_exec --name=$LXC_NAME --command="true"
 
     # Print the version of YunoHost from the LXC container
     log_small_title "YunoHost versions"
-    LXC_EXEC "yunohost --version"
-    LXC_EXEC "yunohost --version --output-as json" | jq -r .yunohost.version >> $TEST_CONTEXT/ynh_version
-    LXC_EXEC "yunohost --version --output-as json" | jq -r .yunohost.repo >> $TEST_CONTEXT/ynh_branch
+    ynh_lxc_pc_exec --name=$LXC_NAME --command="yunohost --version"
+    ynh_lxc_pc_exec --name=$LXC_NAME --command="yunohost --version --output-as json" | jq -r .yunohost.version >> $TEST_CONTEXT/ynh_version
+    ynh_lxc_pc_exec --name=$LXC_NAME --command="yunohost --version --output-as json" | jq -r .yunohost.repo >> $TEST_CONTEXT/ynh_branch
     echo $ARCH > $TEST_CONTEXT/architecture
     echo $app_id > $TEST_CONTEXT/app_id
 
@@ -349,7 +350,7 @@ TEST_LAUNCHER () {
     # End the timer for the test
     stop_timer 2
 
-    LXC_STOP $LXC_NAME
+    ynh_lxc_stop --name=$LXC_NAME
 
     # Update the lock file with the date of the last finished test.
     # $$ is the PID of package_check itself.
