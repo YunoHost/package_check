@@ -81,8 +81,6 @@ parse_check_process() {
         local install_args=$(       extract_check_process_section "^; Manifest"     "^; " $test_serie_rawconf | sed 's/\s*(.*)$//g' | tr -d '"' | tr '\n' '&')
         local preinstall_template=$(extract_check_process_section "^; pre-install"  "^; " $test_serie_rawconf)
         local preupgrade_template=$(extract_check_process_section "^; pre-upgrade"  "^; " $test_serie_rawconf)
-        local action_infos=$(       extract_check_process_section "^; Actions"      "^; " $test_serie_rawconf)
-        local configpanel_infos=$(  extract_check_process_section "^; Config_panel" "^; " $test_serie_rawconf)
 
         # Add (empty) special args if they ain't provided in check_process
         echo "$install_args" | tr '&' '\n' | grep -q "^domain="    ||install_args+="domain=&"
@@ -118,12 +116,6 @@ parse_check_process() {
                     local upgrade_name="$test_arg"
                 fi
                 extra="$(jq -n --arg upgrade_name "$upgrade_name" '{ $upgrade_name }')"
-            elif [[ "$test_type" == "ACTIONS_CONFIG_PANEL" ]] && [[ "$test_arg" == "actions" ]]
-            then
-                extra="$(jq -n --arg actions "$action_infos" '{ $actions }')"
-            elif [[ "$test_type" == "ACTIONS_CONFIG_PANEL" ]] && [[ "$test_arg" == "config_panel" ]]
-            then
-                extra="$(jq -n --arg configpanel "$configpanel_infos" '{ $configpanel }')"
             fi
 
             jq -n  \
@@ -158,8 +150,6 @@ parse_check_process() {
         # "Advanced" features
 
         is_test_enabled change_url       && add_test "TEST_CHANGE_URL"
-        is_test_enabled actions          && add_test "ACTIONS_CONFIG_PANEL" "actions"
-        is_test_enabled config_panel     && add_test "ACTIONS_CONFIG_PANEL" "config_panel"
 
         # Port already used ... do we really need this ...
 

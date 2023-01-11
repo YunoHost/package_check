@@ -19,7 +19,6 @@ The script is able to perform the following tests:
 - Upgrade from previous versions
 - Backup/restore
 - Changing the installation url (`change_url`)
-- Actions and config-panel
 
 Package_check script uses a LXC container to manipulate the package in a clean environment without any previous installations.
 
@@ -164,15 +163,6 @@ If the `build_base_lxc.sh` script detects that you are trying a cross container 
 		language="fr"
 		password="password"
 		port="666"
-	; Actions
-		action_argument=arg1|arg2
-		is_public=1|0
-	; Config_panel
-		main.categorie.config_example=arg1|arg2
-		main.overwrite_files.overwrite_phpfpm=1|0
-		main.php_fpm_config.footprint=low|medium|high|specific
-		main.php_fpm_config.free_footprint=20
-		main.php_fpm_config.usage=low|medium|high
 	; Checks
 		pkg_linter=1
 		setup_sub_dir=1
@@ -185,8 +175,6 @@ If the `build_base_lxc.sh` script detects that you are trying a cross container 
 		multi_instance=1
 		port_already_use=1	(66)
 		change_url=0
-		actions=0
-		config_panel=0
 ;;; Upgrade options
 	; commit=65c382d138596fcb32b4c97c39398815a1dcd4e8
 		name=Name of this previous version
@@ -212,22 +200,6 @@ All manifest keys need to be filled to perform the installation.
 
 > The manifest keys already in the file here are simply examples. Check the package manifest.
 
-### `; Actions`
-
-List of arguments for each action that needs an argument.
-`action_argument` is the name of the argument, as you can find at the end of [action.arguments.**action_argument**].
-`arg1|arg2` are the different arguments to use for the tests. You can have as many arguments as you want, each separated by `|`.
-
-_Only `actions.toml` can be tested by package_check, not `actions.json`._
-
-### `; Config_panel`
-
-List of arguments for each config_panel configuration.
-`main.categorie.config_example` is the complete toml entry for the argument of a configuration.
-`arg1|arg2` are the different arguments to use for the tests. You can as many arguments as you want, each separated by `|`.
-
-_Only `config_panel.toml` can be tested by package_check, not `config_panel.json`._
-
 ### `; Checks`
 
 List of tests to perform.
@@ -247,8 +219,6 @@ If a test is not in the list, it will be ignored. It's similar to set the test a
   The `port_already_use` test may eventually take as argument the port number.
   The port number must be written into parentheses.
 - `change_url`: Try to change the url by 6 different ways. Root to path, path to another path and path to root. And the same thing, to another domain.
-- `actions`: All actions available in actions.toml
-- `config_panel`: All configurations available in config_panel.toml
 
 ### `;;; Upgrade options`
 
