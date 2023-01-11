@@ -82,7 +82,7 @@ _INSTALL_APP () {
         value="$(echo $arg_override | cut -d '=' -f 2-)"
 
         # (Legacy stuff ... We don't override is_public if its type is not boolean)
-        [[ -e $package_path/manifest.json ]] \ 
+        [[ -e $package_path/manifest.json ]] \
             && [[ "$key" == "is_public" ]] \
             && [[ "$(jq -r '.arguments.install[] | select(.name=="is_public") | .type' $package_path/manifest.json)" != "boolean" ]] \
             && continue
@@ -110,7 +110,7 @@ _INSTALL_APP () {
             then
                 local default_value=$(jq -e -r --arg ARG $ARG '.arguments.install[] | select(.name==$ARG) | .default' $package_path/manifest.json)
             else
-                local default_value=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); d = t['install']['$ARG'].get('default'); assert d is not None, 'Missing default value'; print(d)" < manifest.toml)
+                local default_value=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); d = t['install']['$ARG'].get('default'); assert d is not None, 'Missing default value'; print(d)" < $package_path/manifest.toml)
             fi
             [[ $? -eq 0 ]] || { log_error "Missing install arg $ARG ?"; return 1; }
             [[ ${install_args: -1} == '&' ]] || install_args+="&"
@@ -195,7 +195,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
     then
         local has_public_arg=$([[ -n "$(jq -r '.arguments.install[] | select(.name=="is_public")' $package_path/manifest.json)" ]] && echo true || echo false)
     else
-        local has_public_arg=$(grep -q '\[install.init_main_permission\]' manifest.toml && echo true || echo false)
+        local has_public_arg=$(grep -q '\[install.init_main_permission\]' $package_path/manifest.toml && echo true || echo false)
     fi
     
     if [ "$install_type" != 'private' ] && [[ $has_public_arg == "false" ]]
