@@ -350,7 +350,7 @@ Page extract:\n$page_extract" > $TEST_CONTEXT/curl_result
 # Tests
 #=================================================
 
-PACKAGE_LINTER () {
+TEST_PACKAGE_LINTER () {
 
     start_test "Package linter"
 

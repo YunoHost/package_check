@@ -41,7 +41,6 @@ def get_default_values_for_questions(manifest):
         else:
             raise Exception("No default value could be computed for arg " + name)
 
-
 if __name__ == '__main__':
     manifest_path = sys.argv[1:][0]
 

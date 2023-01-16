@@ -25,10 +25,10 @@ def test_notes(test):
     if test["test_type"] == "TEST_UPGRADE" and test["test_arg"]:
         return
 
-    if test["test_type"] == "PACKAGE_LINTER" and test['results']['main_result'] == 'success' and test['results'].get("warning"):
+    if test["test_type"] == "TEST_PACKAGE_LINTER" and test['results']['main_result'] == 'success' and test['results'].get("warning"):
         yield '<style=warning>%s warnings</style>' % len(test['results'].get("warning"))
 
-    if test["test_type"] == "PACKAGE_LINTER" and test['results']['main_result'] == 'success' and test['results'].get("info"):
+    if test["test_type"] == "TEST_PACKAGE_LINTER" and test['results']['main_result'] == 'success' and test['results'].get("info"):
         yield '%s possible improvements' % len(set(test['results'].get("info")))
 
     if test['results'].get("witness"):
@@ -71,7 +71,7 @@ def level_1(tests):
     And there are no critical issues in the linter
     """
 
-    linter_tests = [t for t in tests if t["test_type"] == "PACKAGE_LINTER"]
+    linter_tests = [t for t in tests if t["test_type"] == "TEST_PACKAGE_LINTER"]
     install_tests = [t for t in tests if t["test_type"] == "TEST_INSTALL"]
     witness_missing_detected = any(t["results"].get("witness") for t in tests)
 
@@ -126,7 +126,7 @@ def level_5(tests):
     """
 
     alias_traversal_detected = any(t["results"].get("alias_traversal") for t in tests)
-    linter_tests = [t for t in tests if t["test_type"] == "PACKAGE_LINTER"]
+    linter_tests = [t for t in tests if t["test_type"] == "TEST_PACKAGE_LINTER"]
 
     return not alias_traversal_detected \
         and linter_tests != [] \
@@ -140,7 +140,7 @@ def level_6(tests):
     (the linter will report a warning named "is_in_github_org" if it's not)
     """
 
-    linter_tests = [t for t in tests if t["test_type"] == "PACKAGE_LINTER"]
+    linter_tests = [t for t in tests if t["test_type"] == "TEST_PACKAGE_LINTER"]
 
     return linter_tests != [] \
         and "is_in_github_org" not in linter_tests[0]["results"]["warning"]
@@ -153,7 +153,7 @@ def level_7(tests):
     linter which will report a "qualify_for_level_7" in successes)
     """
 
-    linter_tests = [t for t in tests if t["test_type"] == "PACKAGE_LINTER"]
+    linter_tests = [t for t in tests if t["test_type"] == "TEST_PACKAGE_LINTER"]
 
     # For runtime warnings, ignore stuff happening during upgrades from previous versions
     tests_on_which_to_check_for_runtime_warnings = [t for t in tests if not (t["test_type"] == "TEST_UPGRADE" and t["test_arg"])]
@@ -178,7 +178,7 @@ def level_8(tests):
     which will report a "qualify_for_level_8")
     """
 
-    linter_tests = [t for t in tests if t["test_type"] == "PACKAGE_LINTER"]
+    linter_tests = [t for t in tests if t["test_type"] == "TEST_PACKAGE_LINTER"]
 
     return linter_tests != [] \
         and "App.qualify_for_level_8" in linter_tests[0]["results"]["success"]
@@ -190,7 +190,7 @@ def level_9(tests):
     App is flagged high-quality in the app catalog (this is tested by the linter
     which will rpeort a "qualify_for_level_9")
     """
-    linter_tests = [t for t in tests if t["test_type"] == "PACKAGE_LINTER"]
+    linter_tests = [t for t in tests if t["test_type"] == "TEST_PACKAGE_LINTER"]
 
     return linter_tests != [] \
         and "App.qualify_for_level_9" in linter_tests[0]["results"]["success"]
@@ -199,7 +199,7 @@ def level_9(tests):
 def make_summary():
 
     test_types = {
-        "PACKAGE_LINTER": "Package linter",
+        "TEST_PACKAGE_LINTER": "Package linter",
         "TEST_INSTALL": "Install",
         "TEST_UPGRADE": "Upgrade",
         "TEST_BACKUP_RESTORE": "Backup/restore",

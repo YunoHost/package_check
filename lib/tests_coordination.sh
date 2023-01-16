@@ -133,7 +133,7 @@ parse_check_process() {
 
         test_serie=${tests_serie//;; }
 
-        is_test_enabled pkg_linter     && add_test "PACKAGE_LINTER"
+        is_test_enabled pkg_linter     && add_test "TEST_PACKAGE_LINTER"
         is_test_enabled setup_root     && add_test "TEST_INSTALL" "root"
         is_test_enabled setup_sub_dir  && add_test "TEST_INSTALL" "subdir"
         is_test_enabled setup_nourl    && add_test "TEST_INSTALL" "nourl"
@@ -196,7 +196,7 @@ guess_test_configuration() {
 
     local install_args=$(python3 "./lib/default_install_args.py" "$package_path"/manifest.*)
 
-    add_test "PACKAGE_LINTER"
+    add_test "TEST_PACKAGE_LINTER"
     add_test "TEST_INSTALL" "root"
     add_test "TEST_INSTALL" "subdir"
     if echo $install_args | grep -q "is_public=\|init_main_permission="
