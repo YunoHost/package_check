@@ -228,12 +228,18 @@ run_all_tests() {
         readonly app_id="$(grep '^id = ' $package_path/manifest.toml | tr -d '" ' | awk -F= '{print $2}')"
     fi
 
-    # Parse the check_process only if it's exist
-    check_process="$package_path/check_process"
+    tests_toml="$package_path/tests.toml"
+    if [ -e "$tests_toml"]
+    then
+        python3 "./lib/parse_tests_toml.py" "$package_path" "$TEST_CONTEXT"
+    else
+        # Parse the check_process only if it's exist
+        check_process="$package_path/check_process"
 
-    [ -e "$check_process" ] \
-        && parse_check_process \
-        || guess_test_configuration
+        [ -e "$check_process" ] \
+            && parse_check_process \
+            || guess_test_configuration
+    fi
 
     # Start the timer for this test
     start_timer
