@@ -20,7 +20,7 @@ def generate_test_list_base(test_manifest, default_install_args, is_webapp, is_m
             continue
 
         install_args = copy.copy(default_install_args)
-        install_args.update(test_suite.get("args"))
+        install_args.update(test_suite.get("args", {}))
 
         default_meta = {
             "preinstall_template": test_suite.get("preinstall_template", ""),

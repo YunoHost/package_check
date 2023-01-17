@@ -33,7 +33,7 @@ run_all_tests() {
     tests_toml="$package_path/tests.toml"
     if [ -e "$tests_toml" ]
     then
-        python3 "./lib/parse_tests_toml.py" "$package_path" "$TEST_CONTEXT"
+        python3 "./lib/parse_tests_toml.py" "$package_path" "$TEST_CONTEXT/tests"
     else
         # Parse the check_process only if it's exist
         check_process="$package_path/check_process"
