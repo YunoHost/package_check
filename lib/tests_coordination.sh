@@ -31,7 +31,7 @@ run_all_tests() {
     fi
 
     tests_toml="$package_path/tests.toml"
-    if [ -e "$tests_toml"]
+    if [ -e "$tests_toml" ]
     then
         python3 "./lib/parse_tests_toml.py" "$package_path" "$TEST_CONTEXT"
     else
