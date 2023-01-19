@@ -23,8 +23,8 @@ def generate_test_list_base(test_manifest, default_install_args, is_webapp, is_m
         install_args.update(test_suite.get("args", {}))
 
         default_meta = {
-            "preinstall_template": test_suite.get("preinstall_template", ""),
-            "preupgrade_template": test_suite.get("preupgrade_template", ""),
+            "preinstall": test_suite.get("preinstall", ""),
+            "preupgrade": test_suite.get("preupgrade", ""),
             "install_args": install_args,
         }
 
@@ -111,10 +111,10 @@ def dump_for_package_check(test_list, package_check_tests_dir):
                 "test_serie": test_suite_id,
                 "test_type": "TEST_" + test_type.upper(),
                 "test_arg": test_arg,
-                "preinstall_template": meta.pop("preinstall_template", ""),
-                "preupgrade_template": meta.pop("preupgrade_template", ""),
+                "preinstall_template": meta.pop("preinstall", ""),
+                "preupgrade_template": meta.pop("preupgrade", ""),
                 "install_args": '&'.join([k + "=" + str(v) for k, v in meta.pop("install_args").items()]),
-                "extra": meta  # Boring logic just to ship the upgrade-from-commit's name ...
+                "extra": meta  # Boring legacy logic just to ship the upgrade-from-commit's name ...
             }
 
             test_file_id = test_suite_i * 100 + subtest_i

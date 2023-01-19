@@ -29,6 +29,26 @@ For a package on GitHub: `./package_check.sh https://github.com/YunoHost-Apps/AP
 You need to provide, at the root of the package, a `check_process` file to help the script to test the package with the correct arguments.
 If this file is not present, package_check will be used in downgraded mode. It will try to retrieve domain, path and admin user arguments in the manifest and execute some tests, based on the arguments it can find.
 
+## Usage
+
+```text
+> ./package_check.sh --help
+ Usage: package_check.sh [OPTION]... PACKAGE_TO_CHECK
+
+    -b, --branch=BRANCH     Specify a branch to check.
+    -a, --arch=ARCH
+    -d, --dist=DIST
+    -y, --ynh-branch=BRANCH
+    -i, --interactive           Wait for the user to continue before each remove
+    -e, --interactive-on-errors Wait for the user to continue on errors
+    -s, --force-stop            Force the stop of running package_check
+    -r, --rebuild               (Re)Build the base container
+                                (N.B.: you're not supposed to use this option,
+                                images are supposed to be fetch from
+                                devbaseimgs.yunohost.org automatically)
+    -h, --help                  Display this help
+```
+
 ## Deploying package_check
 
 First you need to install the system dependencies.
@@ -137,103 +157,63 @@ lxc exec inspired-lamprey -- dpkg --print-architecture
 
 If the `build_base_lxc.sh` script detects that you are trying a cross container architecture, it will try to perform this hack
 
-## Syntax of `check_process`
+## `tests.toml` syntax
 
-> Except spaces, the syntax of this file must be respected.
+```toml
+test_format = 1.0
 
+[default]
+
+    # ------------
+    # Tests to run
+    # ------------
+
+    # NB: the tests to run are automatically deduced by the CI script according to the
+    # content of the app's manifest. The declarations below allow to customize which
+    # tests are ran, possibly add special test suite to test special args, or
+    # declare which commits to test upgrade from.
+    #
+    # You can also decide (though this is discouraged!) to ban/ignore some tests,
+
+    exclude = ["install.private", "install.multi"]  # NB : you should NOT need this except if you really have a good reason ...
+
+    # For special usecases, sometimes you need to setup other things on the machine
+    # prior to installing the app (such as installing another app)
+    # (Remove this key entirely if not needed)
+    preinstall = """
+    sudo yunohost app install foobar
+    sudo yunohost user list
+    """
+
+    # -------------------------------
+    # Default args to use for install
+    # -------------------------------
+    
+    # By default, the CI will automagically fill the 'standard' args
+    # such as domain, path, admin, is_public and password with relevant values
+    # and also install args with a "default" provided in the manifest..
+    # It should only make sense to declare custom args here for args with no default values
+
+    args.language = "fr_FR"    # NB : you should NOT need those lines unless for custom questions with no obvious/default value
+    args.multisite = 0
+
+    # -------------------------------
+    # Commits to test upgrade from
+    # -------------------------------
+
+    test_upgrade_from.00a1a6e7.name = "Upgrade from 5.4"
+    test_upgrade_from.00a1a6e7.args.foo = "bar"
+
+
+# This is an additional test suite
+[multisite]
+
+    # On additional tests suites, you can decide to run only specific tests
+
+    only = ["install.subdir"]    
+
+    args.language = "en_GB"
+    args.multisite = 1
 ```
-;; Default test serie
-# Comment ignored
-	; pre-install
-		set -euxo pipefail
-		echo -n "Here your commands to execute in the container"
-		echo ", before each installation of the app."
-	; pre-upgrade
-		set -euxo pipefail
-		if [ "$FROM_COMMIT" == '65c382d138596fcb32b4c97c39398815a1dcd4e8' ]
-		then
-			resolve=127.0.0.1:443:$DOMAIN
-			# Example of request using curl
-			curl -X POST --data '{"some-key": "some-value"}' https://$DOMAIN/$PATH --resolve "$resolve"
-		fi
-	; Manifest
-        # You need to provide default values for installation parameters ...
-        # EXCEPT for special args: domain, path, admin, and is_public
-        # which will be filled automatically during tests
-		language="fr"
-		password="password"
-		port="666"
-	; Checks
-		pkg_linter=1
-		setup_sub_dir=1
-		setup_root=1
-		setup_nourl=0
-		setup_private=1
-		upgrade=1
-		upgrade=1	from_commit=65c382d138596fcb32b4c97c39398815a1dcd4e8
-		backup_restore=1
-		multi_instance=1
-		port_already_use=1	(66)
-		change_url=0
-;;; Upgrade options
-	; commit=65c382d138596fcb32b4c97c39398815a1dcd4e8
-		name=Name of this previous version
-		manifest_arg=domain=DOMAIN&path=PATH&admin=USER&password=pass&is_public=1&
-```
 
-### `;; Default test serie`
-
-A name for the series of tests to perform.
-It's possible to create multiple tests series, all with the same syntax.
-All different series will be performed sequentially.
-
-### `; pre-install`
-
-_Optional instruction_
-If you have to execute a command or a group of commands before the installation. You can use this instruction.
-All the commands added after the instruction `; pre-install` will be executed in the container before each installation of the app.
-
-### `; Manifest`
-
-List of manifest keys.
-All manifest keys need to be filled to perform the installation.
-
-> The manifest keys already in the file here are simply examples. Check the package manifest.
-
-### `; Checks`
-
-List of tests to perform.
-Each test set to 1 will be performed by the script.
-If a test is not in the list, it will be ignored. It's similar to set the test at 0.
-
-- `pkg_linter`: Check the package with [package linter](https://github.com/YunoHost/package_linter)
-- `setup_root`: Installation at the root of a domain.
-- `setup_sub_dir`: Installation in a path.
-- `setup_nourl`: Installation with no domain/path. This test is meant for non-web apps
-- `setup_private`: Private installation.
-- `upgrade`: Upgrade the package to the same version. Only to test the upgrade script.
-- `upgrade from_commit`: Upgrade the package from the specified commit to the latest version.
-- `backup_restore`: Backup then restore.
-- `multi_instance`: Install the application 2 times, to verify its ability to be multi-instanced.
-- `port_already_use`: Provoke an error by opening the port before.
-  The `port_already_use` test may eventually take as argument the port number.
-  The port number must be written into parentheses.
-- `change_url`: Try to change the url by 6 different ways. Root to path, path to another path and path to root. And the same thing, to another domain.
-
-### `;;; Upgrade options`
-
-_Optional instruction_
-For each specified commit for an upgrade, allow to give a name for this version and the manifest parameters which will be used for the preliminary installation.
-If there's no name specified, the commit will be used.
-And if there's no manifest arguments, the default arguments of the check process will be used.
-
-> 3 variables have to be used for the arguments of the manifest, DOMAIN, PATH and USER.
-
----
-
-The `package_check.sh` script accept 6 arguments in addition of the package to be checked.
-
-- `--branch=branch-name`: Check a branch of the repository instead of master. Allow to check a pull request.
-  You can use an url with a branch, https://github.com/YunoHost-Apps/APP_ynh/tree/my_branch, to implicitly use this argument.
-- `--interactive`: Wait for user input between each tests
-- `--help`: Display help.
+Note that you can run `python3 lib/parse_tests_toml.py /path/to/your/app/ | jq` to dump what tests will be run by package check
