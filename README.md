@@ -26,8 +26,7 @@ Usage:
 For a package in a directory: `./package_check.sh APP_ynh`
 For a package on GitHub: `./package_check.sh https://github.com/YunoHost-Apps/APP_ynh`
 
-You need to provide, at the root of the package, a `check_process` file to help the script to test the package with the correct arguments.
-If this file is not present, package_check will be used in downgraded mode. It will try to retrieve domain, path and admin user arguments in the manifest and execute some tests, based on the arguments it can find.
+The app is expected to contain a `tests.toml` file (see below) to tell package_check what tests to run (though most of it is guessed automagically)
 
 ## Usage
 
