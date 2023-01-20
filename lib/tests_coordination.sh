@@ -90,7 +90,7 @@ run_all_tests() {
     # Restore the started time for the timer
     starttime=$complete_start_timer
     # End the timer for the test
-    stop_timer 3
+    stop_timer all_tests
 
     echo "You can find the complete log of these tests in $(realpath $complete_log)"
 
@@ -151,7 +151,7 @@ TEST_LAUNCHER () {
     # Restore the started time for the timer
     starttime=$global_start_timer
     # End the timer for the test
-    stop_timer 2
+    stop_timer one_test
 
     LXC_STOP $LXC_NAME
 
@@ -256,4 +256,3 @@ path_to_install_type() {
     [ "$check_path" == "/" ] && { echo "root"; return; }
     echo "subdir"
 }
-

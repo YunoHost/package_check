@@ -25,7 +25,7 @@ LXC_CREATE () {
     else
         log_critical "Can't find base image $LXC_BASE, run ./package_check.sh --rebuild"
     fi
-    
+
     pipestatus="${PIPESTATUS[0]}"
     location=$(lxc list --format json | jq -e --arg LXC_NAME $LXC_NAME '.[] | select(.name==$LXC_NAME) | .location' | tr -d '"')
     [[ "$location" != "none" ]] && log_info "... on $location"
@@ -57,7 +57,7 @@ CREATE_LXC_SNAPSHOT () {
 
     # Remove swap files to avoid killing the CI with huge snapshots.
     CLEAN_SWAPFILES
-    
+
     LXC_STOP $LXC_NAME
 
     # Check if the snapshot already exist
@@ -69,7 +69,7 @@ CREATE_LXC_SNAPSHOT () {
 
     _LXC_START_AND_WAIT $LXC_NAME
 
-    stop_timer 1
+    stop_timer
 }
 
 LOAD_LXC_SNAPSHOT () {
@@ -104,7 +104,7 @@ LXC_EXEC () {
 
     log_debug "Return code: $returncode"
 
-    stop_timer 1
+    stop_timer
     # Return the exit code of the ssh command
     return $returncode
 }
@@ -127,14 +127,14 @@ LXC_RESET () {
     if lxc info $LXC_NAME >/dev/null 2>/dev/null; then
         # Remove swap files before deletting the continer
         CLEAN_SWAPFILES
-    fi 
+    fi
 
     LXC_STOP $LXC_NAME
 
     if lxc info $LXC_NAME >/dev/null 2>/dev/null; then
         local current_storage=$(lxc list $LXC_NAME --format json --columns b | jq '.[].expanded_devices.root.pool')
         swapoff "$(lxc storage get $current_storage source)/containers/$LXC_NAME/rootfs/swap" 2>/dev/null
-    fi 
+    fi
 
     lxc delete $LXC_NAME --force 2>/dev/null
 }
@@ -220,4 +220,3 @@ CLEAN_SWAPFILES() {
 RUN_INSIDE_LXC() {
     lxc exec $LXC_NAME -- "$@"
 }
-

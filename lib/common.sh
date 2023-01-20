@@ -142,7 +142,8 @@ start_timer () {
 
 stop_timer () {
     # Ending the timer
-    # $1 = Type of querying
+    # $1 = Type of message
+    msg_type="${1:-}"
 
     local finishtime=$(date +%s)
     # Calculate the gap between the starting and the ending of the timer
@@ -170,9 +171,9 @@ stop_timer () {
     [ $seconds -gt 1 ] && pseconds="${pseconds}s" || pseconds="0s"
 
     local time="${phours}${pminutes}${pseconds} ($(date '+%T'))"
-    if [ $1 -eq 2 ]; then
+    if [ "$msg_type" = "one_test" ]; then
         log_info "Working time for this test: $time"
-    elif [ $1 -eq 3 ]; then
+    elif [ "$msg_type" = "all_tests" ]; then
         log_info "Global working time for all tests: $time"
     else
         log_debug "Working time: $time"
