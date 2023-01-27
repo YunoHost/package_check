@@ -5,13 +5,17 @@ source lib/tests.sh
 source lib/witness.sh
 source lib/legacy.sh
 
-readonly complete_log="./Complete-${WORKER_ID}.log"
+readonly full_log="./full_log_${WORKER_ID}.log"
+readonly result_json="./results_${WORKER_ID}.json"
+readonly summary_png="./summary_${WORKER_ID}.png"
 
 # Purge some log files
-rm -f "$complete_log" && touch "$complete_log"
+rm -f "$full_log" && touch "$full_log"
+rm $result_json
+rm $summary_png
 
-# Redirect fd 3 (=debug steam) to complete log
-exec 3>>$complete_log
+# Redirect fd 3 (=debug steam) to full log
+exec 3>>$full_log
 
 #=================================================
 # Misc test helpers & coordination
@@ -84,8 +88,8 @@ run_all_tests() {
     # Print the final results of the tests
     log_title "Tests summary"
 
-    python3 lib/analyze_test_results.py $TEST_CONTEXT 2> ./results-${WORKER_ID}.json
-    [[ -e "$TEST_CONTEXT/summary.png" ]] && cp "$TEST_CONTEXT/summary.png" ./summary.png || rm -f summary.png
+    python3 lib/analyze_test_results.py $TEST_CONTEXT 2> $result_json
+    [[ -e "$TEST_CONTEXT/summary.png" ]] && cp "$TEST_CONTEXT/summary.png" $summary_png || rm -f $summary_png
 
     # Restore the started time for the timer
     starttime=$complete_start_timer

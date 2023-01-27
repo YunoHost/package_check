@@ -277,7 +277,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
         then
             # Print the title of the page
             local page_title=$(grep "<title>" "$curl_output" | cut --delimiter='>' --fields=2 | cut --delimiter='<' --fields=1)
-            local page_extract=$(lynx -dump -force_html "$curl_output" | head --lines 20 | tee -a "$complete_log")
+            local page_extract=$(lynx -dump -force_html "$curl_output" | head --lines 20 | tee -a "$full_log")
 
             # Check if the page title is neither the YunoHost portail or default NGINX page
             if [ "$page_title" = "YunoHost Portal" ]
@@ -355,8 +355,8 @@ TEST_PACKAGE_LINTER () {
     start_test "Package linter"
 
     # Execute package linter and linter_result gets the return code of the package linter
-    ./package_linter/package_linter.py "$package_path" | tee -a "$complete_log"
-    ./package_linter/package_linter.py "$package_path" --json | tee -a "$complete_log" > $current_test_results
+    ./package_linter/package_linter.py "$package_path" | tee -a "$full_log"
+    ./package_linter/package_linter.py "$package_path" --json | tee -a "$full_log" > $current_test_results
 
     return ${PIPESTATUS[0]}
 }
