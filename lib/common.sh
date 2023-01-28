@@ -21,6 +21,8 @@ LXC_NAME="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-test-${WORKER_ID}"
 
 readonly lock_file="./pcheck-${WORKER_ID}.lock"
 
+LXC_PROFILE_LIST=(yunohost_ramfs yunohost_btrfs yunohost_dir)
+
 #=================================================
 # LXC helpers
 #=================================================
@@ -53,6 +55,12 @@ function check_lxd_setup()
 
     ip a | grep -q lxdbr0 \
         || log_critical "There is no 'lxdbr0' interface... Did you ran 'lxd init' ?"
+
+    # Check the asked profile exists
+    if [[ "$profile" != "" ]] && [[ $(lxc profile list) != *"$profile"* ]]
+    then
+      log_critical "The lxd profile asked, $profile, is not configured. Did you run setup_lxd.sh ?"
+    fi
 }
 
 #=================================================

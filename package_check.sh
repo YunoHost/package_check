@@ -10,12 +10,13 @@ print_help() {
  Usage: package_check.sh [OPTION]... PACKAGE_TO_CHECK
 
     -b, --branch=BRANCH     Specify a branch to check.
-    -a, --arch=ARCH         
-    -d, --dist=DIST         
-    -y, --ynh-branch=BRANCH 
+    -a, --arch=ARCH
+    -d, --dist=DIST
+    -y, --ynh-branch=BRANCH
     -i, --interactive           Wait for the user to continue before each remove
     -e, --interactive-on-errors Wait for the user to continue on errors
     -s, --force-stop            Force the stop of running package_check
+    -p, --profile=PROFILE       LXD profile to use when creating the instance
     -r, --rebuild               (Re)Build the base container
                                 (N.B.: you're not supposed to use this option,
                                 images are supposed to be fetch from
@@ -39,6 +40,7 @@ interactive=0
 interactive_on_errors=0
 rebuild=0
 force_stop=0
+profile=""
 
 function parse_args() {
 
@@ -51,6 +53,11 @@ function parse_args() {
         then
             getopts_built_arg+=(-b)
             arguments[$i]=${arguments[$i]//--branch=/}
+        fi
+        if [[ "${arguments[$i]}" =~ "--profile=" ]]
+        then
+            getopts_built_arg+=(-p)
+            arguments[$i]=${arguments[$i]//--profile=/}
         fi
         # For each argument in the array, reduce to short argument for getopts
         arguments[$i]=${arguments[$i]//--interactive/-i}
@@ -71,7 +78,7 @@ function parse_args() {
                 # Initialize the index of getopts
                 OPTIND=1
                 # Parse with getopts only if the argument begin by -
-                getopts ":b:iresh" parameter || true
+                getopts ":b:iresp:h" parameter || true
                 case $parameter in
                     b)
                         # --branch=branch-name
@@ -97,6 +104,11 @@ function parse_args() {
                         # --force-stop
                         force_stop=1
                         shift_value=1
+                        ;;
+                    p)
+                        # --profile=profile
+                        profile="$OPTARG"
+                        shift_value=2
                         ;;
                     h)
                         # --help
@@ -127,6 +139,28 @@ function parse_args() {
 
 arguments=("$@")
 parse_args
+
+#=================================================
+# Guess the best lxd profile to apply
+#=================================================
+select_the_best_profile () {
+  if [[ "$profile" == "" ]]
+  then
+      # No profile preselected try to find one automatically
+        for name in "${LXC_PROFILE_LIST[@]}"
+        do
+            if [[ "$profile" == "" ]] && [[ $(lxc profile list --format=compact) == *"$name"* ]]
+            then
+              profile=$name
+            fi
+        done
+  fi
+
+  if [[ "$profile" != "" ]]
+  then
+    echo "Using LXD profile $profile"
+  fi
+}
 
 #=================================================
 # Cleanup / force-stop
@@ -193,6 +227,8 @@ trap 'exit 2' TERM
 assert_we_are_connected_to_the_internets
 assert_we_have_all_dependencies
 
+select_the_best_profile
+
 if [[ $rebuild == 1 ]]
 then
     rebuild_base_lxc 2>&1 | tee -a "./build_base_lxc.log"
@@ -202,7 +238,13 @@ fi
 self_upgrade
 fetch_or_upgrade_package_linter
 
-readonly TEST_CONTEXT=$(mktemp -d /tmp/package_check.XXXXXX)
+root_tmp_dir=/tmp
+if [[ $profile == "yunohost_ramfs" ]]
+then
+    # Download the application into the ramdisk if it exist
+  root_tmp_dir=/tmp/yunohost_ramfs
+fi
+readonly TEST_CONTEXT=$(mktemp -d $root_tmp_dir/package_check.XXXXXX)
 
 fetch_package_to_test "$path_to_package_to_test"
 run_all_tests
