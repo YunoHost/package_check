@@ -81,7 +81,8 @@ LOAD_LXC_SNAPSHOT () {
 
     LXC_STOP $LXC_NAME
 
-    lxc restore $LXC_NAME $snapname
+    lxc restore $LXC_NAME $snapname || log_error "Failed to restore snapshot ? The next step may miserably crash because of this ... if this happens to often, maybe restarting the LXD daemon can help ..."
+
     lxc start $LXC_NAME
     _LXC_START_AND_WAIT $LXC_NAME
 }
@@ -132,7 +133,7 @@ LXC_RESET () {
     LXC_STOP $LXC_NAME
 
     if lxc info $LXC_NAME >/dev/null 2>/dev/null; then
-        local current_storage=$(lxc list $LXC_NAME --format json --columns b | jq '.[].expanded_devices.root.pool')
+        local current_storage=$(lxc list $LXC_NAME --format json --columns b | jq -r '.[].expanded_devices.root.pool')
         swapoff "$(lxc storage get $current_storage source)/containers/$LXC_NAME/rootfs/swap" 2>/dev/null
     fi
 
@@ -142,7 +143,7 @@ LXC_RESET () {
 
 _LXC_START_AND_WAIT() {
 
-	restart_container()
+        restart_container()
 	{
         LXC_STOP $1
 		lxc start "$1"

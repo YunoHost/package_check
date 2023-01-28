@@ -11,8 +11,8 @@ readonly summary_png="./summary_${WORKER_ID}.png"
 
 # Purge some log files
 rm -f "$full_log" && touch "$full_log"
-rm $result_json
-rm $summary_png
+rm -f $result_json
+rm -f $summary_png
 
 # Redirect fd 3 (=debug steam) to full log
 exec 3>>$full_log
@@ -96,7 +96,10 @@ run_all_tests() {
     # End the timer for the test
     stop_timer all_tests
 
-    echo "You can find the complete log of these tests in $(realpath $complete_log)"
+    if [[ "$IN_YUNORUNNER" != "1" ]]
+    then
+        echo "You can find the complete log of these tests in $(realpath $full_log)"
+    fi
 
 }
 
