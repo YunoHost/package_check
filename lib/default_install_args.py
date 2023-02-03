@@ -4,7 +4,7 @@ import sys
 import json
 import toml
 
-def get_default_values_for_questions(manifest):
+def get_default_values_for_questions(manifest, raise_if_no_default=True):
 
     base_default_value_per_arg_type = {
         ("domain", "domain"): "domain.tld",
@@ -37,9 +37,10 @@ def get_default_values_for_questions(manifest):
                 choices = str(question["choices"])
             else:
                 choices = list(question["choices"].keys())
-            yield (name, question["choices"][0])
+            yield (name, choices[0])
         else:
-            raise Exception("No default value could be computed for arg " + name)
+            if raise_if_no_default:
+                raise Exception("No default value could be computed for arg " + name)
 
 if __name__ == '__main__':
     manifest_path = sys.argv[1:][0]

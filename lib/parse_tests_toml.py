@@ -136,7 +136,7 @@ def build_test_list(basedir):
     is_webapp = os.system(f"grep -q '^ynh_add_nginx_config' '{basedir}/scripts/install'") == 0
 
     from default_install_args import get_default_values_for_questions
-    default_install_args = {k: v for k, v in get_default_values_for_questions(manifest)}
+    default_install_args = {k: v for k, v in get_default_values_for_questions(manifest, raise_if_no_default=False)}
 
     base_test_list = list(generate_test_list_base(test_manifest, default_install_args, is_webapp, is_multi_instance))
     test_list = {test_suite_id: tests for test_suite_id, tests in filter_test_list(test_manifest, base_test_list)}
