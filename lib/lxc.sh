@@ -13,7 +13,10 @@ LXC_CREATE () {
 
     # Check if we can launch container from YunoHost remote image
     if lxc remote list | grep -q "yunohost" && lxc image list yunohost:$LXC_BASE | grep -q -w $LXC_BASE; then
-        lxc launch yunohost:$LXC_BASE $LXC_NAME $profile_option \
+        # Force the usage of the fingerprint because otherwise for some reason lxd won't use the newer version
+        # available even though it's aware it exists -_-
+        LXC_BASE_HASH="$(lxc image list yunohost:ynh-appci-bullseye-amd64-stable-base --format json | jq -r '.[].fingerprint')"
+        lxc launch yunohost:$LXC_BASE_HASH $LXC_NAME $profile_option \
             -c security.nesting=true \
             -c security.privileged=true \
             -c limits.memory=80% \
@@ -180,7 +183,7 @@ _LXC_START_AND_WAIT() {
 
 		# Wait for container to access the internet
 		for j in $(seq 1 10); do
-			if lxc exec "$1" -- curl -s http://wikipedia.org > /dev/null 2>/dev/null; then
+			if lxc exec "$1" -- timeout 10 curl -s http://wikipedia.org > /dev/null 2>/dev/null; then
 				break
 			fi
 
