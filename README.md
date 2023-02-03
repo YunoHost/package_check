@@ -216,3 +216,8 @@ test_format = 1.0
 ```
 
 Note that you can run `python3 lib/parse_tests_toml.py /path/to/your/app/ | jq` to dump what tests will be run by package check
+
+
+##### Test ids
+
+The test IDs to be used in only/exclude statements are: `install.root`, `install.subdir`, `install.nourl`, `install.multi`, `backup_restore`, `upgrade`, `upgrade.someCommitId` `change_url`
