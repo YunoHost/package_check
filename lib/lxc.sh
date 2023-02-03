@@ -8,7 +8,10 @@ LXC_CREATE () {
     log_info "Launching new LXC $LXC_NAME ..."
     # Check if we can launch container from YunoHost remote image
     if lxc remote list | grep -q "yunohost" && lxc image list yunohost:$LXC_BASE | grep -q -w $LXC_BASE; then
-        lxc launch yunohost:$LXC_BASE $LXC_NAME \
+        # Force the usage of the fingerprint because otherwise for some reason lxd won't use the newer version
+        # available even though it's aware it exists -_-
+        LXC_BASE_HASH="$(lxc image list yunohost:ynh-appci-bullseye-amd64-stable-base --format json | jq -r '.[].fingerprint')"
+        lxc launch yunohost:$LXC_BASE_HASH $LXC_NAME \
             -c security.nesting=true \
             -c security.privileged=true \
             -c limits.memory=80% \
