@@ -84,12 +84,12 @@ LOAD_LXC_SNAPSHOT () {
 
     local retry=0
     while [[ $retry -lt 5 ]]
-    then
+    do
         LXC_STOP $LXC_NAME || true
         lxc restore $LXC_NAME $snapname && break || retry+=1
         log_warning "Failed to stop LXC and restore snapshot? Retrying in 10 sec ..."
         sleep 20
-    fi
+    done
 
     if [[ $retry -ge 3 ]]
     then
