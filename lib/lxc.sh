@@ -83,15 +83,15 @@ LOAD_LXC_SNAPSHOT () {
     CLEAN_SWAPFILES
 
     local retry=0
-    while [[ $retry -lt 5 ]]
+    while [[ $retry -lt 10 ]]
     do
         LXC_STOP $LXC_NAME || true
         lxc restore $LXC_NAME $snapname && break || retry+=1
-        log_warning "Failed to stop LXC and restore snapshot? Retrying in 10 sec ..."
+        log_warning "Failed to stop LXC and restore snapshot? Retrying in 20 sec ..."
         sleep 20
     done
 
-    if [[ $retry -ge 3 ]]
+    if [[ $retry -ge 10 ]]
     then
         log_error "Failed to restore snapshot ? The next step may miserably crash because of this ... if this happens to often, maybe restarting the LXD daemon can help ..."
     fi
