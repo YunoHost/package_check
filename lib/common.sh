@@ -247,11 +247,11 @@ function fetch_package_to_test() {
         # Force the branch master if no branch is specified.
         if [ -z "$gitbranch" ]
         then
-            if git ls-remote --quiet --exit-code $path_to_package_to_test master
+            if git ls-remote --quiet --exit-code $path_to_package_to_test master >/dev/null
             then
                 gitbranch="-b master"
             else
-                if git ls-remote --quiet --exit-code $path_to_package_to_test stable
+                if git ls-remote --quiet --exit-code $path_to_package_to_test stable >/dev/null
                 then
                     gitbranch="-b stable"
                 else
