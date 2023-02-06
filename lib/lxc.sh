@@ -82,9 +82,19 @@ LOAD_LXC_SNAPSHOT () {
     # Remove swap files before restoring the snapshot.
     CLEAN_SWAPFILES
 
-    LXC_STOP $LXC_NAME
+    local retry=0
+    while [[ $retry -lt 5 ]]
+    then
+        LXC_STOP $LXC_NAME || true
+        lxc restore $LXC_NAME $snapname && break || retry+=1
+        log_warning "Failed to stop LXC and restore snapshot? Retrying in 10 sec ..."
+        sleep 20
+    fi
 
-    lxc restore $LXC_NAME $snapname || log_error "Failed to restore snapshot ? The next step may miserably crash because of this ... if this happens to often, maybe restarting the LXD daemon can help ..."
+    if [[ $retry -ge 3 ]]
+    then
+        log_error "Failed to restore snapshot ? The next step may miserably crash because of this ... if this happens to often, maybe restarting the LXD daemon can help ..."
+    fi
 
     lxc start $LXC_NAME
     _LXC_START_AND_WAIT $LXC_NAME
