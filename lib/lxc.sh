@@ -86,15 +86,13 @@ LOAD_LXC_SNAPSHOT () {
     while [[ ${retry_lxc} -lt 10 ]]
     do
         LXC_STOP $LXC_NAME || true
-        lxc restore $LXC_NAME $snapname && break || retry_lxc+=1
-        log_info "$retry_lxc"
-        log_warning "Failed to stop LXC and restore snapshot? Retrying in 20 sec ..."
+        lxc restore $LXC_NAME $snapname && break || retry_lxc=$(($retry_lxc+1))
+        log_warning "Failed to restore snapshot? Retrying in 20 sec ..."
         sleep 20
     done
 
     if [[ ${retry_lxc} -ge 10 ]]
     then
-        log_info "$retry_lxc"
         log_error "Failed to restore snapshot ? The next step may miserably crash because of this ... if this happens to often, maybe restarting the LXD daemon can help ..."
     fi
 
@@ -130,16 +128,25 @@ LXC_STOP () {
     # (We also use timeout 30 in front of the command because sometime lxc
     # commands can hang forever despite the --timeout >_>...)
     timeout 30 lxc stop --timeout 15 $container_to_stop 2>/dev/null
-    local ret=$?
 
-    # If the command times out, then add the option --force
-    if [ $ret -eq 124 ]; then
+    local retry_stop_lxc=0
+    while  && [[ ${retry_stop_lxc} -lt 5 ]]
+    do
+        local status="$(lxc list $container_to_stop --format json | jq -r '.[].state.status')"
+        if [[ -z "$status" ]] || [[ "$status" == "Stopped" ]]
+        then
+            break
+        fi
+        log_warning "Failed to stop LXC (status=$status) ? Retrying in 10 sec ..."
+        retry_stop_lxc="$(($retry_stop_lxc+1))"
+        sleep 10
+        timeout 30 lxc stop --timeout 15 $container_to_stop 2>/dev/null
+    done
+
+    if [[ ${retry_stop_lxc} -ge 5 ]]
+    then
         timeout 30 lxc stop --timeout 15 $container_to_stop --force 2>/dev/null
-    elif [ $ret -ne 0 ]; then
-        log_warning "Tried to stop lxc, got ret $ret"
-        log_warning $(lxc list $container_to_stop --format json | jq -r '.[].state.status')
     fi
-
 }
 
 LXC_RESET () {
@@ -162,7 +169,7 @@ LXC_RESET () {
 
 _LXC_START_AND_WAIT() {
 
-        restart_container()
+    restart_container()
 	{
         LXC_STOP $1
 		lxc start "$1"
