@@ -193,7 +193,7 @@ _LXC_START_AND_WAIT() {
 		# Wait for container to start, we are using systemd to check this,
 		# for the sake of brevity.
 		for j in $(seq 1 10); do
-			if lxc exec "$1" -- systemctl isolate multi-user.target >/dev/null 2>/dev/null; then
+			if lxc exec "$1" -- timeout 30 systemctl isolate multi-user.target >/dev/null 2>/dev/null; then
 				break
 			fi
 
