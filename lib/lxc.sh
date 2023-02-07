@@ -91,6 +91,10 @@ LOAD_LXC_SNAPSHOT () {
         LXC_STOP $LXC_NAME || true
         lxc restore $LXC_NAME $snapname && break || retry_lxc=$(($retry_lxc+1))
         log_warning "Failed to restore snapshot? Retrying in 20 sec ..."
+        if [[ ${retry_lxc} -ge 3 ]]
+        then
+            log_error "If this keeps happening, restarting the LXD daemon might help :| ..."
+        fi
         sleep 20
     done
 
