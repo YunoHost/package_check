@@ -87,12 +87,14 @@ LOAD_LXC_SNAPSHOT () {
     do
         LXC_STOP $LXC_NAME || true
         lxc restore $LXC_NAME $snapname && break || retry_lxc+=1
+        log_info "$retry_lxc"
         log_warning "Failed to stop LXC and restore snapshot? Retrying in 20 sec ..."
         sleep 20
     done
 
     if [[ ${retry_lxc} -ge 10 ]]
     then
+        log_info "$retry_lxc"
         log_error "Failed to restore snapshot ? The next step may miserably crash because of this ... if this happens to often, maybe restarting the LXD daemon can help ..."
     fi
 
@@ -135,6 +137,7 @@ LXC_STOP () {
         timeout 30 lxc stop --timeout 15 $container_to_stop --force 2>/dev/null
     elif [ $ret -ne 0 ]; then
         log_warning "Tried to stop lxc, got ret $ret"
+        lxc list $container_to_stop --format json | jq -r '.[].state.status'
     fi
 
 }
