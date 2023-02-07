@@ -36,7 +36,10 @@ LXC_CREATE () {
     [[ "$pipestatus" -eq 0 ]] || exit 1
 
     _LXC_START_AND_WAIT $LXC_NAME
+    sleep 3
     set_witness_files
+    sleep 3
+    log_info "Creating initial snapshot $LXC_NAME ..."
     lxc snapshot $LXC_NAME snap0
 }
 
