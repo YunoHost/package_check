@@ -86,15 +86,10 @@ LOAD_LXC_SNAPSHOT () {
     CLEAN_SWAPFILES
 
     local retry_lxc=0
-    local debug=""
     while [[ ${retry_lxc} -lt 10 ]]
     do
         LXC_STOP $LXC_NAME || true
-        if [[ ${retry_lxc} -ge 2 ]]
-        then
-            debug="--debug"
-        fi
-        lxc restore $LXC_NAME $snapname $debug && break || retry_lxc=$(($retry_lxc+1))
+        lxc restore $LXC_NAME $snapname && break || retry_lxc=$(($retry_lxc+1))
         log_warning "Failed to restore snapshot? Retrying in 20 sec ..."
         sleep 20
     done
