@@ -133,7 +133,7 @@ LXC_STOP () {
     # If the command times out, then add the option --force
     if [ $ret -eq 124 ]; then
         timeout 30 lxc stop --timeout 15 $container_to_stop --force 2>/dev/null
-    elif [ $ret -ne 0 ]
+    elif [ $ret -ne 0 ]; then
         log_warning "Tried to stop lxc, got ret $ret"
     fi
 
