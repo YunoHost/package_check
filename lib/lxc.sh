@@ -137,7 +137,7 @@ LXC_STOP () {
         timeout 30 lxc stop --timeout 15 $container_to_stop --force 2>/dev/null
     elif [ $ret -ne 0 ]; then
         log_warning "Tried to stop lxc, got ret $ret"
-        lxc list $container_to_stop --format json | jq -r '.[].state.status'
+        log_warning $(lxc list $container_to_stop --format json | jq -r '.[].state.status')
     fi
 
 }
