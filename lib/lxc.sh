@@ -252,5 +252,5 @@ CLEAN_SWAPFILES() {
 }
 
 RUN_INSIDE_LXC() {
-    timeout 300 lxc exec $LXC_NAME -- "$@"
+    timeout --signal TERM 300 lxc exec $LXC_NAME -- "$@"
 }
