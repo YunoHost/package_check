@@ -5,7 +5,7 @@ set_witness_files () {
 
     create_witness_file () {
         [ "$2" = "file" ] && local action="touch" || local action="mkdir -p"
-        RUN_INSIDE_LXC $action $1
+        RUN_INSIDE_LXC timeout --signal TERM 10 $action $1
     }
 
     # Nginx conf
