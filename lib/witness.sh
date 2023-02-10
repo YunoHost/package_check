@@ -52,6 +52,8 @@ check_witness_files () {
         fi
     }
 
+    sleep 2
+
     # Nginx conf
     check_file_exist "/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf"
     check_file_exist "/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf"

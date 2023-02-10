@@ -36,7 +36,7 @@ LXC_CREATE () {
     [[ "$pipestatus" -eq 0 ]] || exit 1
 
     _LXC_START_AND_WAIT $LXC_NAME
-    sleep 10
+    sleep 3
     set_witness_files
     sleep 3
     log_info "Creating initial snapshot $LXC_NAME ..."
@@ -236,6 +236,8 @@ _LXC_START_AND_WAIT() {
 			return 1
 		fi
 	done
+
+    sleep 3
 
     LXC_IP=$(lxc exec $1 -- hostname -I | cut -d' ' -f1 | grep -E -o "\<[0-9.]{8,}\>")
 }
