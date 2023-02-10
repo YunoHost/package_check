@@ -140,13 +140,9 @@ LXC_STOP () {
     while [[ ${retry_stop_lxc} -lt 5 ]]
     do
         local status="$(lxc list $container_to_stop --format json | jq -r '.[].state.status')"
-        if [[ -z "$status" ]] || [[ "$status" == "Stopped" ]]
+        if [[ -z "$status" ]] || [[ "$status" == "Stopped" ]] || [[ "$status" == "null" ]]
         then
             break
-        fi
-        if [[ ${retry_stop_lxc} -ge 3 ]]
-        then
-            log_warning "Failed to stop LXC (status=$status) ? Retrying in 10 sec ..."
         fi
         retry_stop_lxc="$(($retry_stop_lxc+1))"
         sleep 10
