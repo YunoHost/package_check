@@ -144,7 +144,10 @@ LXC_STOP () {
         then
             break
         fi
-        log_warning "Failed to stop LXC (status=$status) ? Retrying in 10 sec ..."
+        if [[ ${retry_stop_lxc} -ge 3 ]]
+        then
+            log_warning "Failed to stop LXC (status=$status) ? Retrying in 10 sec ..."
+        fi
         retry_stop_lxc="$(($retry_stop_lxc+1))"
         sleep 10
         timeout 30 lxc stop --timeout 15 $container_to_stop 2>/dev/null
