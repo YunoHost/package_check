@@ -10,7 +10,7 @@ LXC_CREATE () {
     if lxc remote list | grep -q "yunohost" && lxc image list yunohost:$LXC_BASE | grep -q -w $LXC_BASE; then
         # Force the usage of the fingerprint because otherwise for some reason lxd won't use the newer version
         # available even though it's aware it exists -_-
-        LXC_BASE_HASH="$(lxc image list yunohost:ynh-appci-bullseye-amd64-stable-base --format json | jq -r '.[].fingerprint')"
+        LXC_BASE_HASH="$(lxc image list $LXC_BASE --format json | jq -r '.[].fingerprint')"
         lxc launch yunohost:$LXC_BASE_HASH $LXC_NAME \
             -c security.nesting=true \
             -c security.privileged=true \
@@ -35,12 +35,22 @@ LXC_CREATE () {
 
     [[ "$pipestatus" -eq 0 ]] || exit 1
 
+    if [[ "$(lxc list $LXC_NAME --format json)" == "[]" ]]
+    then
+        log_critical "Failed to create the new LXC :/"
+    fi
+
     _LXC_START_AND_WAIT $LXC_NAME
     sleep 3
     set_witness_files
     sleep 3
     log_info "Creating initial snapshot $LXC_NAME ..."
     lxc snapshot $LXC_NAME snap0
+
+    if [[ -z "$(lxc list $LXC_NAME --format json | jq '.[].snapshots[] | select(.name=="snap0")')" ]]
+    then
+        log_critical "Failed to create the initial snapshot :/"
+    fi
 }
 
 LXC_SNAPSHOT_EXISTS() {
