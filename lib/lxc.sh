@@ -10,7 +10,7 @@ LXC_CREATE () {
     if lxc remote list | grep -q "yunohost" && lxc image list yunohost:$LXC_BASE | grep -q -w $LXC_BASE; then
         # Force the usage of the fingerprint because otherwise for some reason lxd won't use the newer version
         # available even though it's aware it exists -_-
-        LXC_BASE_HASH="$(lxc image list $LXC_BASE --format json | jq -r '.[].fingerprint')"
+        LXC_BASE_HASH="$(lxc image list yunohost:$LXC_BASE --format json | jq -r '.[].fingerprint')"
         lxc launch yunohost:$LXC_BASE_HASH $LXC_NAME \
             -c security.nesting=true \
             -c security.privileged=true \
