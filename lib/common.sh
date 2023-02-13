@@ -258,8 +258,6 @@ function fetch_package_to_test() {
                     log_critical "Unable to find a default branch to test (master or stable)"
                 fi
             fi
-        else ! git ls-remote --quiet --exit-code $path_to_package_to_test ${gitbranch##-b } >/dev/null
-            log_critical "Branch ${gitbranch##-b } doesn't exists (anymore?) ?"
         fi
 
         log_info " on branch ${gitbranch##-b }"
