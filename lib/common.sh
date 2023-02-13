@@ -259,11 +259,19 @@ function fetch_package_to_test() {
                 fi
             fi
         fi
+        else ! git ls-remote --quiet --exit-code $path_to_package_to_test ${gitbranch##-b } >/dev/null
+            log_critical "Branch ${gitbranch##-b } doesn't exists (anymore?) ?"
+        fi
 
         log_info " on branch ${gitbranch##-b }"
 
         # Clone the repository
         git clone --quiet $path_to_package_to_test $gitbranch "$package_path"
+
+        if [[ ! -e "$package_path" ]]
+        then
+            log_critical "Failed to git clone the repo / branch ?"
+        fi
 
         log_info " (commit $(git -C $package_path rev-parse HEAD))"
 
