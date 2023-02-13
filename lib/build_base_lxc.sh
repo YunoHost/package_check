@@ -4,9 +4,14 @@ function launch_new_lxc()
 {
     lxc info $LXC_BASE >/dev/null && lxc delete $LXC_BASE --force
 
+    profile_option=""
+    if [ "$profile" != "" ]; then
+       profile_option="--profile $profile"
+    fi
+
     if [ $(get_arch) = $ARCH ];
     then
-        lxc launch images:debian/$DIST/$ARCH $LXC_BASE -c security.privileged=true -c security.nesting=true
+       lxc launch images:debian/$DIST/$ARCH $LXC_BASE $profile_option -c security.privileged=true -c security.nesting=true
     else
         lxc image info $LXC_BASE >/dev/null && lxc image delete $LXC_BASE
 
@@ -23,7 +28,7 @@ function launch_new_lxc()
         popd
         rm -rf "$tmp_dir"
 
-        lxc launch $LXC_BASE $LXC_BASE -c security.privileged=true -c security.nesting=true
+        lxc launch $LXC_BASE $LXC_BASE $profile_option -c security.privileged=true -c security.nesting=true
     fi
 }
 
@@ -33,17 +38,17 @@ function rebuild_base_lxc()
 
     launch_new_lxc
     sleep 5
-    
+
     IN_LXC="lxc exec $LXC_BASE --"
-    
+
     INSTALL_SCRIPT="https://install.yunohost.org/$DIST"
     $IN_LXC apt install curl -y
     $IN_LXC /bin/bash -c "curl $INSTALL_SCRIPT | bash -s -- -a -d $YNH_BRANCH"
-    
+
     $IN_LXC systemctl -q stop apt-daily.timer
     $IN_LXC systemctl -q stop apt-daily-upgrade.timer
     $IN_LXC systemctl -q stop apt-daily.service
-    $IN_LXC systemctl -q stop apt-daily-upgrade.service 
+    $IN_LXC systemctl -q stop apt-daily-upgrade.service
     $IN_LXC systemctl -q disable apt-daily.timer
     $IN_LXC systemctl -q disable apt-daily-upgrade.timer
     $IN_LXC systemctl -q disable apt-daily.service
