@@ -42,6 +42,12 @@ LXC_CREATE () {
 
     _LXC_START_AND_WAIT $LXC_NAME
     sleep 3
+
+    if ! lxc exec $LXC_NAME -- test -e /etc/yunohost
+    then
+         log_critical "Failed to run 'test -e /etc/yunohost' on the container ... either the container did not start, or YunoHost doesn't exists yet in the container :/"
+    fi
+
     set_witness_files
     sleep 3
     log_info "Creating initial snapshot $LXC_NAME ..."
