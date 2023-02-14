@@ -456,7 +456,9 @@ TEST_UPGRADE () {
         # Make a backup of the directory
         # and Change to the specified commit
         cp -a "$package_path" "${package_path}_back"
-        (cd "$package_path"; git checkout --force --quiet "$commit")
+        pushd "$package_path"
+        git checkout --force --quiet "$commit" || { log_error "Failed to checkout commit $commit ?"; return 1; }
+        popd
 
         LOAD_LXC_SNAPSHOT snap0
 
