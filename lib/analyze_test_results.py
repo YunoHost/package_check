@@ -43,6 +43,9 @@ def test_notes(test):
     if test['results'].get("install_dir_permissions"):
         yield '<style=danger>Unsafe install dir permissions</style>'
 
+    if test['results'].get("file_manually_modified"):
+        yield '<style=danger>Config file overwritten / manually modified</style>'
+
 
 levels = []
 
@@ -161,6 +164,7 @@ def level_7(tests):
     unsafe_install_dir_perms = any(t["results"].get("install_dir_permissions") for t in tests_on_which_to_check_for_runtime_warnings)
     alias_traversal = any(t["results"].get("alias_traversal") for t in tests_on_which_to_check_for_runtime_warnings)
     witness = any(t["results"].get("witness") for t in tests_on_which_to_check_for_runtime_warnings)
+    file_manually_modified = any(t["results"].get("file_manually_modified") for t in tests_on_which_to_check_for_runtime_warnings)
 
     return all(t["results"]["main_result"] == "success" for t in tests) \
         and linter_tests != [] \
@@ -168,6 +172,7 @@ def level_7(tests):
         and not alias_traversal \
         and not too_many_warnings \
         and not unsafe_install_dir_perms \
+        and not file_manually_modified \
         and "App.qualify_for_level_7" in linter_tests[0]["results"]["success"]
 
 

@@ -132,7 +132,15 @@ TEST_LAUNCHER () {
     # which should not happen during tests because no human modified the file ...
     if grep -q --extended-regexp 'has been manually modified since the installation or last upgrade. So it has been duplicated' $current_test_log
     then
-        log_error "Apparently the log is telling that 'some file got manually modified' ... which should not happen, considering that no human modified the file ... ! Maybe you need to check what's happening with ynh_store_file_checksum and ynh_backup_if_checksum_is_different between install and upgrade."
+        log_error "Apparently the log is telling that 'some file got manually modified' ... which should not happen, considering that no human modified the file ... ! This is usually symptomatic of something that modified a conf file after installing it with ynh_add_config. Maybe usigin ynh_store_file_checksum can help, or maybe the issue is more subtle!"
+        if [[ "$test_type" == "TEST_UPGRADE" ]] && [[ "$test_arg" == "" ]]
+        then
+            SET_RESULT "failure" file_manually_modified
+        fi
+        if [[ "$test_type" == "TEST_BACKUP_RESTORE" ]]
+        then
+            SET_RESULT "failure" file_manually_modified
+        fi
     fi
 
     # Check that the number of warning ain't higher than a treshold
