@@ -181,6 +181,43 @@ stop_timer () {
 }
 
 #=================================================
+# Resource metrics helpers
+#=================================================
+# Communication between the background thread and the main one
+# is done via a shared memory.
+
+get_ram_usage() {
+    free -m | grep Mem | awk '{print $3}'
+}
+
+metrics_background_thread() {
+    declare -A resources=( [ram]=0 )
+    while true; do
+        ram_usage=$(get_ram_usage)
+        echo "$ram_usage"
+        if ((ram_usage > resources[ram])); then
+            resources[ram]=$ram_usage
+        fi
+        declare -p resources > "$TEST_CONTEXT/metrics_vars"
+        sleep 1
+    done
+}
+
+metrics_start() {
+    ram_usage_base=$(get_ram_usage)
+    metrics_background_thread &
+    metrics_background_thread_pid=$!
+}
+
+metrics_stop() {
+    kill "$metrics_background_thread_pid"
+    source "$TEST_CONTEXT/metrics_vars"
+
+    max_ram_usage_diff=$((resources[ram] - ram_usage_base))
+    log_info "RAM usage for this test: ${max_ram_usage_diff}MB (total: ${resources[ram]}MB)"
+}
+
+#=================================================
 # Package check self-upgrade
 #=================================================
 
