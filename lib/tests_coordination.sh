@@ -149,9 +149,9 @@ TEST_LAUNCHER () {
     # Check that the number of warning ain't higher than a treshold
     local n_warnings=$(grep --extended-regexp '^[0-9]+\s+.{1,15}WARNING' $current_test_log | wc -l)
     # (we ignore this test for upgrade from older commits to avoid having to patch older commits for this)
-    if [ "$n_warnings" -gt 50 ] && [ "$test_type" != "TEST_UPGRADE" -o "$test_arg" == "" ]
+    if [ "$n_warnings" -gt 30 ] && [ "$test_type" != "TEST_UPGRADE" -o "$test_arg" == "" ]
     then
-        if [ "$n_warnings" -gt 200 ]
+        if [ "$n_warnings" -gt 100 ]
         then
             log_error "There's A SHITLOAD of warnings in the output ! If those warnings are coming from some app build step and ain't actual warnings, please redirect them to the standard output instead of the error output ...!"
             log_report_test_failed
