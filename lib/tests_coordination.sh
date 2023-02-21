@@ -111,9 +111,6 @@ TEST_LAUNCHER () {
     # And keep this value separately
     local global_start_timer=$starttime
 
-    # Start metrics measurement
-    metrics_start
-
     current_test_id=$(basename $testfile | cut -d. -f1)
     current_test_infos="$TEST_CONTEXT/tests/$current_test_id.json"
     current_test_results="$TEST_CONTEXT/results/$current_test_id.json"
@@ -170,9 +167,6 @@ TEST_LAUNCHER () {
     starttime=$global_start_timer
     # End the timer for the test
     stop_timer one_test
-
-    # Stop metrics and show results
-    metrics_stop
 
     LXC_STOP $LXC_NAME
 

@@ -94,7 +94,7 @@ _INSTALL_APP () {
     # because this also applies to upgrades ... ie older version may have different args and default values
 
     # Fetch and loop over all manifest arg
-    if [[ -e $package_path/manifest.json ]] 
+    if [[ -e $package_path/manifest.json ]]
     then
         local manifest_args="$(jq -r '.arguments.install[].name' $package_path/manifest.json)"
     else
@@ -106,7 +106,7 @@ _INSTALL_APP () {
         # If the argument is not yet in install args, add its default value
         if ! echo "$install_args" | grep -q -E "\<$ARG="
         then
-            if [[ -e $package_path/manifest.json ]] 
+            if [[ -e $package_path/manifest.json ]]
             then
                 local default_value=$(jq -e -r --arg ARG $ARG '.arguments.install[] | select(.name==$ARG) | .default' $package_path/manifest.json)
             else
@@ -197,7 +197,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
     else
         local has_public_arg=$(grep -q '\[install.init_main_permission\]' $package_path/manifest.toml && echo true || echo false)
     fi
-    
+
     if [ "$install_type" != 'private' ] && [[ $has_public_arg == "false" ]]
     then
         log_debug "Forcing public access using a skipped_uris setting"
@@ -243,7 +243,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
                 --output './curl_output' \
                 $check_domain$curl_check_path" \
                 > "$TEST_CONTEXT/curl_print"
-            
+
             LXC_EXEC "cat ./curl_output" > $curl_output
 
             # Analyze the result of curl command
@@ -382,9 +382,13 @@ TEST_INSTALL () {
 
     _PREINSTALL
 
+    metrics_start
+
     # Install the application in a LXC container
     _INSTALL_APP "path=$check_path" "is_public=$is_public" "init_main_permission=$init_main_permission" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "$install_type" \
+
+    metrics_stop
 
     local install=$?
 
@@ -488,9 +492,13 @@ TEST_UPGRADE () {
     ret=$?
     [ $ret -eq 0 ] || { log_error "Pre-upgrade instruction failed"; return 1; }
 
+    metrics_start
+
     # Upgrade the application in a LXC container
     _RUN_YUNOHOST_CMD "app upgrade $app_id --file /app_folder --force" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "upgrade"
+
+    metrics_stop
 
     return $?
 }
@@ -608,8 +616,10 @@ TEST_BACKUP_RESTORE () {
             fi
 
             # Restore the application from the previous backup
+            metrics_start
             _RUN_YUNOHOST_CMD "backup restore Backup_test --force --apps $app_id" \
                 && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path"
+            metrics_stop
 
             ret=$?
             [ $ret -eq 0 ] || main_result=1
