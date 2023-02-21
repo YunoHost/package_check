@@ -194,7 +194,7 @@ metrics_background_thread() {
     declare -A resources=( [ram]=0 )
     while true; do
         ram_usage=$(get_ram_usage)
-        echo "$ram_usage"
+        #echo "$ram_usage"
         if ((ram_usage > resources[ram])); then
             resources[ram]=$ram_usage
         fi
@@ -212,9 +212,14 @@ metrics_start() {
 metrics_stop() {
     kill "$metrics_background_thread_pid"
     source "$TEST_CONTEXT/metrics_vars"
+    ram_usage_end=$(get_ram_usage)
 
-    max_ram_usage_diff=$((resources[ram] - ram_usage_base))
-    log_info "RAM usage for this test: ${max_ram_usage_diff}MB (total: ${resources[ram]}MB)"
+    max_ram_usage_diff_peak=$((resources[ram] - ram_usage_base))
+    max_ram_usage_diff_end=$((ram_usage_end - ram_usage_base))
+
+    log_info "Peak RAM usage during this test: ${max_ram_usage_diff_peak}MB"
+    log_info "RAM usage diff after test: ${max_ram_usage_diff_end}MB"
+
 }
 
 #=================================================
