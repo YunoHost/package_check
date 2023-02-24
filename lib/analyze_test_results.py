@@ -189,18 +189,6 @@ def level_8(tests):
         and "App.qualify_for_level_8" in linter_tests[0]["results"]["success"]
 
 
-@level(9, "Flagged high-quality in app catalog")
-def level_9(tests):
-    """
-    App is flagged high-quality in the app catalog (this is tested by the linter
-    which will rpeort a "qualify_for_level_9")
-    """
-    linter_tests = [t for t in tests if t["test_type"] == "TEST_PACKAGE_LINTER"]
-
-    return linter_tests != [] \
-        and "App.qualify_for_level_9" in linter_tests[0]["results"]["success"]
-
-
 def make_summary():
 
     test_types = {
