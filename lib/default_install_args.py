@@ -32,6 +32,8 @@ def get_default_values_for_questions(manifest, raise_if_no_default=True):
                 yield (name, str(question.get("default")))
         elif question["type"] == "boolean":
             yield (name, "1")
+        elif question["type"] == "password":
+            yield (name, "SomeSuperStrongPassword1234")
         elif question.get("choices"):
             if isinstance(question["choices"]):
                 choices = str(question["choices"])
