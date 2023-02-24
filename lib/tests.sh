@@ -388,9 +388,9 @@ TEST_INSTALL () {
     _INSTALL_APP "path=$check_path" "is_public=$is_public" "init_main_permission=$init_main_permission" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "$install_type" \
 
-    metrics_stop
-
     local install=$?
+
+    metrics_stop
 
     [ $install -eq 0 ] || return 1
 
@@ -497,10 +497,11 @@ TEST_UPGRADE () {
     # Upgrade the application in a LXC container
     _RUN_YUNOHOST_CMD "app upgrade $app_id --file /app_folder --force" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "upgrade"
+    ret=$?
 
     metrics_stop
 
-    return $?
+    return $ret
 }
 
 TEST_PORT_ALREADY_USED () {
@@ -619,9 +620,8 @@ TEST_BACKUP_RESTORE () {
             metrics_start
             _RUN_YUNOHOST_CMD "backup restore Backup_test --force --apps $app_id" \
                 && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path"
-            metrics_stop
-
             ret=$?
+            metrics_stop
             [ $ret -eq 0 ] || main_result=1
 
             break_before_continue
