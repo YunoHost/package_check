@@ -190,7 +190,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
     # For example, that's the case for agendav which is always installed as
     # private by default For "regular" apps (with a is_public arg) they are
     # installed as public, and we precisely want to check they are publicly
-    # accessible *without* tweaking skipped_uris...
+    # accessible *without* tweaking main permission...
     if [[ -e $package_path/manifest.json ]]
     then
         local has_public_arg=$([[ -n "$(jq -r '.arguments.install[] | select(.name=="is_public")' $package_path/manifest.json)" ]] && echo true || echo false)
@@ -200,11 +200,9 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
     if [ "$install_type" != 'private' ] && [[ $has_public_arg == "false" ]]
     then
-        log_debug "Forcing public access using a skipped_uris setting"
-        # Add a skipped_uris on / for the app
-        _RUN_YUNOHOST_CMD "app setting $app_id_to_check skipped_uris -v /"
-        # Regen the config of sso
-        _RUN_YUNOHOST_CMD "app ssowatconf"
+        log_debug "Forcing public access using tools shell"
+        # Force the public access by setting force=True, which is not possible with "yunohost user permission update"
+        _RUN_YUNOHOST_CMD "tools shell -c 'from yunohost.permission import user_permission_update; user_permission_update(\"$app_id_to_check.main\", add=\"visitors\", force=True)'"
     fi
 
     # Try to access to the URL in 2 times, with a final / and without
