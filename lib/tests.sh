@@ -186,17 +186,12 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
     log_small_title "Validating that the app $app_id_to_check can/can't be accessed with its URL..."
 
-    # Force the app to public only if we're checking the public-like installs AND there's no is_public arg
+    # Force the app to public only if we're checking the public-like installs AND visitors are allowed to access the app
     # For example, that's the case for agendav which is always installed as
     # private by default For "regular" apps (with a is_public arg) they are
     # installed as public, and we precisely want to check they are publicly
     # accessible *without* tweaking main permission...
-    if [[ -e $package_path/manifest.json ]]
-    then
-        local has_public_arg=$([[ -n "$(jq -r '.arguments.install[] | select(.name=="is_public")' $package_path/manifest.json)" ]] && echo true || echo false)
-    else
-        local has_public_arg=$(grep -q '\[install.init_main_permission\]' $package_path/manifest.toml && echo true || echo false)
-    fi
+    local has_public_arg=$(LXC_EXEC "cat /etc/ssowat/conf.json" | jq .permissions.\""$app_id_to_check.main"\".public)
 
     if [ "$install_type" != 'private' ] && [[ $has_public_arg == "false" ]]
     then
