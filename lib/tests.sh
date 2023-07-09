@@ -72,7 +72,7 @@ _TEST_CONFIG_PANEL() {
     if [[ -e "$package_path/config_panel.toml" ]]
     then
         # Call app config get, but with no output, we just want to check that no error is raised
-        yunohost app config get $app_id --output-as none
+        _RUN_YUNOHOST_CMD "app config get $app_id"
     fi
 }
 
