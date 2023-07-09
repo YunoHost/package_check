@@ -68,6 +68,14 @@ _PREUPGRADE () {
     fi
 }
 
+_TEST_CONFIG_PANEL() {
+    if [[ -e "$package_path/config_panel.toml" ]]
+    then
+        # Call app config get, but with no output, we just want to check that no error is raised
+        yunohost app config get $app_id --output-as none
+    fi
+}
+
 _INSTALL_APP () {
     local install_args="$(jq -r '.install_args' $current_test_infos)"
 
@@ -380,6 +388,7 @@ TEST_INSTALL () {
     # Install the application in a LXC container
     _INSTALL_APP "path=$check_path" "is_public=$is_public" "init_main_permission=$init_main_permission" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "$install_type" \
+        && _TEST_CONFIG_PANEL
 
     local install=$?
 
@@ -489,7 +498,9 @@ TEST_UPGRADE () {
 
     # Upgrade the application in a LXC container
     _RUN_YUNOHOST_CMD "app upgrade $app_id --file /app_folder --force" \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "upgrade"
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "upgrade" \
+        && _TEST_CONFIG_PANEL
+
     ret=$?
 
     metrics_stop
@@ -612,7 +623,9 @@ TEST_BACKUP_RESTORE () {
             # Restore the application from the previous backup
             metrics_start
             _RUN_YUNOHOST_CMD "backup restore Backup_test --force --apps $app_id" \
-                && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path"
+                && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" \
+                && _TEST_CONFIG_PANEL
+
             ret=$?
             metrics_stop
             [ $ret -eq 0 ] || main_result=1
