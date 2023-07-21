@@ -57,6 +57,14 @@ run_all_tests() {
         read -p "Press a key to start the tests..." < /dev/tty
     fi
 
+    if [ $dry_run -eq 1 ]; then
+        for FILE in $(ls $TEST_CONTEXT/tests/*.json)
+        do
+            cat $FILE | jq
+        done
+        exit
+    fi
+
     # Launch all tests successively
     cat $TEST_CONTEXT/tests/*.json >> /proc/self/fd/3
 

@@ -13,6 +13,7 @@ print_help() {
     -a, --arch=ARCH         
     -d, --dist=DIST         
     -y, --ynh-branch=BRANCH 
+    -D, --dry-run               Show a JSON representing which tests are going to be ran (meant for debugging)
     -i, --interactive           Wait for the user to continue before each remove
     -e, --interactive-on-errors Wait for the user to continue on errors
     -s, --force-stop            Force the stop of running package_check
@@ -35,6 +36,7 @@ exit 0
 [ "$#" -eq 0 ] && print_help
 
 gitbranch=""
+dry_run=0
 interactive=0
 interactive_on_errors=0
 rebuild=0
@@ -54,6 +56,7 @@ function parse_args() {
         fi
         # For each argument in the array, reduce to short argument for getopts
         arguments[$i]=${arguments[$i]//--interactive/-i}
+        arguments[$i]=${arguments[$i]//--dry-run/-D}
         arguments[$i]=${arguments[$i]//--rebuild/-r}
         arguments[$i]=${arguments[$i]//--force-stop/-s}
         arguments[$i]=${arguments[$i]//--help/-h}
@@ -71,7 +74,7 @@ function parse_args() {
                 # Initialize the index of getopts
                 OPTIND=1
                 # Parse with getopts only if the argument begin by -
-                getopts ":b:iresh" parameter || true
+                getopts ":b:Diresh" parameter || true
                 case $parameter in
                     b)
                         # --branch=branch-name
@@ -81,6 +84,11 @@ function parse_args() {
                     i)
                         # --interactive
                         interactive=1
+                        shift_value=1
+                        ;;
+                    D)
+                        # --dry-run
+                        dry_run=1
                         shift_value=1
                         ;;
                     e)
