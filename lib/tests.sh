@@ -497,7 +497,7 @@ TEST_UPGRADE () {
     metrics_start
 
     # Upgrade the application in a LXC container
-    _RUN_YUNOHOST_CMD "app upgrade $app_id --file /app_folder --force" \
+    _RUN_YUNOHOST_CMD "app upgrade $app_id --file /app_folder --no-safety-backup --force" \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "upgrade" \
         && _TEST_CONFIG_PANEL
 
