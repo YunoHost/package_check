@@ -136,6 +136,9 @@ TEST_LAUNCHER () {
 
     [ $test_result -eq 0 ] && SET_RESULT "success" main_result || SET_RESULT "failure" main_result
 
+    # Publish logs with YunoPaste on failure
+    [ ! $test_result -eq 0 ] && RUN_INSIDE_LXC yunohost tools shell -c "from yunohost.log import log_list, log_share; log_share(log_list().get('operation')[-1].get('path'))"
+
     # Check that we don't have this message characteristic of a file that got manually modified,
     # which should not happen during tests because no human modified the file ...
     if grep -q --extended-regexp 'has been manually modified since the installation or last upgrade. So it has been duplicated' $current_test_log
