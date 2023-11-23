@@ -123,7 +123,11 @@ parse_check_process() {
         is_test_enabled setup_root     && add_test "TEST_INSTALL" "root"
         is_test_enabled setup_sub_dir  && add_test "TEST_INSTALL" "subdir"
         is_test_enabled setup_nourl    && add_test "TEST_INSTALL" "nourl"
-        is_test_enabled setup_private  && add_test "TEST_INSTALL" "private"
+        if [[ $DIST == "bullseye" ]]
+        then
+            # Testing private vs. public install doesnt make that much sense, remote it for bookworm etc...
+            is_test_enabled setup_private  && add_test "TEST_INSTALL" "private"
+        fi
         is_test_enabled multi_instance && add_test "TEST_INSTALL" "multi"
         is_test_enabled backup_restore && add_test "TEST_BACKUP_RESTORE"
 
