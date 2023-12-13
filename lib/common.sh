@@ -190,6 +190,10 @@ get_ram_usage() {
     free -m | grep Mem | awk '{print $3}'
 }
 
+get_disk_usage() {
+    LANG= df --output="used" --total -k -l | tail -n 1
+}
+
 metrics_background_thread() {
     declare -A resources=( [ram]=0 )
     while true; do
@@ -205,6 +209,7 @@ metrics_background_thread() {
 
 metrics_start() {
     ram_usage_base=$(get_ram_usage)
+    disk_usage_base=$(get_disk_usage)
     metrics_background_thread &
     metrics_background_thread_pid=$!
 }
@@ -213,13 +218,16 @@ metrics_stop() {
     kill "$metrics_background_thread_pid"
     source "$TEST_CONTEXT/metrics_vars"
     ram_usage_end=$(get_ram_usage)
+    disk_usage_end=$(get_disk_usage)
 
     max_ram_usage_diff_peak=$((resources[ram] - ram_usage_base))
     max_ram_usage_diff_end=$((ram_usage_end - ram_usage_base))
+    max_disk_usage_diff_end=$(awk -v before="$disk_usage_base" -v after="$disk_usage_end"\
+        'BEGIN{printf "%.1f\n", (after - before)/1024}')
 
     log_info "Peak RAM usage during this test: ${max_ram_usage_diff_peak}MB"
     log_info "RAM usage diff after test: ${max_ram_usage_diff_end}MB"
-
+    log_info "Disk usage diff after test: ${max_disk_usage_diff_end}MB"
 }
 
 #=================================================
