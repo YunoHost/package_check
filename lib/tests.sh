@@ -81,6 +81,7 @@ _INSTALL_APP () {
 
     # Make sure we have a trailing & because that assumption is used in some sed regex later
     [[ ${install_args: -1} == '&' ]] || install_args+="&"
+    [[ ${install_args:0:1} == '&' ]] || install_args="&$install_args"
 
     # We have default values for domain, admin and is_public, but these
     # may still be overwritten by the args ($@)
@@ -95,7 +96,7 @@ _INSTALL_APP () {
             && [[ "$(jq -r '.arguments.install[] | select(.name=="is_public") | .type' $package_path/manifest.json)" != "boolean" ]] \
             && continue
 
-        install_args=$(echo $install_args | sed "s@$key=[^&]*\&@$key=$value\&@")
+        install_args=$(echo $install_args | sed "s@\&$key=[^&]*\&@\&$key=$value\&@")
     done
 
     # Note : we do this at this stage and not during the parsing of check_process
