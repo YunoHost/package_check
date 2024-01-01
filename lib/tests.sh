@@ -79,13 +79,9 @@ _TEST_CONFIG_PANEL() {
 _INSTALL_APP () {
     local install_args="$(jq -r '.install_args' $current_test_infos)"
 
-    log_info "install_args: $install_args"
-
     # Make sure we have a trailing & because that assumption is used in some sed regex later
     [[ ${install_args: -1} == '&' ]] || install_args+="&"
     [[ ${install_args:0:1} == '&' ]] || install_args="&$install_args"
-    
-    log_info "install_args: $install_args"
 
     # We have default values for domain, admin and is_public, but these
     # may still be overwritten by the args ($@)
@@ -102,8 +98,6 @@ _INSTALL_APP () {
 
         install_args=$(echo $install_args | sed "s@\&$key=[^&]*\&@\&$key=$value\&@")
     done
-    
-    log_info "install_args: $install_args"
 
     # Note : we do this at this stage and not during the parsing of check_process
     # because this also applies to upgrades ... ie older version may have different args and default values
@@ -127,16 +121,11 @@ _INSTALL_APP () {
             else
                 local default_value=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); d = t['install']['$ARG'].get('default'); assert d is not None, 'Missing default value'; print(d)" < $package_path/manifest.toml)
             fi
-            log_info "adding $ARG"
-            log_info "install_args: $install_args"
             [[ $? -eq 0 ]] || { log_error "Missing install arg $ARG ?"; return 1; }
             [[ ${install_args: -1} == '&' ]] || install_args+="&"
             install_args+="$ARG=$default_value"
-            log_info "install_args: $install_args"
         fi
     done
-    
-    log_info "install_args: $install_args"
 
     # Install the application in a LXC container
     log_info "Running: yunohost app install --no-remove-on-failure --force /app_folder -a \"$install_args\""
