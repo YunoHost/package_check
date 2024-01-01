@@ -483,16 +483,13 @@ TEST_UPGRADE () {
         _PREINSTALL
 
         # Install the application
-        log_debug  "before _INSTALL_APP path=$check_path"
         _INSTALL_APP "path=$check_path"
-        log_debug  "after _INSTALL_APP path=$check_path"
 
         local ret=$?
 
         # Test if the app can be accessed (though we don't want to report an
         # error if it's not, in that context) ... but the point
         # is to display the curl page
-        log_debug "before _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN $check_path upgrade"
         _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "upgrade"
 
         # Then replace the backup
