@@ -234,16 +234,6 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
             log_debug "Running curl $check_domain$curl_check_path"
 
-            log_info "curl --location --insecure --silent --show-error \
-                --header 'Host: $check_domain' \
-                --resolve $DOMAIN:80:$LXC_IP \
-                --resolve $DOMAIN:443:$LXC_IP \
-                --resolve $SUBDOMAIN:80:$LXC_IP \
-                --resolve $SUBDOMAIN:443:$LXC_IP \
-                --write-out '%{http_code};%{url_effective}\n' \
-                --output './curl_output' \
-                $check_domain$curl_check_path"
-
             # Call cURL to try to access to the URL of the app
             LXC_EXEC "curl --location --insecure --silent --show-error \
                 --header 'Host: $check_domain' \
