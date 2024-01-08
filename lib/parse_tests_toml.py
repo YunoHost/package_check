@@ -49,6 +49,8 @@ def generate_test_list_base(test_manifest, default_install_args, is_webapp, is_m
         yield test_suite_id, "upgrade", default_meta
         for commit, infos in test_suite.get("test_upgrade_from", {}).items():
             infos["upgrade_name"] = infos.pop("name")
+            if infos["upgrade_name"]:
+                infos["upgrade_name"] = infos["upgrade_name"].replace("Upgrade from ", "")
             if "args" in infos:
                 infos["install_args"] = infos.pop("args")
             upgrade_meta = copy.copy(default_meta)
