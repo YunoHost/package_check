@@ -4,6 +4,20 @@
 # "Low-level" logistic helpers
 #=================================================
 
+_PREINSTALL_APT_DEPS()
+{
+    [[ -e $package_path/manifest.toml ]] || return
+
+    local apt_deps=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); p = t['resources'].get('apt', {}).get('packages', ''); print(p.replace(',', ' ')) if isinstance(p, str) else print(' '.join(p));" < $package_path/manifest.toml)
+
+    log_small_title "Preinstalling apt dependencies before creating the initial snapshot..."
+    RUN_INSIDE_LXC apt install $apt_deps || true
+
+    # Execute the command given in argument in the container and log its results.
+    lxc exec $LXC_NAME -t -- /bin/bash -c "apt install $apt_deps" | tee -a "$full_log" >/dev/null
+}
+
+
 _RUN_YUNOHOST_CMD() {
 
     log_debug "Running yunohost $1"

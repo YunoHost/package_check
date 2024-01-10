@@ -49,6 +49,8 @@ LXC_CREATE () {
     fi
 
     set_witness_files
+    _PREINSTALL_APT_DEPS
+
     sleep 3
     log_info "Creating initial snapshot $LXC_NAME ..."
     lxc snapshot $LXC_NAME snap0
