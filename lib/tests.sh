@@ -4,13 +4,23 @@
 # "Low-level" logistic helpers
 #=================================================
 
-_PREINSTALL_APT_DEPS()
+_STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT()
 {
+    # Print the version of YunoHost from the LXC container
+    log_small_title "YunoHost versions"
+    lxc exec $LXC_NAME -t -- /bin/bash -c "yunohost --version" | tee -a "$full_log" >/dev/null
+
+    log_title "Package linter"
+    ./package_linter/package_linter.py "$package_path" | tee -a "$full_log"
+
+    # Set witness files
+    set_witness_files
+
     [[ -e $package_path/manifest.toml ]] || return
 
     local apt_deps=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); p = t['resources'].get('apt', {}).get('packages', ''); print(p.replace(',', ' ')) if isinstance(p, str) else print(' '.join(p));" < $package_path/manifest.toml)
 
-    log_small_title "Preinstalling apt dependencies before creating the initial snapshot..."
+    log_title "Preinstalling apt dependencies before creating the initial snapshot..."
 
     apt="LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get --assume-yes --quiet -o=Acquire::Retries=3 -o=Dpkg::Use-Pty=0"
     # Execute the command given in argument in the container and log its results.
@@ -371,7 +381,6 @@ TEST_PACKAGE_LINTER () {
     start_test "Package linter"
 
     # Execute package linter and linter_result gets the return code of the package linter
-    ./package_linter/package_linter.py "$package_path" | tee -a "$full_log"
     ./package_linter/package_linter.py "$package_path" --json | tee -a "$full_log" > $current_test_results
 
     return ${PIPESTATUS[0]}

@@ -48,8 +48,7 @@ LXC_CREATE () {
          log_critical "Failed to run 'test -e /etc/yunohost' on the container ... either the container did not start, or YunoHost doesn't exists yet in the container :/"
     fi
 
-    set_witness_files
-    _PREINSTALL_APT_DEPS
+    _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT
 
     sleep 3
     log_info "Creating initial snapshot $LXC_NAME ..."
