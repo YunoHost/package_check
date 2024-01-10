@@ -11,7 +11,6 @@ _PREINSTALL_APT_DEPS()
     local apt_deps=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); p = t['resources'].get('apt', {}).get('packages', ''); print(p.replace(',', ' ')) if isinstance(p, str) else print(' '.join(p));" < $package_path/manifest.toml)
 
     log_small_title "Preinstalling apt dependencies before creating the initial snapshot..."
-    RUN_INSIDE_LXC apt install $apt_deps || true
 
     apt="LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get --assume-yes --quiet -o=Acquire::Retries=3 -o=Dpkg::Use-Pty=0"
     # Execute the command given in argument in the container and log its results.
