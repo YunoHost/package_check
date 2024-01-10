@@ -8,7 +8,7 @@ _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT()
 {
     # Print the version of YunoHost from the LXC container
     log_small_title "YunoHost versions"
-    lxc exec $LXC_NAME -t -- /bin/bash -c "yunohost --version" | tee -a "$full_log" >/dev/null
+    lxc exec $LXC_NAME -t -- /bin/bash -c "yunohost --version" | tee -a "$full_log"
 
     log_title "Package linter"
     ./package_linter/package_linter.py "$package_path" | tee -a "$full_log"
