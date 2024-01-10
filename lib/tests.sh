@@ -13,8 +13,9 @@ _PREINSTALL_APT_DEPS()
     log_small_title "Preinstalling apt dependencies before creating the initial snapshot..."
     RUN_INSIDE_LXC apt install $apt_deps || true
 
+    apt="LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get --assume-yes --quiet -o=Acquire::Retries=3 -o=Dpkg::Use-Pty=0"
     # Execute the command given in argument in the container and log its results.
-    lxc exec $LXC_NAME -t -- /bin/bash -c "apt install $apt_deps" | tee -a "$full_log" >/dev/null
+    lxc exec $LXC_NAME -t -- /bin/bash -c "$apt update; $apt install $apt_deps" | tee -a "$full_log" >/dev/null
 }
 
 
