@@ -18,13 +18,16 @@ _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT()
 
     [[ -e $package_path/manifest.toml ]] || return
 
-    local apt_deps=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); p = t['resources'].get('apt', {}).get('packages', ''); print(p.replace(',', ' ')) if isinstance(p, str) else print(' '.join(p));" < $package_path/manifest.toml)
+    # We filter apt deps starting with $app_id to prevent stupid issues with for example cockpit and transmission where the apt package is not properly reinstalled on reinstall-after-remove test ...
+    local apt_deps=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); P = t['resources'].get('apt', {}).get('packages', ''); P = P.replace(',', ' ').split() if isinstance(P, str) else P; P = [p for p in P if p != '$app_id' and not p.startswith('$app_id-')]; print(' '.join(P));" < $package_path/manifest.toml)
 
-    log_title "Preinstalling apt dependencies before creating the initial snapshot..."
+    if [[ -n "$apt_deps" ]]
+    then
+        log_title "Preinstalling apt dependencies before creating the initial snapshot..."
 
-    apt="LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get --assume-yes --quiet -o=Acquire::Retries=3 -o=Dpkg::Use-Pty=0"
-    # Execute the command given in argument in the container and log its results.
-    lxc exec $LXC_NAME -t -- /bin/bash -c "$apt update; $apt install $apt_deps" | tee -a "$full_log" >/dev/null
+        apt="LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get --assume-yes --quiet -o=Acquire::Retries=3 -o=Dpkg::Use-Pty=0"
+        lxc exec $LXC_NAME -t -- /bin/bash -c "$apt update; $apt install $apt_deps" | tee -a "$full_log" >/dev/null
+    fi
 
     # Gotta generate the psql password even though apparently it's not even useful anymore these days but it otherwise trigger warnings ~_~
     if echo "$apt_deps" | grep -q postgresql
