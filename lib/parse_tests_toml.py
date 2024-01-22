@@ -13,6 +13,10 @@ def generate_test_list_base(test_manifest, default_install_args, is_webapp, is_m
 
     is_full_domain_app = "domain" in default_install_args and "path" not in default_install_args
 
+    if test_manifest.get("webapp") is not None:
+        assert isinstance(test_manifest["webapp"], bool), "webapp must be a boolean value"
+        is_webapp = test_manifest["webapp"]
+
     for test_suite_id, test_suite in test_manifest.items():
 
         # Ignore non-testsuite stuff like "test_format"
