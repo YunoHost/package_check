@@ -1,11 +1,19 @@
-import sys
-import os
-import toml
+#!/usr/bin/env python3
+
+from typing import Any
+import argparse
 import copy
 import json
+import os
+import sys
+from pathlib import Path
+
+import toml
+
+from default_install_args import get_default_values_for_questions
 
 
-def generate_test_list_base(test_manifest, default_install_args, is_webapp, is_multi_instance):
+def generate_test_list_base(test_manifest: dict, default_install_args: dict, is_webapp: bool, is_multi_instance: bool):
 
     assert test_manifest["test_format"] == 1.0, "Only test_format 1.0 is supported for now"
 
@@ -128,42 +136,39 @@ def dump_for_package_check(test_list, package_check_tests_dir):
             json.dump(J, open(package_check_tests_dir + f"/{test_file_id}.json", "w"))
 
 
-def build_test_list(basedir):
+def build_test_list(basedir: Path) -> dict[str, dict[str, Any]]:
+    test_manifest = toml.load((basedir / "tests.toml").open("r"))
 
-    test_manifest = toml.load(open(basedir + "/tests.toml", "r"))
-
-    if os.path.exists(basedir + "/manifest.json"):
-        manifest = json.load(open(basedir + "/manifest.json", "r"))
+    if (basedir / "manifest.json").exists():
+        manifest = json.load((basedir / "manifest.json").open("r"))
         is_multi_instance = manifest.get("multi_instance") is True
     else:
-        manifest = toml.load(open(basedir + "/manifest.toml", "r"))
+        manifest = json.load((basedir / "manifest.toml").open("r"))
         is_multi_instance = manifest.get("integration").get("multi_instance") is True
 
-    is_webapp = os.system(f"grep -q '^ynh_add_nginx_config' '{basedir}/scripts/install'") == 0
+    is_webapp = os.system(f"grep -q '^ynh_add_nginx_config' '{str(basedir)}/scripts/install'") == 0
 
-    from default_install_args import get_default_values_for_questions
-    default_install_args = {k: v for k, v in get_default_values_for_questions(manifest, raise_if_no_default=False)}
+    default_install_args = get_default_values_for_questions(manifest, raise_if_no_default=False)
 
     base_test_list = list(generate_test_list_base(test_manifest, default_install_args, is_webapp, is_multi_instance))
-    test_list = {test_suite_id: tests for test_suite_id, tests in filter_test_list(test_manifest, base_test_list)}
+    test_list = dict(filter_test_list(test_manifest, base_test_list))
 
     return test_list
 
-if __name__ == '__main__':
 
-    test_list = build_test_list(sys.argv[1])
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("app", type=Path, help="Path to the app directory")
+    parser.add_argument("-d", "--dump-to", type=Path, required=False, help="Dump the result to the package check directory")
+    args = parser.parse_args()
 
-    if len(sys.argv) <= 1 or sys.argv[1] in ["-h", "--help"]:
-        print("""Usage:
+    test_list = build_test_list(args.app)
 
-Display generated test list:
-    python3 parse_tests_toml.py /path/to/app/folder/ | jq
-
-Dump the list (only relevant from inside package_checker's code ...)
-    python3 parse_tests_toml.py /path/to/app/folder/ /tmp/dir/for/package/check/....
-
-""")
-    elif len(sys.argv) == 2:
-        print(json.dumps(test_list, indent=4))
+    if args.dump_to:
+        dump_for_package_check(test_list, args.dump_to)
     else:
-        dump_for_package_check(test_list, sys.argv[2])
+        print(json.dumps(test_list, indent=4))
+
+
+if __name__ == "__main__":
+    main()
