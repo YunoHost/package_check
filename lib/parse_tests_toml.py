@@ -99,7 +99,7 @@ def filter_test_list(test_manifest, base_test_list):
         yield test_suite_id, tests_for_this_suite
 
 
-def dump_for_package_check(test_list, package_check_tests_dir):
+def dump_for_package_check(test_list: dict[str, dict[str, Any]], package_check_tests_dir: Path) -> None:
 
     test_suite_i = 0
 
@@ -133,7 +133,7 @@ def dump_for_package_check(test_list, package_check_tests_dir):
 
             test_file_id = test_suite_i * 100 + subtest_i
 
-            json.dump(J, open(package_check_tests_dir + f"/{test_file_id}.json", "w"))
+            json.dump(J, (package_check_tests_dir / f"{test_file_id}.json").open("w"))
 
 
 def build_test_list(basedir: Path) -> dict[str, dict[str, Any]]:
@@ -143,7 +143,7 @@ def build_test_list(basedir: Path) -> dict[str, dict[str, Any]]:
         manifest = json.load((basedir / "manifest.json").open("r"))
         is_multi_instance = manifest.get("multi_instance") is True
     else:
-        manifest = json.load((basedir / "manifest.toml").open("r"))
+        manifest = toml.load((basedir / "manifest.toml").open("r"))
         is_multi_instance = manifest.get("integration").get("multi_instance") is True
 
     is_webapp = os.system(f"grep -q '^ynh_add_nginx_config' '{str(basedir)}/scripts/install'") == 0
