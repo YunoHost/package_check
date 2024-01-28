@@ -1,56 +1,75 @@
 #!/usr/bin/python3
 
-import sys
+import argparse
 import json
+from pathlib import Path
+
 import toml
 
-def get_default_values_for_questions(manifest, raise_if_no_default=True):
 
+def get_default_value(app_name: str, name: str, question: dict, raise_if_no_default: bool = True) -> str:
     base_default_value_per_arg_type = {
         ("domain", "domain"): "domain.tld",
-        ("path", "path"): "/" + manifest["id"],
+        ("path", "path"): "/" + app_name,
         ("user", "admin"): "package_checker",
         ("group", "init_main_permission"): "visitors",
         ("group", "init_admin_permission"): "admins",
         ("password", "password"): "MySuperComplexPassword"
     }
 
+    type_and_name = (question["type"], name)
+
+    if value := base_default_value_per_arg_type.get(type_and_name):
+        return value
+
+    if value := question.get("default"):
+        if isinstance(value, bool):
+            # Convert bool to "0", "1"
+            value = str(int(value))
+        return value
+
+    if question["type"] == "boolean":
+        return "1"
+
+    if question["type"] == "password":
+        return "SomeSuperStrongPassword1234"
+
+    if choices := question.get("choices"):
+        return list(choices)[0]
+
+    if raise_if_no_default:
+        raise RuntimeError("No default value could be computed for arg " + name)
+    return ""
+
+
+def get_default_values_for_questions(manifest: dict, raise_if_no_default=True) -> dict[str, str]:
+    app_name = manifest["id"]
+
     if manifest.get("packaging_format", 1) <= 1:
-        questions = {q["name"]:q for q in manifest["arguments"]["install"]}
+        questions = {q["name"]: q for q in manifest["arguments"]["install"]}
     else:
         questions = manifest["install"]
 
-    for name, question in questions.items():
-        type_and_name = (question["type"], name)
-        base_default = base_default_value_per_arg_type.get(type_and_name)
-        if base_default:
-            yield (name, base_default)
-        elif question.get("default"):
-            if isinstance(question.get("default"), bool):
-                yield (name, str(int(question.get("default"))))
-            else:
-                yield (name, str(question.get("default")))
-        elif question["type"] == "boolean":
-            yield (name, "1")
-        elif question["type"] == "password":
-            yield (name, "SomeSuperStrongPassword1234")
-        elif question.get("choices"):
-            if isinstance(question["choices"], list):
-                choices = question["choices"]
-            else:
-                choices = list(question["choices"].keys())
-            yield (name, choices[0])
-        else:
-            if raise_if_no_default:
-                raise Exception("No default value could be computed for arg " + name)
+    args = {
+        name: get_default_value(app_name, name, question, raise_if_no_default)
+        for name, question in questions.items()
+    }
+    return args
 
-if __name__ == '__main__':
-    manifest_path = sys.argv[1:][0]
 
-    if manifest_path.endswith(".json"):
-        manifest = json.load(open(manifest_path, "r"))
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("manifest_path", type=Path, help="Path to the app directory")
+    args = parser.parse_args()
+
+    if args.manifest_path.name.endswith(".json"):
+        manifest = json.load(args.manifest_path.open())
     else:
-        manifest = toml.load(open(manifest_path, "r"))
+        manifest = toml.load(args.manifest_path.open())
 
-    querystring = '&'.join([k + "=" + v for k, v in get_default_values_for_questions(manifest)])
-    print(querystring)
+    query_string = "&".join([f"{name}={value}" for name, value in get_default_values_for_questions(manifest).items()])
+    print(query_string)
+
+
+if __name__ == "__main__":
+    main()
