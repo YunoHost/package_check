@@ -170,7 +170,7 @@ stop_timer () {
     [ $minutes -eq 1 ] && pminutes="${pminutes}, " || test -z "$pminutes" || pminutes="${pminutes}s, "
     [ $seconds -gt 1 ] && pseconds="${pseconds}s" || pseconds="0s"
 
-    local time="${phours}${pminutes}${pseconds} ($(date '+%T'))"
+    local time="${phours}${pminutes}${pseconds} ($(date '+%T %Z' -u))"
     if [ "$msg_type" = "one_test" ]; then
         log_info "Working time for this test: $time"
     elif [ "$msg_type" = "all_tests" ]; then
