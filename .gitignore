@@ -1,3 +1,4 @@
+.*
 *.swp
 *~
 Notes
@@ -11,3 +12,6 @@ config
 curl_print
 
 *.lock
+
+vagrant/repos/
+!vagrant/repos/.gitkeep
