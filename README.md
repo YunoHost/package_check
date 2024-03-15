@@ -1,5 +1,4 @@
-Package checker for YunoHost
-==================
+# Package checker for YunoHost
 
 [YunoHost project](https://yunohost.org/#/)
 
@@ -95,13 +94,13 @@ The app is expected to contain a `tests.toml` file (see below) to tell package_c
 
 Install the package `qemu-user-static` and `binfmt-support`, then list of all available images :
 
-```
+```bash
 lxc image list images:debian/bullseye
 ```
 
 Export the image of the architecture you want to run (for example armhf):
 
-```
+```bash
 lxc image export images:debian/bullseye/armhf
 ```
 
@@ -112,7 +111,7 @@ This command will create two files.
 
 We need to change the architecture of the metadata:
 
-```
+```bash
 tar xJf lxd.tar.xz
 sed -i '0,/architecture: armhf/s//architecture: amd64/' metadata.yaml
 tar cJf lxd.tar.xz metadata.yaml templates
@@ -120,13 +119,13 @@ tar cJf lxd.tar.xz metadata.yaml templates
 
 And reimport the image:
 
-```
+```bash
 lxc image import lxd.tar.xz rootfs.squashfs --alias test-arm
 ```
 
 You can now start an armhf image with:
 
-```
+```bash
 lxc launch test-arm
 lxc exec inspired-lamprey -- dpkg --print-architecture
 ```
@@ -219,8 +218,7 @@ test_format = 1.0
 
 Note that you can run `python3 lib/parse_tests_toml.py /path/to/your/app/ | jq` to dump what tests will be run by package check
 
-
-##### Test ids
+### Test ids
 
 The test IDs to be used in only/exclude statements are: `install.root`, `install.subdir`, `install.nourl`, `install.multi`, `backup_restore`, `upgrade`, `upgrade.someCommitId` `change_url`
 
@@ -238,3 +236,24 @@ For each curl test, you may define the following properties:
 - `auto_test_assets`: wether or not to test the first CSS and first JS asset found on the HTML page (default `false` except when the app provides no curl test and use the default mode)
 - `base_url`: defaults to the app's install URL (`$domain$path`). Can be changed to something like `https://__DOMAIN__` combined with `path` set to for example `/.well-known/foobar`, useful to test URLs which may be on a different domain or always at the domain root even when the app is on a subpath (such as well-known endpoints)
 
+
+## Using a btrfs storage pool
+
+```bash
+# Install btrfs tools
+apt install btrfs-progs
+
+# Create a partition. No need to format it!
+fdisk /dev/sdb
+# n for new then default values
+# w to write and exit
+
+# Remove the previous storage pool
+incus profile device remove default root
+
+# Create the storage pool (it will format and mount the partition)
+incus storage create btrfs_pool btrfs source=/dev/sdb1
+
+# Use it as the default pool
+incus profile device add default root disk path=/ pool=btrfs_pool
+```
