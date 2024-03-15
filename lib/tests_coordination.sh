@@ -69,7 +69,7 @@ run_all_tests() {
     cat $TEST_CONTEXT/tests/*.json >> /proc/self/fd/3
 
     # Reset and create a fresh container to work with
-    check_lxd_setup
+    check_lxc_setup
     LXC_RESET
     LXC_CREATE
 
@@ -213,7 +213,7 @@ break_before_continue () {
     if [ $interactive -eq 1 ] || [ $interactive_on_errors -eq 1 ] && [ ! $test_result -eq 0 ]
     then
         echo "To enter a shell on the lxc:"
-        echo "     lxc exec $LXC_NAME bash"
+        echo "     $lxc exec $LXC_NAME bash"
         read -p "Press a key to delete the application and continue...." < /dev/tty
     fi
 }

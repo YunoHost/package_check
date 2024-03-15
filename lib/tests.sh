@@ -8,7 +8,7 @@ _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT()
 {
     # Print the version of YunoHost from the LXC container
     log_small_title "YunoHost versions"
-    lxc exec $LXC_NAME -t -- /bin/bash -c "yunohost --version" | tee -a "$full_log"
+    $lxc exec $LXC_NAME -t -- /bin/bash -c "yunohost --version" | tee -a "$full_log"
 
     log_title "Package linter"
     ./package_linter/package_linter.py "$package_path" | tee -a "$full_log"
@@ -26,13 +26,13 @@ _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT()
         log_title "Preinstalling apt dependencies before creating the initial snapshot..."
 
         apt="LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get --assume-yes --quiet -o=Acquire::Retries=3 -o=Dpkg::Use-Pty=0"
-        lxc exec $LXC_NAME -t -- /bin/bash -c "$apt update; $apt install $apt_deps" | tee -a "$full_log" >/dev/null
+        $lxc exec $LXC_NAME -t -- /bin/bash -c "$apt update; $apt install $apt_deps" | tee -a "$full_log" >/dev/null
     fi
 
     # Gotta generate the psql password even though apparently it's not even useful anymore these days but it otherwise trigger warnings ~_~
     if echo "$apt_deps" | grep -q postgresql
     then
-        lxc exec $LXC_NAME -t -- /bin/bash -c "yunohost tools regen-conf postgresql" | tee -a "$full_log" >/dev/null
+        $lxc exec $LXC_NAME -t -- /bin/bash -c "yunohost tools regen-conf postgresql" | tee -a "$full_log" >/dev/null
     fi
 }
 
@@ -42,8 +42,8 @@ _RUN_YUNOHOST_CMD() {
     log_debug "Running yunohost $1"
 
     # Copy the package into the container.
-    lxc exec $LXC_NAME -- rm -rf /app_folder
-    lxc file push -p -r "$package_path" $LXC_NAME/app_folder --quiet
+    $lxc exec $LXC_NAME -- rm -rf /app_folder
+    $lxc file push -p -r "$package_path" $LXC_NAME/app_folder --quiet
 
     # --output-as none is to disable the json-like output for some commands like backup create
     LXC_EXEC "yunohost --output-as none --debug $1" \
@@ -70,7 +70,7 @@ _PREINSTALL () {
         sed -i "s/\$SUBDOMAIN/$SUBDOMAIN/g" "$preinstall_script"
         sed -i "s/\$PASSWORD/$YUNO_PWD/g" "$preinstall_script"
         # Copy the pre-install script into the container.
-        lxc file push "$preinstall_script" "$LXC_NAME/preinstall.sh"
+        $lxc file push "$preinstall_script" "$LXC_NAME/preinstall.sh"
         # Then execute the script to execute the pre-install commands.
         LXC_EXEC "bash /preinstall.sh"
     fi
@@ -94,7 +94,7 @@ _PREUPGRADE () {
         sed -i "s/\$PASSWORD/$YUNO_PWD/g" "$preupgrade_script"
         sed -i "s/\$FROM_COMMIT/$commit/g" "$preupgrade_script"
         # Copy the pre-upgrade script into the container.
-        lxc file push "$preupgrade_script" "$LXC_NAME/preupgrade.sh"
+        $lxc file push "$preupgrade_script" "$LXC_NAME/preupgrade.sh"
         # Then execute the script to execute the pre-upgrade commands.
         LXC_EXEC "bash /preupgrade.sh"
         return $?
@@ -357,7 +357,7 @@ Page extract:\n$page_extract" > $TEST_CONTEXT/curl_result
     If you see this page, you have failed the test for alias_traversal issue.</body></html>" \
     > $TEST_CONTEXT/alias_traversal.html
 
-    lxc file push $TEST_CONTEXT/alias_traversal.html $LXC_NAME/var/www/html/alias_traversal.html
+    $lxc file push $TEST_CONTEXT/alias_traversal.html $LXC_NAME/var/www/html/alias_traversal.html
 
     curl --location --insecure --silent $check_domain$check_path../html/alias_traversal.html \
         | grep "title" | grep --quiet "alias_traversal test" \
@@ -557,7 +557,7 @@ TEST_PORT_ALREADY_USED () {
     echo -e "[Service]\nExecStart=/bin/netcat -l -k -p $check_port\n
     [Install]\nWantedBy=multi-user.target" > $TEST_CONTEXT/netcat.service
 
-    lxc file push $TEST_CONTEXT/netcat.service $LXC_NAME/etc/systemd/system/netcat.service
+    $lxc file push $TEST_CONTEXT/netcat.service $LXC_NAME/etc/systemd/system/netcat.service
 
     # Then start this service to block this port.
     LXC_EXEC "systemctl enable --now netcat"
@@ -621,7 +621,7 @@ TEST_BACKUP_RESTORE () {
         [ $ret -eq 0 ] || { main_result=1; break_before_continue; continue; }
 
         # Grab the backup archive into the LXC container, and keep a copy
-        lxc file pull -r $LXC_NAME/home/yunohost.backup/archives $TEST_CONTEXT/ynh_backups
+        $lxc file pull -r $LXC_NAME/home/yunohost.backup/archives $TEST_CONTEXT/ynh_backups
 
         # RESTORE
         # Try the restore process in 2 times, first after removing the app, second after a restore of the container.
@@ -646,7 +646,7 @@ TEST_BACKUP_RESTORE () {
                 RUN_INSIDE_LXC rm -rf /home/yunohost.backup/archives
 
                 # Place the copy of the backup archive in the container.
-                lxc file push -r $TEST_CONTEXT/ynh_backups/archives $LXC_NAME/home/yunohost.backup/
+                $lxc file push -r $TEST_CONTEXT/ynh_backups/archives $LXC_NAME/home/yunohost.backup/
 
                 _PREINSTALL
 

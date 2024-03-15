@@ -10,9 +10,9 @@ print_help() {
  Usage: package_check.sh [OPTION]... PACKAGE_TO_CHECK
 
     -b, --branch=BRANCH     Specify a branch to check.
-    -a, --arch=ARCH         
-    -d, --dist=DIST         
-    -y, --ynh-branch=BRANCH 
+    -a, --arch=ARCH
+    -d, --dist=DIST
+    -y, --ynh-branch=BRANCH
     -D, --dry-run               Show a JSON representing which tests are going to be ran (meant for debugging)
     -i, --interactive           Wait for the user to continue before each remove
     -e, --interactive-on-errors Wait for the user to continue on errors
@@ -22,6 +22,9 @@ print_help() {
                                 images are supposed to be fetch from
                                 devbaseimgs.yunohost.org automatically)
     -h, --help                  Display this help
+
+    Pass YNHDEV_BACKEND=incus to use incus instead of lxd.
+
 EOF
 exit 0
 }

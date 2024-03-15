@@ -1,5 +1,17 @@
 #!/bin/bash
 
+# Check for LXC or Incus
+function switch_lxc_incus()
+{
+    if [[ "${YNHDEV_BACKEND:-}" == "incus" ]]; then
+        lxc=incus
+    else
+        lxc=lxc
+    fi
+}
+
+switch_lxc_incus
+
 #=================================================
 # RUNNING SNAPSHOT
 #=================================================
@@ -7,19 +19,19 @@
 LXC_CREATE () {
     log_info "Launching new LXC $LXC_NAME ..."
     # Check if we can launch container from YunoHost remote image
-    if lxc remote list | grep -q "yunohost" && lxc image list yunohost:$LXC_BASE | grep -q -w $LXC_BASE; then
+    if $lxc remote list | grep -q "yunohost" && $lxc image list yunohost:$LXC_BASE | grep -q -w $LXC_BASE; then
         # Force the usage of the fingerprint because otherwise for some reason lxd won't use the newer version
         # available even though it's aware it exists -_-
-        LXC_BASE_HASH="$(lxc image list yunohost:$LXC_BASE --format json | jq -r '.[].fingerprint')"
-        lxc launch yunohost:$LXC_BASE_HASH $LXC_NAME \
+        LXC_BASE_HASH="$($lxc image list yunohost:$LXC_BASE --format json | jq -r '.[].fingerprint')"
+        $lxc launch yunohost:$LXC_BASE_HASH $LXC_NAME \
             -c security.nesting=true \
             -c security.privileged=true \
             -c limits.memory=80% \
             -c limits.cpu.allowance=80% \
             >>/proc/self/fd/3
     # Check if we can launch container from a local image
-    elif lxc image list $LXC_BASE | grep -q -w $LXC_BASE; then
-        lxc launch $LXC_BASE $LXC_NAME \
+    elif $lxc image list $LXC_BASE | grep -q -w $LXC_BASE; then
+        $lxc launch $LXC_BASE $LXC_NAME \
             -c security.nesting=true \
             -c security.privileged=true \
             -c limits.memory=80% \
@@ -30,12 +42,12 @@ LXC_CREATE () {
     fi
 
     pipestatus="${PIPESTATUS[0]}"
-    location=$(lxc list --format json | jq -e --arg LXC_NAME $LXC_NAME '.[] | select(.name==$LXC_NAME) | .location' | tr -d '"')
+    location=$($lxc list --format json | jq -e --arg LXC_NAME $LXC_NAME '.[] | select(.name==$LXC_NAME) | .location' | tr -d '"')
     [[ "$location" != "none" ]] && log_info "... on $location"
 
     [[ "$pipestatus" -eq 0 ]] || exit 1
 
-    if [[ "$(lxc list $LXC_NAME --format json)" == "[]" ]]
+    if [[ "$($lxc list $LXC_NAME --format json)" == "[]" ]]
     then
         log_critical "Failed to create the new LXC :/"
     fi
@@ -43,7 +55,7 @@ LXC_CREATE () {
     _LXC_START_AND_WAIT $LXC_NAME
     sleep 3
 
-    if ! lxc exec $LXC_NAME -- test -e /etc/yunohost
+    if ! $lxc exec $LXC_NAME -- test -e /etc/yunohost
     then
          log_critical "Failed to run 'test -e /etc/yunohost' on the container ... either the container did not start, or YunoHost doesn't exists yet in the container :/"
     fi
@@ -52,9 +64,13 @@ LXC_CREATE () {
 
     sleep 3
     log_info "Creating initial snapshot $LXC_NAME ..."
-    lxc snapshot $LXC_NAME snap0
+    if [[ "$lxc" == "lxc" ]]; then
+        $lxc snapshot $LXC_NAME snap0
+    else
+        $lxc snapshot create $LXC_NAME snap0
+    fi
 
-    if [[ -z "$(lxc list $LXC_NAME --format json | jq '.[].snapshots[] | select(.name=="snap0")')" ]]
+    if [[ -z "$($lxc list $LXC_NAME --format json | jq '.[].snapshots[] | select(.name=="snap0")')" ]]
     then
         log_critical "Failed to create the initial snapshot :/"
     fi
@@ -62,7 +78,7 @@ LXC_CREATE () {
 
 LXC_SNAPSHOT_EXISTS() {
     local snapname=$1
-    lxc list --format json \
+    $lxc list --format json \
         | jq -e --arg LXC_NAME $LXC_NAME --arg snapname $snapname \
         '.[] | select(.name==$LXC_NAME) | .snapshots[] | select(.name==$snapname)' \
             >/dev/null
@@ -87,7 +103,11 @@ CREATE_LXC_SNAPSHOT () {
     if ! LXC_SNAPSHOT_EXISTS "$snapname"
     then
         log_info "(Creating snapshot $snapname ...)"
-        lxc snapshot $LXC_NAME $snapname
+        if [[ "$lxc" == "lxc" ]]; then
+            $lxc snapshot $LXC_NAME $snapname
+        else
+            $lxc snapshot create $LXC_NAME $snapname
+        fi
     fi
 
     _LXC_START_AND_WAIT $LXC_NAME
@@ -106,7 +126,11 @@ LOAD_LXC_SNAPSHOT () {
     while [[ ${retry_lxc} -lt 10 ]]
     do
         LXC_STOP $LXC_NAME || true
-        lxc restore $LXC_NAME $snapname && break || retry_lxc=$(($retry_lxc+1))
+        if [[ "$lxc" == "lxc" ]]; then
+            $lxc restore $LXC_NAME $snapname && break || retry_lxc=$(($retry_lxc+1))
+        else
+            $lxc snapshot restore $LXC_NAME $snapname && break || retry_lxc=$(($retry_lxc+1))
+        fi
         log_warning "Failed to restore snapshot? Retrying in 20 sec ..."
         if [[ ${retry_lxc} -ge 3 ]]
         then
@@ -120,7 +144,7 @@ LOAD_LXC_SNAPSHOT () {
         log_error "Failed to restore snapshot ? The next step may miserably crash because of this ... if this happens to often, maybe restarting the LXD daemon can help ..."
     fi
 
-    lxc start $LXC_NAME
+    $lxc start $LXC_NAME
     _LXC_START_AND_WAIT $LXC_NAME
 }
 
@@ -135,7 +159,7 @@ LXC_EXEC () {
     start_timer
 
     # Execute the command given in argument in the container and log its results.
-    lxc exec $LXC_NAME --env PACKAGE_CHECK_EXEC=1 -t -- /bin/bash -c "$cmd" | tee -a "$full_log" $current_test_log
+    $lxc exec $LXC_NAME --env PACKAGE_CHECK_EXEC=1 -t -- /bin/bash -c "$cmd" | tee -a "$full_log" $current_test_log
 
     # Store the return code of the command
     local returncode=${PIPESTATUS[0]}
@@ -151,42 +175,42 @@ LXC_STOP () {
     local container_to_stop=$1
     # (We also use timeout 30 in front of the command because sometime lxc
     # commands can hang forever despite the --timeout >_>...)
-    timeout 30 lxc stop --timeout 15 $container_to_stop 2>/dev/null
+    timeout 30 $lxc stop --timeout 15 $container_to_stop 2>/dev/null
 
     local retry_stop_lxc=0
     while [[ ${retry_stop_lxc} -lt 5 ]]
     do
-        local status="$(lxc list $container_to_stop --format json | jq -r '.[].state.status')"
+        local status="$($lxc list $container_to_stop --format json | jq -r '.[].state.status')"
         if [[ -z "$status" ]] || [[ "$status" == "Stopped" ]] || [[ "$status" == "null" ]]
         then
             break
         fi
         retry_stop_lxc="$(($retry_stop_lxc+1))"
         sleep 10
-        timeout 30 lxc stop --timeout 15 $container_to_stop 2>/dev/null
+        timeout 30 $lxc stop --timeout 15 $container_to_stop 2>/dev/null
     done
 
     if [[ ${retry_stop_lxc} -ge 5 ]]
     then
-        timeout 30 lxc stop --timeout 15 $container_to_stop --force 2>/dev/null
+        timeout 30 $lxc stop --timeout 15 $container_to_stop --force 2>/dev/null
     fi
 }
 
 LXC_RESET () {
     # If the container exists
-    if lxc info $LXC_NAME >/dev/null 2>/dev/null; then
+    if $lxc info $LXC_NAME >/dev/null 2>/dev/null; then
         # Remove swap files before deletting the continer
         CLEAN_SWAPFILES
     fi
 
     LXC_STOP $LXC_NAME
 
-    if lxc info $LXC_NAME >/dev/null 2>/dev/null; then
-        local current_storage=$(lxc list $LXC_NAME --format json --columns b | jq -r '.[].expanded_devices.root.pool')
-        swapoff "$(lxc storage get $current_storage source)/containers/$LXC_NAME/rootfs/swap" 2>/dev/null
+    if $lxc info $LXC_NAME >/dev/null 2>/dev/null; then
+        local current_storage=$($lxc list $LXC_NAME --format json --columns b | jq -r '.[].expanded_devices.root.pool')
+        swapoff "$($lxc storage get $current_storage source)/containers/$LXC_NAME/rootfs/swap" 2>/dev/null
     fi
 
-    lxc delete $LXC_NAME --force 2>/dev/null
+    $lxc delete $LXC_NAME --force 2>/dev/null
 }
 
 
@@ -195,7 +219,7 @@ _LXC_START_AND_WAIT() {
     restart_container()
 	{
         LXC_STOP $1
-		lxc start "$1"
+		$lxc start "$1"
 	}
 
 	# Try to start the container 3 times.
@@ -209,7 +233,7 @@ _LXC_START_AND_WAIT() {
 		# Wait for container to start, we are using systemd to check this,
 		# for the sake of brevity.
 		for j in $(seq 1 10); do
-			if lxc exec "$1" -- timeout 30 systemctl isolate multi-user.target >/dev/null 2>/dev/null; then
+			if $lxc exec "$1" -- timeout 30 systemctl isolate multi-user.target >/dev/null 2>/dev/null; then
 				break
 			fi
 
@@ -225,7 +249,7 @@ _LXC_START_AND_WAIT() {
 
 		# Wait for container to access the internet
 		for j in $(seq 1 10); do
-			if lxc exec "$1" -- timeout 10 curl -s http://wikipedia.org > /dev/null 2>/dev/null; then
+			if $lxc exec "$1" -- timeout 10 curl -s http://wikipedia.org > /dev/null 2>/dev/null; then
 				break
 			fi
 
@@ -249,26 +273,26 @@ _LXC_START_AND_WAIT() {
 		if [ $i -eq $max_try ] && [ $failstart -eq 1 ]
 		then
             log_error "The container miserably failed to start or to connect to the internet"
-            lxc info --show-log $1
+            $lxc info --show-log $1
 			return 1
 		fi
 	done
 
     sleep 3
 
-    LXC_IP=$(lxc exec $1 -- hostname -I | cut -d' ' -f1 | grep -E -o "\<[0-9.]{8,}\>")
+    LXC_IP=$($lxc exec $1 -- hostname -I | cut -d' ' -f1 | grep -E -o "\<[0-9.]{8,}\>")
 }
 
 CLEAN_SWAPFILES() {
     # Restart it if needed
-    if [ "$(lxc info $LXC_NAME | grep Status | awk '{print tolower($2)}')" != "running" ]; then
-        lxc start $LXC_NAME
+    if [ "$($lxc info $LXC_NAME | grep Status | awk '{print tolower($2)}')" != "running" ]; then
+        $lxc start $LXC_NAME
         _LXC_START_AND_WAIT $LXC_NAME
     fi
-    lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done'
-    lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do rm -f $swapfile; done'
+    $lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done'
+    $lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do rm -f $swapfile; done'
 }
 
 RUN_INSIDE_LXC() {
-    lxc exec $LXC_NAME -- "$@"
+    $lxc exec $LXC_NAME -- "$@"
 }

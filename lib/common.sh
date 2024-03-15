@@ -32,8 +32,14 @@ assert_we_are_connected_to_the_internets() {
 }
 
 assert_we_have_all_dependencies() {
-    for dep in "lxc" "lxd" "lynx" "jq" "python3" "pip3"
-    do
+    deps=("lynx" "jq" "python3" "pip3")
+    if [[ "${YNHDEV_BACKEND:-}" == "incus" ]]; then
+        deps+=(incus)
+    else
+        deps+=(lxc lxd)
+    fi
+
+    for dep in "${deps[@]}"; do
         which $dep 2>&1 > /dev/null || log_critical "Please install $dep"
     done
 }
@@ -53,6 +59,39 @@ function check_lxd_setup()
 
     ip a | grep -q lxdbr0 \
         || log_critical "There is no 'lxdbr0' interface... Did you ran 'lxd init' ?"
+}
+
+function check_incus_setup()
+{
+    # Check incus is installed somehow
+    if ! which incus &>/dev/null; then
+        critical "You need to have Incus installed for ynh-dev to be usable from the host machine. Refer to the README to know how to install it."
+    fi
+    if ! id -nG "$(whoami)" | grep -qw "incus-admin"; then
+        critical "You need to be in the incus-admin group!"
+    fi
+
+    ip a | grep -q incusbr0 \
+        || warn "There is no 'incusbr0' interface... Did you ran 'incus admin init' ?"
+
+    set_incus_remote
+}
+
+function set_incus_remote()
+{
+    configured=$(incus remote list -f json | jq 'has("yunohost")')
+    if [[ "$configured" != "true" ]]; then
+        incus remote add yunohost https://devbaseimgs.yunohost.org --public
+    fi
+}
+
+function check_lxc_setup()
+{
+    if [[ "${YNHDEV_BACKEND:-}" == "incus" ]]; then
+        check_incus_setup
+    else
+        check_lxd_setup
+    fi
 }
 
 #=================================================
