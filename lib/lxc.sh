@@ -64,7 +64,11 @@ LXC_CREATE () {
 
     sleep 3
     log_info "Creating initial snapshot $LXC_NAME ..."
-    $lxc snapshot create $LXC_NAME snap0
+    if [[ "$lxc" == "lxc" ]]; then
+        $lxc snapshot $LXC_NAME snap0
+    else
+        $lxc snapshot create $LXC_NAME snap0
+    fi
 
     if [[ -z "$($lxc list $LXC_NAME --format json | jq '.[].snapshots[] | select(.name=="snap0")')" ]]
     then
@@ -99,7 +103,11 @@ CREATE_LXC_SNAPSHOT () {
     if ! LXC_SNAPSHOT_EXISTS "$snapname"
     then
         log_info "(Creating snapshot $snapname ...)"
-        $lxc snapshot create $LXC_NAME $snapname
+        if [[ "$lxc" == "lxc" ]]; then
+            $lxc snapshot $LXC_NAME $snapname
+        else
+            $lxc snapshot create $LXC_NAME $snapname
+        fi
     fi
 
     _LXC_START_AND_WAIT $LXC_NAME
@@ -118,7 +126,11 @@ LOAD_LXC_SNAPSHOT () {
     while [[ ${retry_lxc} -lt 10 ]]
     do
         LXC_STOP $LXC_NAME || true
-        $lxc snapshot restore $LXC_NAME $snapname && break || retry_lxc=$(($retry_lxc+1))
+        if [[ "$lxc" == "lxc" ]]; then
+            $lxc restore $LXC_NAME $snapname && break || retry_lxc=$(($retry_lxc+1))
+        else
+            $lxc snapshot restore $LXC_NAME $snapname && break || retry_lxc=$(($retry_lxc+1))
+        fi
         log_warning "Failed to restore snapshot? Retrying in 20 sec ..."
         if [[ ${retry_lxc} -ge 3 ]]
         then
