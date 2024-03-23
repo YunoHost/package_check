@@ -322,7 +322,7 @@ function fetch_package_to_test() {
     # If the url is on a specific branch, extract the branch
     if echo "$path_to_package_to_test" | grep -Eq "https?:\/\/.*\/tree\/"
     then
-        gitbranch="-b ${path_to_package_to_test##*/tree/}"
+        gitbranch="${path_to_package_to_test##*/tree/}"
         path_to_package_to_test="${path_to_package_to_test%%/tree/*}"
     fi
 
@@ -331,28 +331,25 @@ function fetch_package_to_test() {
     package_path="$TEST_CONTEXT/app_folder"
 
     # If the package is in a git repository
-    if echo "$path_to_package_to_test" | grep -Eq "https?:\/\/"
-    then
+    if echo "$path_to_package_to_test" | grep -Eq "https?:\/\/"; then
         # Force the branch master if no branch is specified.
-        if [ -z "$gitbranch" ]
-        then
-            if git ls-remote --quiet --exit-code $path_to_package_to_test master >/dev/null
-            then
-                gitbranch="-b master"
-            else
-                if git ls-remote --quiet --exit-code $path_to_package_to_test stable >/dev/null
-                then
-                    gitbranch="-b stable"
-                else
-                    log_critical "Unable to find a default branch to test (master or stable)"
+        if [ -z "$gitbranch" ]; then
+            branches=(master main stable)
+            for branch in "${branches[@]}"; do
+                if git ls-remote --quiet --exit-code "$path_to_package_to_test" "$branch" >/dev/null; then
+                    gitbranch="$branch"
+                    break
                 fi
+            done
+            if [ -z "$gitbranch" ]; then
+                log_critical "Unable to find a default branch to test (master or stable)"
             fi
         fi
 
-        log_info " on branch ${gitbranch##-b }"
+        log_info " on branch ${gitbranch}"
 
         # Clone the repository
-        git clone --quiet $path_to_package_to_test $gitbranch "$package_path"
+        git clone --quiet $path_to_package_to_test -b "$gitbranch" "$package_path"
 
         if [[ ! -e "$package_path" ]]
         then
