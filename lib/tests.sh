@@ -140,7 +140,7 @@ _INSTALL_APP () {
     then
         local manifest_args="$(jq -r '.arguments.install[].name' $package_path/manifest.json)"
     else
-        local manifest_args="$(grep '^\s*\[install\.' $package_path/manifest.toml | tr -d '[]' | awk -F. '{print $2}')"
+        local manifest_args="$(grep -oE '^\s*\[install\.\w+]' $package_path/manifest.toml | tr -d '[]' | awk -F. '{print $2}')"
     fi
 
     for ARG in $manifest_args
