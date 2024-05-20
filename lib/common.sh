@@ -226,11 +226,11 @@ stop_timer () {
 # is done via a shared memory.
 
 get_ram_usage() {
-    free -m | grep Mem | awk '{print $3}'
+    RUN_INSIDE_LXC free -m | grep Mem | awk '{print $3}'
 }
 
 get_disk_usage() {
-    LANG= df --output="used" --total -k -l | tail -n 1
+    RUN_INSIDE_LXC df --output="used" --total -k -l | tail -n 1
 }
 
 metrics_background_thread() {
