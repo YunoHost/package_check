@@ -130,6 +130,9 @@ _INSTALL_APP () {
             && continue
 
         install_args=$(echo $install_args | sed "s@\&$key=[^&]*\&@\&$key=$value\&@")
+        if ! echo $install_args | grep -q $key; then
+            install_args+="$key=$value&"
+        fi
     done
 
     # Note : we do this at this stage and not during the parsing of check_process
