@@ -318,7 +318,8 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
             local page_extract=$(lynx -dump -force_html "$curl_output" | head --lines 20 | tee -a "$full_log")
 
             # Check if the page title is neither the YunoHost portail or default NGINX page
-            if [ "$page_title" = "YunoHost Portal" ]
+            # And check if the "Real URL" is the ynh sso
+            if [ "$page_title" = "YunoHost Portal" ] || cat $TEST_CONTEXT/curl_print | cut --delimiter=';' --fields=2 | grep -q "/yunohost/sso"
             then
                 log_debug "The connection attempt fall on the YunoHost portal."
                 fell_on_sso_portal=1
