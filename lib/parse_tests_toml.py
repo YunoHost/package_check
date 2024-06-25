@@ -146,7 +146,7 @@ def build_test_list(basedir: Path) -> dict[str, dict[str, Any]]:
         manifest = toml.load((basedir / "manifest.toml").open("r"))
         is_multi_instance = manifest.get("integration").get("multi_instance") is True
 
-    is_webapp = os.system(f"grep -q '^ynh_add_nginx_config' '{str(basedir)}/scripts/install'") == 0
+    is_webapp = os.system(f"grep -q '^ynh_add_nginx_config\|^ynh_nginx_add_config' '{str(basedir)}/scripts/install'") == 0
 
     default_install_args = get_default_values_for_questions(manifest, raise_if_no_default=False)
 
