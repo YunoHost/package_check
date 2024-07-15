@@ -21,6 +21,7 @@ print_help() {
                                 (N.B.: you're not supposed to use this option,
                                 images are supposed to be fetch from
                                 devbaseimgs.yunohost.org automatically)
+    -S, --storage-dir DIRECTORY Where to store temporary test files like yunohost backups
     -h, --help                  Display this help
 
     Pass YNHDEV_BACKEND=incus to use incus instead of lxd.
@@ -44,6 +45,7 @@ interactive=0
 interactive_on_errors=0
 rebuild=0
 force_stop=0
+storage_dir="${YNH_PACKAGE_CHECK_STORAGE_DIR:-}"
 
 function parse_args() {
 
@@ -62,6 +64,7 @@ function parse_args() {
         arguments[$i]=${arguments[$i]//--dry-run/-D}
         arguments[$i]=${arguments[$i]//--rebuild/-r}
         arguments[$i]=${arguments[$i]//--force-stop/-s}
+        arguments[$i]=${arguments[$i]//--storage-dir/-s}
         arguments[$i]=${arguments[$i]//--help/-h}
         getopts_built_arg+=("${arguments[$i]}")
     done
@@ -108,6 +111,11 @@ function parse_args() {
                         # --force-stop
                         force_stop=1
                         shift_value=1
+                        ;;
+                    S)
+                        # --storage-dir
+                        storage_dir=$OPTARG
+                        shift_value=2
                         ;;
                     h)
                         # --help
@@ -213,7 +221,11 @@ fi
 self_upgrade
 fetch_or_upgrade_package_linter
 
-readonly TEST_CONTEXT=$(mktemp -d /tmp/package_check.XXXXXX)
+if [[ -n "$storage_dir" ]]; then
+    readonly TEST_CONTEXT=$(mktemp -d "$storage_dir/package_check.XXXXXX")
+else
+    readonly TEST_CONTEXT=$(mktemp -d "/tmp/package_check.XXXXXX")
+fi
 
 fetch_package_to_test "$path_to_package_to_test"
 run_all_tests
