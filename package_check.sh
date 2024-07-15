@@ -45,7 +45,7 @@ interactive=0
 interactive_on_errors=0
 rebuild=0
 force_stop=0
-storage_dir=""
+storage_dir="${YNH_PACKAGE_CHECK_STORAGE_DIR:-}"
 
 function parse_args() {
 
