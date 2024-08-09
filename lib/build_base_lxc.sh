@@ -37,7 +37,7 @@ function rebuild_base_lxc()
     IN_LXC="$lxc exec $LXC_BASE --"
 
     INSTALL_SCRIPT="https://install.yunohost.org/$DIST"
-    $IN_LXC apt install curl -y
+    $IN_LXC apt install curl eatmydata -y
     $IN_LXC /bin/bash -c "curl $INSTALL_SCRIPT | bash -s -- -a -d $YNH_BRANCH"
 
     $IN_LXC systemctl -q stop apt-daily.timer
