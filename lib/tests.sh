@@ -123,12 +123,6 @@ _INSTALL_APP () {
         key="$(echo $arg_override | cut -d '=' -f 1)"
         value="$(echo $arg_override | cut -d '=' -f 2-)"
 
-        # (Legacy stuff ... We don't override is_public if its type is not boolean)
-        [[ -e $package_path/manifest.json ]] \
-            && [[ "$key" == "is_public" ]] \
-            && [[ "$(jq -r '.arguments.install[] | select(.name=="is_public") | .type' $package_path/manifest.json)" != "boolean" ]] \
-            && continue
-
         install_args=$(echo $install_args | sed "s@\&$key=[^&]*\&@\&$key=$value\&@")
         if ! echo $install_args | grep -q $key; then
             install_args+="$key=$value&"
@@ -139,24 +133,14 @@ _INSTALL_APP () {
     # because this also applies to upgrades ... ie older version may have different args and default values
 
     # Fetch and loop over all manifest arg
-    if [[ -e $package_path/manifest.json ]]
-    then
-        local manifest_args="$(jq -r '.arguments.install[].name' $package_path/manifest.json)"
-    else
-        local manifest_args="$(grep -oE '^\s*\[install\.\w+]' $package_path/manifest.toml | tr -d '[]' | awk -F. '{print $2}')"
-    fi
+    local manifest_args="$(grep -oE '^\s*\[install\.\w+]' $package_path/manifest.toml | tr -d '[]' | awk -F. '{print $2}')"
 
     for ARG in $manifest_args
     do
         # If the argument is not yet in install args, add its default value
         if ! echo "$install_args" | grep -q -E "\<$ARG="
         then
-            if [[ -e $package_path/manifest.json ]]
-            then
-                local default_value=$(jq -e -r --arg ARG $ARG '.arguments.install[] | select(.name==$ARG) | .default' $package_path/manifest.json)
-            else
-                local default_value=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); d = t['install']['$ARG'].get('default'); assert d is not None, 'Missing default value'; print(d)" < $package_path/manifest.toml)
-            fi
+            local default_value=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); d = t['install']['$ARG'].get('default'); assert d is not None, 'Missing default value'; print(d)" < $package_path/manifest.toml)
             [[ $? -eq 0 ]] || { log_error "Missing install arg $ARG ?"; return 1; }
             [[ ${install_args: -1} == '&' ]] || install_args+="&"
             install_args+="$ARG=$default_value"

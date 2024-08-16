@@ -43,12 +43,9 @@ def get_default_value(app_name: str, name: str, question: dict, raise_if_no_defa
 
 
 def get_default_values_for_questions(manifest: dict, raise_if_no_default=True) -> dict[str, str]:
-    app_name = manifest["id"]
 
-    if manifest.get("packaging_format", 1) <= 1:
-        questions = {q["name"]: q for q in manifest["arguments"]["install"]}
-    else:
-        questions = manifest["install"]
+    app_name = manifest["id"]
+    questions = manifest["install"]
 
     args = {
         name: get_default_value(app_name, name, question, raise_if_no_default)

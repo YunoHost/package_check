@@ -27,24 +27,14 @@ run_all_tests() {
     mkdir -p $TEST_CONTEXT/results
     mkdir -p $TEST_CONTEXT/logs
 
-    if [ -e $package_path/manifest.json ]
-    then
-        readonly app_id="$(jq -r .id $package_path/manifest.json)"
-    else
-        readonly app_id="$(grep '^id = ' $package_path/manifest.toml | tr -d '" ' | awk -F= '{print $2}')"
-    fi
+    readonly app_id="$(grep '^id = ' $package_path/manifest.toml | tr -d '" ' | awk -F= '{print $2}')"
 
     tests_toml="$package_path/tests.toml"
     if [ -e "$tests_toml" ]
     then
         DIST=$DIST "./lib/parse_tests_toml.py" "$package_path" --dump-to "$TEST_CONTEXT/tests"
     else
-        # Parse the check_process only if it's exist
-        check_process="$package_path/check_process"
-
-        [ -e "$check_process" ] \
-            && parse_check_process \
-            || guess_test_configuration
+        guess_test_configuration
     fi
 
     # Start the timer for this test

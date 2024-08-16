@@ -139,12 +139,8 @@ def dump_for_package_check(test_list: dict[str, dict[str, Any]], package_check_t
 def build_test_list(basedir: Path) -> dict[str, dict[str, Any]]:
     test_manifest = toml.load((basedir / "tests.toml").open("r"))
 
-    if (basedir / "manifest.json").exists():
-        manifest = json.load((basedir / "manifest.json").open("r"))
-        is_multi_instance = manifest.get("multi_instance") is True
-    else:
-        manifest = toml.load((basedir / "manifest.toml").open("r"))
-        is_multi_instance = manifest.get("integration").get("multi_instance") is True
+    manifest = toml.load((basedir / "manifest.toml").open("r"))
+    is_multi_instance = manifest.get("integration").get("multi_instance") is True
 
     is_webapp = os.system(f"grep -q '^ynh_add_nginx_config\|^ynh_nginx_add_config' '{str(basedir)}/scripts/install'") == 0
 
