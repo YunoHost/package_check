@@ -132,15 +132,26 @@ _INSTALL_APP () {
     # Note : we do this at this stage and not during the parsing of check_process
     # because this also applies to upgrades ... ie older version may have different args and default values
 
-    # Fetch and loop over all manifest arg
-    local manifest_args="$(grep -oE '^\s*\[install\.\w+]' $package_path/manifest.toml | tr -d '[]' | awk -F. '{print $2}')"
+    # Fetch and loop over all manifest arg ... NB : we need to keep this as long as there are "upgrade from packaging v1" tests
+    if [[ -e $package_path/manifest.json ]]
+    then
+        local manifest_args="$(jq -r '.arguments.install[].name' $package_path/manifest.json)"
+    else
+        local manifest_args="$(grep -oE '^\s*\[install\.\w+]' $package_path/manifest.toml | tr -d '[]' | awk -F. '{print $2}')"
+    fi
 
     for ARG in $manifest_args
     do
         # If the argument is not yet in install args, add its default value
         if ! echo "$install_args" | grep -q -E "\<$ARG="
         then
-            local default_value=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); d = t['install']['$ARG'].get('default'); assert d is not None, 'Missing default value'; print(d)" < $package_path/manifest.toml)
+            # NB : we need to keep this as long as there are "upgrade from packaging v1" tests
+            if [[ -e $package_path/manifest.json ]]
+            then
+                local default_value=$(jq -e -r --arg ARG $ARG '.arguments.install[] | select(.name==$ARG) | .default' $package_path/manifest.json)
+            else
+                local default_value=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); d = t['install']['$ARG'].get('default'); assert d is not None, 'Missing default value'; print(d)" < $package_path/manifest.toml)
+            fi
             [[ $? -eq 0 ]] || { log_error "Missing install arg $ARG ?"; return 1; }
             [[ ${install_args: -1} == '&' ]] || install_args+="&"
             install_args+="$ARG=$default_value"
