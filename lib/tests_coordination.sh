@@ -3,7 +3,6 @@
 source lib/lxc.sh
 source lib/tests.sh
 source lib/witness.sh
-source lib/legacy.sh
 
 readonly full_log="./full_log_${WORKER_ID}.log"
 readonly result_json="./results_${WORKER_ID}.json"
@@ -29,13 +28,7 @@ run_all_tests() {
 
     readonly app_id="$(grep '^id = ' $package_path/manifest.toml | tr -d '" ' | awk -F= '{print $2}')"
 
-    tests_toml="$package_path/tests.toml"
-    if [ -e "$tests_toml" ]
-    then
-        DIST=$DIST "./lib/parse_tests_toml.py" "$package_path" --dump-to "$TEST_CONTEXT/tests"
-    else
-        guess_test_configuration
-    fi
+    DIST=$DIST "./lib/parse_tests_toml.py" "$package_path" --dump-to "$TEST_CONTEXT/tests"
 
     # Start the timer for this test
     start_timer
