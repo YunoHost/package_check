@@ -153,7 +153,7 @@ def run(tests):
         if full_params["path"] == "/":
             full_params["path"] = ""
             results[name + "_noslash"] = test(**full_params)
-            display_result(results[name])
+            display_result(results[name + "_noslash"])
 
     return results
 
