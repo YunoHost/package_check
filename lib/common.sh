@@ -33,9 +33,9 @@ assert_we_are_connected_to_the_internets() {
 
 assert_we_have_all_dependencies() {
     deps=("lynx" "jq" "python3" "pip3")
-    if [[ "${YNHDEV_BACKEND:-}" == "incus" ]]; then
+    if [[ "${lxc}" == "incus" ]]; then
         deps+=(incus)
-    else
+    elif [[ "${lxc}" == "lxc" ]]; then
         deps+=(lxc lxd)
     fi
 
@@ -87,7 +87,7 @@ function set_incus_remote()
 
 function check_lxc_setup()
 {
-    if [[ "${YNHDEV_BACKEND:-}" == "incus" ]]; then
+    if [[ "${lxc}" == "incus" ]]; then
         check_incus_setup
     else
         check_lxd_setup

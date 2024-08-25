@@ -24,7 +24,7 @@ print_help() {
     -S, --storage-dir DIRECTORY Where to store temporary test files like yunohost backups
     -h, --help                  Display this help
 
-    Pass YNHDEV_BACKEND=incus to use incus instead of lxd.
+    Pass YNHDEV_BACKEND=incus|lxd to use a specific LXD-compatible backend.
 
 EOF
 exit 0
