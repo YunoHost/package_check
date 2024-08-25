@@ -15,6 +15,7 @@ USER = os.environ["USER"]
 PASSWORD = os.environ["PASSWORD"]
 LXC_IP = os.environ["LXC_IP"]
 BASE_URL = os.environ["BASE_URL"].rstrip("/")
+APP_DOMAIN = BASE_URL.replace("https://", "").replace("http://", "").split("/")[0]
 
 DEFAULTS = {
     "base_url": BASE_URL,
@@ -145,7 +146,7 @@ def run(tests):
         full_params.update(params)
         for key, value in full_params.items():
             if isinstance(value, str):
-                full_params[key] = value.replace("__USER__", USER)
+                full_params[key] = value.replace("__USER__", USER).replace("__DOMAIN__", APP_DOMAIN)
 
         results[name] = test(**full_params)
         display_result(results[name])
