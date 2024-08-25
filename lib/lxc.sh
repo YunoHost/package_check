@@ -3,10 +3,15 @@
 # Check for LXC or Incus
 function switch_lxc_incus()
 {
-    if [[ "${YNHDEV_BACKEND:-}" == "incus" ]]; then
-        lxc=incus
+    if [[ -z "${YNHDEV_BACKEND:-}" ]]; then
+        # Autodetect because no preference was specified
+        if command -v incus 2>&1 >/dev/null; then
+            lxc="incus"
+        else
+            lxc="lxc"
+        fi
     else
-        lxc=lxc
+        lxc="${YNHDEV_BACKEND}"
     fi
 }
 
