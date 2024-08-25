@@ -9,7 +9,7 @@ print_help() {
     cat << EOF
  Usage: package_check.sh [OPTION]... PACKAGE_TO_CHECK
 
-    -b, --branch=BRANCH     Specify a branch to check.
+    -b, --branch=BRANCH         Specify a branch to check.
     -a, --arch=ARCH
     -d, --dist=DIST
     -y, --ynh-branch=BRANCH
@@ -22,6 +22,7 @@ print_help() {
                                 images are supposed to be fetch from
                                 devbaseimgs.yunohost.org automatically)
     -S, --storage-dir DIRECTORY Where to store temporary test files like yunohost backups
+    -v, --verbose               Prints the complete debug log to screen
     -h, --help                  Display this help
 
     Pass YNHDEV_BACKEND=incus|lxd to use a specific LXD-compatible backend.
@@ -46,6 +47,7 @@ interactive_on_errors=0
 rebuild=0
 force_stop=0
 storage_dir="${YNH_PACKAGE_CHECK_STORAGE_DIR:-}"
+verbose_log=0
 
 function parse_args() {
 
@@ -65,6 +67,7 @@ function parse_args() {
         arguments[$i]=${arguments[$i]//--rebuild/-r}
         arguments[$i]=${arguments[$i]//--force-stop/-s}
         arguments[$i]=${arguments[$i]//--storage-dir/-s}
+        arguments[$i]=${arguments[$i]//--verbose/-v}
         arguments[$i]=${arguments[$i]//--help/-h}
         getopts_built_arg+=("${arguments[$i]}")
     done
@@ -80,7 +83,7 @@ function parse_args() {
                 # Initialize the index of getopts
                 OPTIND=1
                 # Parse with getopts only if the argument begin by -
-                getopts ":b:Diresh" parameter || true
+                getopts ":b:Direshv" parameter || true
                 case $parameter in
                     b)
                         # --branch=branch-name
@@ -116,6 +119,11 @@ function parse_args() {
                         # --storage-dir
                         storage_dir=$OPTARG
                         shift_value=2
+                        ;;
+                    v)
+                        # --verbose
+                        verbose_log=1
+                        shift_value=1
                         ;;
                     h)
                         # --help
@@ -208,6 +216,9 @@ trap 'exit 2' TERM
 #==========================
 # Main code
 #==========================
+
+# Enable debug log?
+export verbose_log
 
 assert_we_are_connected_to_the_internets
 assert_we_have_all_dependencies
