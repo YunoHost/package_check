@@ -160,8 +160,8 @@ def run(tests):
 
 
 def display_result(result):
-    if result["effective_url"] == result["url"]:
-        print(f"URL     : {result['url']}    (redirected to -> {result['effective_url']})")
+    if result["effective_url"] != result["url"]:
+        print(f"URL     : {result['url']}    (redirected to: {result['effective_url']})")
     else:
         print(f"URL     : {result['url']}")
     if result['code'] != 200:
@@ -181,7 +181,7 @@ def main():
 
     tests = sys.stdin.read()
 
-    if not tests:
+    if not tests.strip():
         tests = "home.path = '/'"
 
     tests = toml.loads(tests)
