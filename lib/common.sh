@@ -65,14 +65,14 @@ function check_incus_setup()
 {
     # Check incus is installed somehow
     if ! which incus &>/dev/null; then
-        critical "You need to have Incus installed for ynh-dev to be usable from the host machine. Refer to the README to know how to install it."
+        log_critical "You need to have Incus installed for ynh-dev to be usable from the host machine. Refer to the README to know how to install it."
     fi
     if ! id -nG "$(whoami)" | grep -qw "incus-admin"; then
-        critical "You need to be in the incus-admin group!"
+        log_critical "You need to be in the incus-admin group!"
     fi
 
     ip a | grep -q incusbr0 \
-        || warn "There is no 'incusbr0' interface... Did you ran 'incus admin init' ?"
+        || log_warning "There is no 'incusbr0' interface... Did you ran 'incus admin init' ?"
 
     set_incus_remote
 }
