@@ -154,7 +154,11 @@ def run(tests):
         if full_params["path"] == "/":
             full_params["path"] = ""
             results[name + "_noslash"] = test(**full_params)
-            display_result(results[name + "_noslash"])
+
+            # Display this result too, but only if there's really a difference compared to the regular test
+            # because 99% of the time it's the same as the regular test
+            if results[name + "_noslash"]["effective_url"] != results[name]["effective_url"]:
+                display_result(results[name + "_noslash"])
 
     return results
 
