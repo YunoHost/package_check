@@ -11,3 +11,8 @@ config
 curl_print
 
 *.lock
+
+.apps/
+.*.schema.json
+lib/__pycache__/
+package_linter/
