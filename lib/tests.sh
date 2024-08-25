@@ -261,6 +261,8 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
         done
         LXC_EXEC "tail -v -n 15 \$(find /var/log/{nginx/,php*,$app_id_to_check} -mmin -3)"
     fi
+
+    return $curl_result
 }
 
 
