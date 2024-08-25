@@ -238,8 +238,14 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
     log_small_title "Validating that the app $app_id_to_check can/can't be accessed with its URL..."
 
-
-    python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); print(toml.dumps(t['default'].get('curl_tests', {})))" < $package_path/tests.toml > $TEST_CONTEXT/curl_tests.toml
+    if [ -e "$package_path/tests.toml" ]
+    then
+        local current_test_serie=$(jq -r '.test_serie' $testfile)
+        python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); print(toml.dumps(t['$current_test_serie'].get('curl_tests', {})))" < "$package_path/tests.toml" > $TEST_CONTEXT/curl_tests.toml
+    # Upgrade from older versions may still be in packaging v1 without a tests.toml
+    else
+        echo "" > $TEST_CONTEXT/curl_tests.toml
+    fi
 
     DOMAIN="$DOMAIN" \
     SUBDOMAIN="$SUBDOMAIN" \
