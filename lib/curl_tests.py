@@ -160,10 +160,14 @@ def run(tests):
 
 
 def display_result(result):
-    print(f"URL     : {result['url']}")
-    print(f"Real URL: {result['effective_url']}")
-    print(f"Code    : {result['code']}")
-    print(f"Title   : {result['title'].strip()}")
+    if result["effective_url"] == result["url"]:
+        print(f"URL     : {result['url']}    (redirected to -> {result['effective_url']})")
+    else:
+        print(f"URL     : {result['url']}")
+    if result['code'] != 200:
+        print(f"Code    : {result['code']}")
+    if result["title"].strip():
+        print(f"Title   : {result['title'].strip()}")
     print(f"Content extract:\n{result['content'][:250].strip()}")
     if result["errors"]:
         print("Errors  :\n    -" + "\n    -".join(result['errors']))
