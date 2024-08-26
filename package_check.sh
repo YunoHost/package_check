@@ -6,6 +6,7 @@ source "./lib/tests_coordination.sh"
 source "./lib/build_base_lxc.sh"
 
 print_help() {
+#STARTHELP
     cat << EOF
  Usage: package_check.sh [OPTION]... PACKAGE_TO_CHECK
 
@@ -28,6 +29,7 @@ print_help() {
     Pass YNHDEV_BACKEND=incus|lxd to use a specific LXD-compatible backend.
 
 EOF
+#ENDHELP
 exit 0
 }
 
