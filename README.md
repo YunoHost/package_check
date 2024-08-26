@@ -3,9 +3,52 @@ Package checker for YunoHost
 
 [YunoHost project](https://yunohost.org/#/)
 
-Set of unit tests to check YunoHost packages.
+Set of integration tests to check YunoHost packages.
 The `package_check.sh` script perform a series of tests on a package for verify its capability to be installed and removed in different situation.
 The test results are printed directly in the terminal and stored in the log file Test_results.log
+
+## Setup
+
+> [!WARNING]
+> We use LXD or Incus, which may conflict with other virtualization technologies. It may conflict with libvirt or LXC due to
+> requiring dnsmasq on port 53. It will definitely conflict with Docker, but [some workarounds are documented](https://linuxcontainers.org/incus/docs/main/howto/network_bridge_firewalld/#prevent-connectivity-issues-with-incus-and-docker).
+
+- install basic dependencies: `sudo apt install lynx jq`
+- install [LXD](https://canonical.com/lxd/install) or [Incus](https://linuxcontainers.org/incus/docs/main/installing/)
+- make sure LXC/Incus is initialized with `lxd init` or `incus admin init --minimal`; in the case of LXD, press enter to apply the default settings, or see below for more details about the settings
+- make sure your user is in the `lxd` or `incus-admin` group (`sudo usermod -a -G lxd MYUSER`), and **don't forget to restart your computer**
+- if using LXD, run this command to add the Yunohost image repository: `lxc remote add yunohost https://devbaseimgs.yunohost.org --public`; at the time this README is written, fingerprint is `d9ae6e76c374e3c58c3c20a881cffe7435809adb3b222ec393805f5bd01bb522`
+
+<details>
+<summary><b>More details about LXD/Incus settings</b></summary>
+If you'd like to use non-default settings with Incus, run `incus admin init` without the `--minimal` flag. In most cases,
+default settings are just fine, but be aware that the storage backend driver may have a large impact on performance.
+
+Using the `btrfs` or `zfs` driver will provide best performance due to [CoW](https://en.wikipedia.org/wiki/Copy-on-write), but it may
+not be available on all systems. In that case, the default `5G` storage may not be enough for your needs. When using the default `dir` driver,
+it is not necessary to specify a dedicated size.
+</details>
+
+<details>
+<summary><b>Additional steps if you have installed LXD with snap...</b></summary>
+<pre><code>
+# Adding lxc/lxd to /usr/local/bin to make sure we can use them easily even
+# with sudo for which the PATH is defined in /etc/sudoers and probably doesn't
+# include /snap/bin
+sudo ln -s /snap/bin/lxc /usr/local/bin/lxc
+sudo ln -s /snap/bin/lxd /usr/local/bin/lxd
+</code></pre>
+</details>
+
+You can now setup and use `package_check`:
+
+```bash
+git clone https://github.com/YunoHost/package_check
+cd package_check
+./package_check.sh your_app_ynh
+```
+
+## Features
 
 The script is able to perform the following tests:
 
@@ -46,72 +89,6 @@ The app is expected to contain a `tests.toml` file (see below) to tell package_c
                                 images are supposed to be fetch from
                                 devbaseimgs.yunohost.org automatically)
     -h, --help                  Display this help
-```
-
-## Deploying package_check
-
-First you need to install the system dependencies.
-
-Package check is based on the LXD/LXC ecosystem. Be careful that
-**LXD can conflict with other installed virtualization technologies such as
-libvirt or vanilla LXCs**, especially because they all require a daemon based
-on DNSmasq which may list on port 53.
-
-On a Debian-based system (regular Debian, Ubuntu, Mint ...), LXD can be
-installed using `snapd`. On other systems like Archlinux, you will probably also
-be able to install `snapd` using the system package manager (or even
-`lxd` directly).
-
-```bash
-apt install git snapd lynx jq
-sudo snap install core
-sudo snap install lxd
-
-# Adding lxc/lxd to /usr/local/bin to make sure we can use them easily even
-# with sudo for which the PATH is defined in /etc/sudoers and probably doesn't
-# include /snap/bin
-sudo ln -s /snap/bin/lxc /usr/local/bin/lxc
-sudo ln -s /snap/bin/lxd /usr/local/bin/lxd
-```
-
-NB. : you should **make sure that your user is in the `lxd` group** so that it's
-able to run `lxc` commands without sudo... You can check this with the command
-`groups` where you should see `lxd`. Otherwise, add your user to this group
-(don't forget that you may need to reload your entire graphical session for this
-to propagate (sigh))
-
-Then you shall initialize LXD which will ask you a bunch of question. Usually
-answering the default (just pressing enter) to all questions is fine. Just pay
-attention to :
-
-- the storage backend driver. Possibly `zfs` is the best, but requires a kernel >= 5.x
-  and corresponding kernel module loaded. You can fallback to the `dir` driver.
-- the size of the default storage it'll create (the default is 5G but you may
-  want 10G for heavy usage ?) (if you're using the 'dir' driver, this won't be asked)
-
-```bash
-lxd init
-```
-
-The base images for tests are centralized on `devbaseimgs.yunohost.org` and we'll download them from there to speed things up:
-
-```bash
-lxc remote add yunohost https://devbaseimgs.yunohost.org --public
-```
-
-(At the time this README is written, fingerprint is d9ae6e76c374e3c58c3c20a881cffe7435809adb3b222ec393805f5bd01bb522 )
-
-Then you can install package check :
-
-```
-git clone https://github.com/YunoHost/package_check
-cd package_check
-```
-
-Then test your packages :
-
-```
-./package_check.sh your_app_ynh
 ```
 
 ## You can start a container on a different architecture with some hacks
