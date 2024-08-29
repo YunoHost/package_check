@@ -212,19 +212,15 @@ _REMOVE_APP () {
 
 _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
-    local check_domain="$1"
-    local check_path="$2"
-    local install_type="$3"      # Can be anything or 'private', later used to check if it's okay to end up on the portal
-    local app_id_to_check="${4:-$app_id}"
-
-    local curl_error=0
-    local fell_on_sso_portal=0
-    local curl_output=$TEST_CONTEXT/curl_output
-
     # Not checking this if this ain't relevant for the current app
     this_is_a_web_app || return 0
 
-    log_small_title "Validating that the app $app_id_to_check can/can't be accessed with its URL..."
+    # We don't check the private case anymore because meh
+    [[ "$3" != "private" ]] || return 0
+
+    local domain_to_check="$1"
+    local path_to_check="$2"
+    local app_id_to_check="${4:-$app_id}"
 
     # Force the app to public only if we're checking the public-like installs AND visitors are allowed to access the app
     # For example, that's the case for agendav which is always installed as
@@ -233,148 +229,47 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
     # accessible *without* tweaking main permission...
     local has_public_arg=$(LXC_EXEC "cat /etc/ssowat/conf.json" | jq .permissions.\""$app_id_to_check.main"\".public)
 
-    if [ "$install_type" != 'private' ] && [[ $has_public_arg == "false" ]]
+    if [[ $has_public_arg == "false" ]]
     then
         log_debug "Forcing public access using tools shell"
         # Force the public access by setting force=True, which is not possible with "yunohost user permission update"
         _RUN_YUNOHOST_CMD "tools shell -c 'from yunohost.permission import user_permission_update; user_permission_update(\"$app_id_to_check.main\", add=\"visitors\", force=True)'"
     fi
 
-    # Try to access to the URL in 2 times, with a final / and without
-    for i in $(seq 1 2)
-    do
+    log_small_title "Validating that the app $app_id_to_check can/can't be accessed with its URL..."
 
-        # First time we'll try without the trailing slash,
-        # Second time *with* the trailing slash
-        local curl_check_path="$(echo $check_path | sed 's@/$@@g')"
-        [ $i -eq 1 ] || curl_check_path="$curl_check_path/"
-
-        # Remove the previous curl output
-        rm -f "$curl_output"
-
-        local http_code="noneyet"
-
-        local retry=0
-        function should_retry() {
-            [ "${http_code}" = "noneyet" ] || [ "${http_code}" = "502" ] || [ "${http_code}" = "503" ] || [ "${http_code}" = "504" ]
-        }
-
-        while [ $retry -lt 3 ] && should_retry;
-        do
-            sleep $(($retry*$retry*$retry + 3))
-
-            log_debug "Running curl $check_domain$curl_check_path"
-
-            # Call cURL to try to access to the URL of the app
-            LXC_EXEC "curl --location --insecure --silent --show-error --cookie /dev/null \
-                --header 'Host: $check_domain' \
-                --resolve $DOMAIN:80:$LXC_IP \
-                --resolve $DOMAIN:443:$LXC_IP \
-                --resolve $SUBDOMAIN:80:$LXC_IP \
-                --resolve $SUBDOMAIN:443:$LXC_IP \
-                --write-out '%{http_code};%{url_effective}\n' \
-                --output './curl_output' \
-                $check_domain$curl_check_path" \
-                > "$TEST_CONTEXT/curl_print"
-
-            LXC_EXEC "cat ./curl_output" > $curl_output
-
-            # Analyze the result of curl command
-            if [ $? -ne 0 ]
-            then
-                log_error "Connection error..."
-                curl_error=1
-            fi
-
-            http_code=$(cat "$TEST_CONTEXT/curl_print" | cut -d ';' -f1)
-
-            log_debug "HTTP code: $http_code"
-
-            retry=$((retry+1))
-        done
-
-        # Analyze the http code (we're looking for 0xx 4xx 5xx 6xx codes)
-        if [ -n "$http_code" ] && echo "0 4 5 6" | grep -q "${http_code:0:1}"
-        then
-            # If the http code is a 0xx 4xx or 5xx, it's an error code.
-            curl_error=1
-
-            # 401 is "Unauthorized", so is a answer of the server. So, it works!
-            [ "${http_code}" == "401" ] && curl_error=0
-
-            [ $curl_error -eq 1 ] && log_error "The HTTP code shows an error."
-        fi
-
-        # Analyze the output of cURL
-        if [ -e "$curl_output" ]
-        then
-            # Print the title of the page
-            local page_title=$(grep "<title>" "$curl_output" | cut --delimiter='>' --fields=2 | cut --delimiter='<' --fields=1)
-            local page_extract=$(lynx -dump -force_html "$curl_output" | head --lines 20 | tee -a "$full_log")
-
-            # Check if the page title is neither the YunoHost portail or default NGINX page
-            # And check if the "Real URL" is the ynh sso
-            if [ "$page_title" = "YunoHost Portal" ] || (cat $TEST_CONTEXT/curl_print | cut --delimiter=';' --fields=2 | grep -q "/yunohost/sso")
-            then
-                log_debug "The connection attempt fall on the YunoHost portal."
-                fell_on_sso_portal=1
-                # Falling on NGINX default page is an error.
-            elif echo "$page_title" | grep -q "Welcome to nginx"
-            then
-                log_error "The connection attempt fall on NGINX default page."
-                curl_error=1
-            fi
-        fi
-
-        echo -e "Test URL: $check_domain$curl_check_path
-Real URL: $(cat "$TEST_CONTEXT/curl_print" | cut --delimiter=';' --fields=2)
-HTTP code: $http_code
-Page title: $page_title
-Page extract:\n$page_extract" > $TEST_CONTEXT/curl_result
-
-        [[ $curl_error -eq 0 ]] \
-            && log_debug "$(cat $TEST_CONTEXT/curl_result)" \
-            || log_warning "$(cat $TEST_CONTEXT/curl_result)"
-
-        # If we had a 50x error, try to display service info and logs to help debugging
-        if [[ $curl_error -ne 0 ]] && echo "5" | grep -q "${http_code:0:1}"
-        then
-            LXC_EXEC "systemctl --no-pager --all" | grep "$app_id_to_check.*service"
-            for SERVICE in $(LXC_EXEC "systemctl --no-pager -all" | grep -o "$app_id_to_check.*service")
-            do
-                LXC_EXEC "journalctl --no-pager --no-hostname -n 30 -u $SERVICE";
-            done
-            LXC_EXEC "tail -v -n 15 \$(find /var/log/{nginx/,php*,$app_id_to_check} -mmin -3)"
-        fi
-    done
-
-    # Detect the issue alias_traversal, https://github.com/yandex/gixy/blob/master/docs/en/plugins/aliastraversal.md
-    # Create a file to get for alias_traversal
-    echo "<!DOCTYPE html><html><head>
-    <title>alias_traversal test</title>
-    </head><body><h1>alias_traversal test</h1>
-    If you see this page, you have failed the test for alias_traversal issue.</body></html>" \
-    > $TEST_CONTEXT/alias_traversal.html
-
-    $lxc file push $TEST_CONTEXT/alias_traversal.html $LXC_NAME/var/www/html/alias_traversal.html
-
-    curl --location --insecure --silent $check_domain$check_path../html/alias_traversal.html \
-        | grep "title" | grep --quiet "alias_traversal test" \
-        && log_error "Issue alias_traversal detected! Please see here https://github.com/YunoHost/example_ynh/pull/45 to fix that." \
-        && SET_RESULT "failure" alias_traversal
-
-    [ "$curl_error" -eq 0 ] || return 1
-    local expected_to_fell_on_portal=""
-    [ "$install_type" == "private" ] && expected_to_fell_on_portal=1 || expected_to_fell_on_portal=0
-
-    if [ "$install_type" == "root" ] || [ "$install_type" == "subdir" ] || [ "$install_type" == "upgrade" ];
+    if [ -e "$package_path/tests.toml" ]
     then
-        log_info "$(cat $TEST_CONTEXT/curl_result)"
+        local current_test_serie=$(jq -r '.test_serie' $testfile)
+        python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); print(toml.dumps(t['$current_test_serie'].get('curl_tests', {})))" < "$package_path/tests.toml" > $TEST_CONTEXT/curl_tests.toml
+    # Upgrade from older versions may still be in packaging v1 without a tests.toml
+    else
+        echo "" > $TEST_CONTEXT/curl_tests.toml
     fi
 
-    [ $fell_on_sso_portal -eq $expected_to_fell_on_portal ] || return 1
+    DIST="$DIST" \
+    DOMAIN="$DOMAIN" \
+    SUBDOMAIN="$SUBDOMAIN" \
+    USER="$TEST_USER" \
+    PASSWORD="SomeSuperStrongPassword" \
+    LXC_IP="$LXC_IP" \
+    BASE_URL="https://$domain_to_check$path_to_check" \
+    python3 lib/curl_tests.py < $TEST_CONTEXT/curl_tests.toml | tee -a "$full_log"
 
-    return 0
+    curl_result=${PIPESTATUS[0]}
+
+    # If we had a 50x error, try to display service info and logs to help debugging
+    if [[ $curl_result == 5 ]]
+    then
+        LXC_EXEC "systemctl --no-pager --all" | grep "$app_id_to_check.*service"
+        for SERVICE in $(LXC_EXEC "systemctl --no-pager -all" | grep -o "$app_id_to_check.*service")
+        do
+            LXC_EXEC "journalctl --no-pager --no-hostname -n 30 -u $SERVICE";
+        done
+        LXC_EXEC "tail -v -n 15 \$(find /var/log/{nginx/,php*,$app_id_to_check} -mmin -3)"
+    fi
+
+    return $curl_result
 }
 
 

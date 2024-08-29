@@ -187,7 +187,7 @@ test_format = 1.0
     # -------------------------------
     # Default args to use for install
     # -------------------------------
-    
+
     # By default, the CI will automagically fill the 'standard' args
     # such as domain, path, admin, is_public and password with relevant values
     # and also install args with a "default" provided in the manifest..
@@ -203,13 +203,38 @@ test_format = 1.0
     test_upgrade_from.00a1a6e7.name = "Upgrade from 5.4"
     test_upgrade_from.00a1a6e7.args.foo = "bar"
 
+    # -------------------------------
+    # Curl tests to validate that the app works
+    # -------------------------------
+    [default.curl_tests]
+    #home.path = "/"
+    home.expect_title = "Login - Nextcloud"
+
+    #dash.path = "/"
+    dash.logged_on_sso = true
+    dash.expect_title = "Tableau de bord - Nextcloud"
+
+    admin.path = "/settings/admin"
+    admin.logged_on_sso = true
+    admin.expect_title = "Paramètres d'administration - Nextcloud"
+
+    asset.path = "/core/img/logo/logo.svg"
+
+    file.path = "/remote.php/dav/files/__USER__/Readme.md"
+    file.logged_on_sso = true
+    file.expect_content = "# Welcome to Nextcloud!"
+
+    caldav.base_url = "https://yolo.test"
+    caldav.path = "/.well-known/caldav"
+    caldav.logged_on_sso = true
+    caldav.expect_content = "This is the WebDAV interface."
 
 # This is an additional test suite
 [multisite]
 
     # On additional tests suites, you can decide to run only specific tests
 
-    only = ["install.subdir"]    
+    only = ["install.subdir"]
 
     args.language = "en_GB"
     args.multisite = 1
