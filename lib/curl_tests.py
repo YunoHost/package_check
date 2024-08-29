@@ -135,17 +135,21 @@ def test(base_url, path, post=None, logged_on_sso=False, expect_return_code=200,
     if auto_test_assets:
         assets_to_check = []
         stylesheets = html.find_all("link", rel="stylesheet", href=True)
+        stylesheets = [s for s in stylesheets if "ynh_portal" not in s["href"] and "ynhtheme" not in s["href"]]
         if stylesheets:
             assets_to_check.append(stylesheets[0]['href'])
         js = html.find_all("script", src=True)
+        js = [s for s in js if "ynh_portal" not in s["src"] and "ynhtheme" not in s["src"]]
         if js:
             assets_to_check.append(js[0]['src'])
         if not assets_to_check:
             print("\033[1m\033[93mWARN\033[0m auto_test_assets set to true, but no js/css asset found in this page")
         for asset in assets_to_check:
-            code, _, _ = curl(f"https://{domain}", asset, use_cookies=cookies)
+            if asset.startswith(f"https://{domain}"):
+                asset = asset.replace(f"https://{domain}", "")
+            code, _, effective_url = curl(f"https://{domain}", asset, use_cookies=cookies)
             if code != 200:
-                errors.append(f"Asset https://{domain}{asset} (automatically derived from the page's html) answered with code {code}, expected 200?")
+                errors.append(f"Asset https://{domain}{asset} (automatically derived from the page's html) answered with code {code}, expected 200? Effective url: {effective_url}")
             assets.append((domain + asset, code))
 
 
@@ -197,7 +201,7 @@ def display_result(result):
         print(f"Title   : {result['title'].strip()}")
     print(f"Content extract:\n{result['content'][:250].strip()}")
     if result["assets"]:
-        print(f"Assets  :")
+        print("Assets  :")
         for asset, code in result["assets"]:
             if code == 200:
                 print(f"  - {asset}")
