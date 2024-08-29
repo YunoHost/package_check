@@ -247,6 +247,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
         echo "" > $TEST_CONTEXT/curl_tests.toml
     fi
 
+    DIST="$DIST" \
     DOMAIN="$DOMAIN" \
     SUBDOMAIN="$SUBDOMAIN" \
     USER="$TEST_USER" \

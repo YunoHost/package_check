@@ -10,6 +10,7 @@ from urllib.parse import urlencode
 from io import BytesIO
 
 DOMAIN = os.environ["DOMAIN"]
+DIST = os.environ["DIST"]
 SUBDOMAIN = os.environ["SUBDOMAIN"]
 USER = os.environ["USER"]
 PASSWORD = os.environ["PASSWORD"]
@@ -54,7 +55,7 @@ DEFAULTS = {
 # ==============================================
 
 
-def curl(base_url, path, method="GET", use_cookies=None, save_cookies=None, post=None):
+def curl(base_url, path, method="GET", use_cookies=None, save_cookies=None, post=None, referer=None):
 
     domain = base_url.replace("https://", "").replace("http://", "").split("/")[0]
 
@@ -70,6 +71,8 @@ def curl(base_url, path, method="GET", use_cookies=None, save_cookies=None, post
         c.setopt(c.COOKIEJAR, save_cookies)
     if post:
         c.setopt(c.POSTFIELDS, urlencode(post))
+    if referer:
+        c.setopt(c.REFERER, referer)
     buffer = BytesIO()
     c.setopt(c.WRITEDATA, buffer)
     c.perform()
@@ -92,8 +95,13 @@ def test(base_url, path, post=None, logged_on_sso=False, expect_return_code=200,
     domain = base_url.replace("https://", "").replace("http://", "").split("/")[0]
     if logged_on_sso:
         cookies = tempfile.NamedTemporaryFile().name
-        code, content, _ = curl(f"https://{domain}/yunohost/portalapi", "/login", save_cookies=cookies, post={"credentials": f"{USER}:{PASSWORD}"})
-        assert code == 200 and content == "Logged in", f"Failed to log in: got code {code} and content: {content}"
+
+        if DIST == "bullseye":
+            code, content, _ = curl(f"https://{domain}/yunohost/sso", "/", save_cookies=cookies, post={"user": USER, "password": PASSWORD}, referer=f"https://{domain}/yunohost/sso/")
+            assert code == 200 and os.system(f"grep -q '{domain}' {cookies}") == 0, f"Failed to log in: got code {code} or cookie file was empty?"
+        else:
+            code, content, _ = curl(f"https://{domain}/yunohost/portalapi", "/login", save_cookies=cookies, post={"credentials": f"{USER}:{PASSWORD}"})
+            assert code == 200 and content == "Logged in", f"Failed to log in: got code {code} and content: {content}"
     else:
         cookies = None
 
@@ -199,7 +207,7 @@ def display_result(result):
         print(f"Code    : {result['code']}")
     if result["title"].strip():
         print(f"Title   : {result['title'].strip()}")
-    print(f"Content extract:\n{result['content'][:250].strip()}")
+    print(f"Content extract:\n{result['content'][:100].strip()}")
     if result["assets"]:
         print("Assets  :")
         for asset, code in result["assets"]:
