@@ -25,6 +25,7 @@ DEFAULTS = {
     "expect_content": None,
     "expect_title": None,
     "expect_effective_url": None,
+    "auto_test_assets": False,
 }
 
 # Example of expected conf:
@@ -86,10 +87,11 @@ def curl(base_url, path, method="GET", use_cookies=None, save_cookies=None, post
     return (return_code, return_content, effective_url)
 
 
-def test(base_url, path, post=None, logged_on_sso=False, expect_return_code=200, expect_content=None, expect_title=None, expect_effective_url=None):
+def test(base_url, path, post=None, logged_on_sso=False, expect_return_code=200, expect_content=None, expect_title=None, expect_effective_url=None, auto_test_assets=False):
+
+    domain = base_url.replace("https://", "").replace("http://", "").split("/")[0]
     if logged_on_sso:
         cookies = tempfile.NamedTemporaryFile().name
-        domain = base_url.replace("https://", "").replace("http://", "").split("/")[0]
         code, content, _ = curl(f"https://{domain}/yunohost/portalapi", "/login", save_cookies=cookies, post={"credentials": f"{USER}:{PASSWORD}"})
         assert code == 200 and content == "Logged in", f"Failed to log in: got code {code} and content: {content}"
     else:
@@ -104,13 +106,15 @@ def test(base_url, path, post=None, logged_on_sso=False, expect_return_code=200,
         if retried > 3:
             break
 
+    html = BeautifulSoup(content, features="lxml")
+
     try:
-        title = BeautifulSoup(content, features="lxml").find("title").string
+        title = html.find("title").string
         title = title.strip().replace("\u2013", "-")
     except Exception:
         title = ""
 
-    content = BeautifulSoup(content, features="lxml").find("body").get_text().strip()
+    content = html.find("body").get_text().strip()
     content = re.sub(r"[\t\n\s]{3,}", "\n\n", content)
 
     errors = []
@@ -127,12 +131,31 @@ def test(base_url, path, post=None, logged_on_sso=False, expect_return_code=200,
     if expect_content and not re.search(expect_content, content):
         errors.append(f"Did not find pattern '{expect_content}' in the page content: '{content[:50]}' (on URL {effective_url})")
 
+    assets = []
+    if auto_test_assets:
+        assets_to_check = []
+        stylesheets = html.find_all("link", rel="stylesheet", href=True)
+        if stylesheets:
+            assets_to_check.append(stylesheets[0]['href'])
+        js = html.find_all("script", src=True)
+        if js:
+            assets_to_check.append(js[0]['src'])
+        if not assets_to_check:
+            print("\033[1m\033[93mWARN\033[0m auto_test_assets set to true, but no js/css asset found in this page")
+        for asset in assets_to_check:
+            code, _, _ = curl(f"https://{domain}", asset, use_cookies=cookies)
+            if code != 200:
+                errors.append(f"Asset https://{domain}{asset} (automatically derived from the page's html) answered with code {code}, expected 200?")
+            assets.append((domain + asset, code))
+
+
     return {
         "url": f"{base_url}{path}",
         "effective_url": effective_url,
         "code": code,
         "title": title,
         "content": content,
+        "assets": assets,
         "errors": errors,
     }
 
@@ -173,6 +196,13 @@ def display_result(result):
     if result["title"].strip():
         print(f"Title   : {result['title'].strip()}")
     print(f"Content extract:\n{result['content'][:250].strip()}")
+    if result["assets"]:
+        print(f"Assets  :")
+        for asset, code in result["assets"]:
+            if code == 200:
+                print(f"  - {asset}")
+            else:
+                print(f"  - \033[1m\033[91mFAIL\033[0m {asset} (code {code})")
     if result["errors"]:
         print("Errors  :\n    -" + "\n    -".join(result['errors']))
         print("\033[1m\033[91mFAIL\033[0m")
@@ -187,6 +217,7 @@ def main():
 
     if not tests.strip():
         tests = "home.path = '/'"
+        tests += "\nhome.auto_test_assets = true"
 
     tests = toml.loads(tests)
     results = run(tests)
