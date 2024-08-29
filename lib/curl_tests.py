@@ -212,14 +212,14 @@ def test(
         for asset in assets_to_check:
             if asset.startswith(f"https://{domain}"):
                 asset = asset.replace(f"https://{domain}", "")
-            code, _, effective_url = curl(
+            asset_code, _, effective_asset_url = curl(
                 f"https://{domain}", asset, use_cookies=cookies
             )
-            if code != 200:
+            if asset_code != 200:
                 errors.append(
-                    f"Asset https://{domain}{asset} (automatically derived from the page's html) answered with code {code}, expected 200? Effective url: {effective_url}"
+                    f"Asset https://{domain}{asset} (automatically derived from the page's html) answered with code {asset_code}, expected 200? Effective url: {effective_asset_url}"
                 )
-            assets.append((domain + asset, code))
+            assets.append((domain + asset, asset_code))
 
     return {
         "url": f"{base_url}{path}",
