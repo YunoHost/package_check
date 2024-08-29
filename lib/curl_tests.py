@@ -55,15 +55,30 @@ DEFAULTS = {
 # ==============================================
 
 
-def curl(base_url, path, method="GET", use_cookies=None, save_cookies=None, post=None, referer=None):
-
+def curl(
+    base_url,
+    path,
+    method="GET",
+    use_cookies=None,
+    save_cookies=None,
+    post=None,
+    referer=None,
+):
     domain = base_url.replace("https://", "").replace("http://", "").split("/")[0]
 
-    c = pycurl.Curl()                     # curl
+    c = pycurl.Curl()  # curl
     c.setopt(c.URL, f"{base_url}{path}")  # https://domain.tld/foo/bar
-    c.setopt(c.FOLLOWLOCATION, True)      # --location
-    c.setopt(c.SSL_VERIFYPEER, False)     # --insecure
-    c.setopt(c.RESOLVE, [f"{DOMAIN}:80:{LXC_IP}", f"{DOMAIN}:443:{LXC_IP}", f"{SUBDOMAIN}:80:{LXC_IP}", f"{SUBDOMAIN}:443:{LXC_IP}"])  # --resolve
+    c.setopt(c.FOLLOWLOCATION, True)  # --location
+    c.setopt(c.SSL_VERIFYPEER, False)  # --insecure
+    c.setopt(
+        c.RESOLVE,
+        [
+            f"{DOMAIN}:80:{LXC_IP}",
+            f"{DOMAIN}:443:{LXC_IP}",
+            f"{SUBDOMAIN}:80:{LXC_IP}",
+            f"{SUBDOMAIN}:443:{LXC_IP}",
+        ],
+    )  # --resolve
     c.setopt(c.HTTPHEADER, [f"Host: {domain}", "X-Requested-With: libcurl"])  # --header
     if use_cookies:
         c.setopt(c.COOKIEFILE, use_cookies)
@@ -90,18 +105,42 @@ def curl(base_url, path, method="GET", use_cookies=None, save_cookies=None, post
     return (return_code, return_content, effective_url)
 
 
-def test(base_url, path, post=None, logged_on_sso=False, expect_return_code=200, expect_content=None, expect_title=None, expect_effective_url=None, auto_test_assets=False):
-
+def test(
+    base_url,
+    path,
+    post=None,
+    logged_on_sso=False,
+    expect_return_code=200,
+    expect_content=None,
+    expect_title=None,
+    expect_effective_url=None,
+    auto_test_assets=False,
+):
     domain = base_url.replace("https://", "").replace("http://", "").split("/")[0]
     if logged_on_sso:
         cookies = tempfile.NamedTemporaryFile().name
 
         if DIST == "bullseye":
-            code, content, _ = curl(f"https://{domain}/yunohost/sso", "/", save_cookies=cookies, post={"user": USER, "password": PASSWORD}, referer=f"https://{domain}/yunohost/sso/")
-            assert code == 200 and os.system(f"grep -q '{domain}' {cookies}") == 0, f"Failed to log in: got code {code} or cookie file was empty?"
+            code, content, _ = curl(
+                f"https://{domain}/yunohost/sso",
+                "/",
+                save_cookies=cookies,
+                post={"user": USER, "password": PASSWORD},
+                referer=f"https://{domain}/yunohost/sso/",
+            )
+            assert (
+                code == 200 and os.system(f"grep -q '{domain}' {cookies}") == 0
+            ), f"Failed to log in: got code {code} or cookie file was empty?"
         else:
-            code, content, _ = curl(f"https://{domain}/yunohost/portalapi", "/login", save_cookies=cookies, post={"credentials": f"{USER}:{PASSWORD}"})
-            assert code == 200 and content == "Logged in", f"Failed to log in: got code {code} and content: {content}"
+            code, content, _ = curl(
+                f"https://{domain}/yunohost/portalapi",
+                "/login",
+                save_cookies=cookies,
+                post={"credentials": f"{USER}:{PASSWORD}"},
+            )
+            assert (
+                code == 200 and content == "Logged in"
+            ), f"Failed to log in: got code {code} and content: {content}"
     else:
         cookies = None
 
@@ -109,7 +148,9 @@ def test(base_url, path, post=None, logged_on_sso=False, expect_return_code=200,
     retried = 0
     while code is None or code in {502, 503, 504}:
         time.sleep(retried * 5)
-        code, content, effective_url = curl(base_url, path, post=post, use_cookies=cookies)
+        code, content, effective_url = curl(
+            base_url, path, post=post, use_cookies=cookies
+        )
         retried += 1
         if retried > 3:
             break
@@ -127,39 +168,58 @@ def test(base_url, path, post=None, logged_on_sso=False, expect_return_code=200,
 
     errors = []
     if expect_effective_url is None and "/yunohost/sso" in effective_url:
-        errors.append(f"The request was redirected to yunohost's portal ({effective_url})")
+        errors.append(
+            f"The request was redirected to yunohost's portal ({effective_url})"
+        )
     if expect_effective_url and expect_effective_url != effective_url:
-        errors.append(f"Ended up on URL '{effective_url}', but was expecting '{expect_effective_url}'")
+        errors.append(
+            f"Ended up on URL '{effective_url}', but was expecting '{expect_effective_url}'"
+        )
     if expect_return_code and code != expect_return_code:
         errors.append(f"Got return code {code}, but was expecting {expect_return_code}")
     if expect_title is None and "Welcome to nginx" in title:
         errors.append("The request ended up on the default nginx page?")
     if expect_title and not re.search(expect_title, title):
-        errors.append(f"Got title '{title}', but was expecting something containing '{expect_title}'")
+        errors.append(
+            f"Got title '{title}', but was expecting something containing '{expect_title}'"
+        )
     if expect_content and not re.search(expect_content, content):
-        errors.append(f"Did not find pattern '{expect_content}' in the page content: '{content[:50]}' (on URL {effective_url})")
+        errors.append(
+            f"Did not find pattern '{expect_content}' in the page content: '{content[:50]}' (on URL {effective_url})"
+        )
 
     assets = []
     if auto_test_assets:
         assets_to_check = []
         stylesheets = html.find_all("link", rel="stylesheet", href=True)
-        stylesheets = [s for s in stylesheets if "ynh_portal" not in s["href"] and "ynhtheme" not in s["href"]]
+        stylesheets = [
+            s
+            for s in stylesheets
+            if "ynh_portal" not in s["href"] and "ynhtheme" not in s["href"]
+        ]
         if stylesheets:
-            assets_to_check.append(stylesheets[0]['href'])
+            assets_to_check.append(stylesheets[0]["href"])
         js = html.find_all("script", src=True)
-        js = [s for s in js if "ynh_portal" not in s["src"] and "ynhtheme" not in s["src"]]
+        js = [
+            s for s in js if "ynh_portal" not in s["src"] and "ynhtheme" not in s["src"]
+        ]
         if js:
-            assets_to_check.append(js[0]['src'])
+            assets_to_check.append(js[0]["src"])
         if not assets_to_check:
-            print("\033[1m\033[93mWARN\033[0m auto_test_assets set to true, but no js/css asset found in this page")
+            print(
+                "\033[1m\033[93mWARN\033[0m auto_test_assets set to true, but no js/css asset found in this page"
+            )
         for asset in assets_to_check:
             if asset.startswith(f"https://{domain}"):
                 asset = asset.replace(f"https://{domain}", "")
-            code, _, effective_url = curl(f"https://{domain}", asset, use_cookies=cookies)
+            code, _, effective_url = curl(
+                f"https://{domain}", asset, use_cookies=cookies
+            )
             if code != 200:
-                errors.append(f"Asset https://{domain}{asset} (automatically derived from the page's html) answered with code {code}, expected 200? Effective url: {effective_url}")
+                errors.append(
+                    f"Asset https://{domain}{asset} (automatically derived from the page's html) answered with code {code}, expected 200? Effective url: {effective_url}"
+                )
             assets.append((domain + asset, code))
-
 
     return {
         "url": f"{base_url}{path}",
@@ -173,7 +233,6 @@ def test(base_url, path, post=None, logged_on_sso=False, expect_return_code=200,
 
 
 def run(tests):
-
     results = {}
 
     for name, params in tests.items():
@@ -181,7 +240,9 @@ def run(tests):
         full_params.update(params)
         for key, value in full_params.items():
             if isinstance(value, str):
-                full_params[key] = value.replace("__USER__", USER).replace("__DOMAIN__", APP_DOMAIN)
+                full_params[key] = value.replace("__USER__", USER).replace(
+                    "__DOMAIN__", APP_DOMAIN
+                )
 
         results[name] = test(**full_params)
         display_result(results[name])
@@ -192,7 +253,10 @@ def run(tests):
 
             # Display this result too, but only if there's really a difference compared to the regular test
             # because 99% of the time it's the same as the regular test
-            if results[name + "_noslash"]["effective_url"] != results[name]["effective_url"]:
+            if (
+                results[name + "_noslash"]["effective_url"]
+                != results[name]["effective_url"]
+            ):
                 display_result(results[name + "_noslash"])
 
     return results
@@ -200,10 +264,12 @@ def run(tests):
 
 def display_result(result):
     if result["effective_url"] != result["url"]:
-        print(f"URL     : {result['url']}    (redirected to: {result['effective_url']})")
+        print(
+            f"URL     : {result['url']}    (redirected to: {result['effective_url']})"
+        )
     else:
         print(f"URL     : {result['url']}")
-    if result['code'] != 200:
+    if result["code"] != 200:
         print(f"Code    : {result['code']}")
     if result["title"].strip():
         print(f"Title   : {result['title'].strip()}")
@@ -216,7 +282,7 @@ def display_result(result):
             else:
                 print(f"  - \033[1m\033[91mFAIL\033[0m {asset} (code {code})")
     if result["errors"]:
-        print("Errors  :\n    -" + "\n    -".join(result['errors']))
+        print("Errors  :\n    -" + "\n    -".join(result["errors"]))
         print("\033[1m\033[91mFAIL\033[0m")
     else:
         print("\033[1m\033[92mOK\033[0m")
@@ -224,7 +290,6 @@ def display_result(result):
 
 
 def main():
-
     tests = sys.stdin.read()
 
     if not tests.strip():
@@ -235,7 +300,7 @@ def main():
     results = run(tests)
 
     # If there was at least one error 50x
-    if any(str(r['code']).startswith("5") for r in results.values()):
+    if any(str(r["code"]).startswith("5") for r in results.values()):
         sys.exit(5)
     elif any(r["errors"] for r in results.values()):
         sys.exit(1)

@@ -7,14 +7,16 @@ from pathlib import Path
 import toml
 
 
-def get_default_value(app_name: str, name: str, question: dict, raise_if_no_default: bool = True) -> str:
+def get_default_value(
+    app_name: str, name: str, question: dict, raise_if_no_default: bool = True
+) -> str:
     base_default_value_per_arg_type = {
         ("domain", "domain"): "domain.tld",
         ("path", "path"): "/" + app_name,
         ("user", "admin"): "package_checker",
         ("group", "init_main_permission"): "visitors",
         ("group", "init_admin_permission"): "admins",
-        ("password", "password"): "MySuperComplexPassword"
+        ("password", "password"): "MySuperComplexPassword",
     }
 
     type_and_name = (question["type"], name)
@@ -42,8 +44,9 @@ def get_default_value(app_name: str, name: str, question: dict, raise_if_no_defa
     return ""
 
 
-def get_default_values_for_questions(manifest: dict, raise_if_no_default=True) -> dict[str, str]:
-
+def get_default_values_for_questions(
+    manifest: dict, raise_if_no_default=True
+) -> dict[str, str]:
     app_name = manifest["id"]
     questions = manifest["install"]
 
@@ -64,7 +67,12 @@ def main() -> None:
     else:
         manifest = toml.load(args.manifest_path.open())
 
-    query_string = "&".join([f"{name}={value}" for name, value in get_default_values_for_questions(manifest).items()])
+    query_string = "&".join(
+        [
+            f"{name}={value}"
+            for name, value in get_default_values_for_questions(manifest).items()
+        ]
+    )
     print(query_string)
 
 
