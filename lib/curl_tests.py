@@ -121,15 +121,15 @@ def test(
         cookies = tempfile.NamedTemporaryFile().name
 
         if DIST == "bullseye":
-            code, content, _ = curl(
-                f"https://{domain}/yunohost/sso",
+            code, content, log_url = curl(
+                f"https://{DOMAIN}/yunohost/sso",
                 "/",
                 save_cookies=cookies,
                 post={"user": USER, "password": PASSWORD},
-                referer=f"https://{domain}/yunohost/sso/",
+                referer=f"https://{DOMAIN}/yunohost/sso/",
             )
             assert (
-                code == 200 and os.system(f"grep -q '{domain}' {cookies}") == 0
+                code == 200 and os.system(f"grep -q '{DOMAIN}' {cookies}") == 0
             ), f"Failed to log in: got code {code} or cookie file was empty?"
         else:
             code, content, _ = curl(
@@ -212,6 +212,10 @@ def test(
         for asset in assets_to_check:
             if asset.startswith(f"https://{domain}"):
                 asset = asset.replace(f"https://{domain}", "")
+            elif asset.startswith(f"{domain}/"):
+                asset = asset.replace(f"{domain}/", "")
+            if not asset.startswith("/"):
+                asset = "/" + asset
             asset_code, _, effective_asset_url = curl(
                 f"https://{domain}", asset, use_cookies=cookies
             )
@@ -282,7 +286,7 @@ def display_result(result):
             else:
                 print(f"  - \033[1m\033[91mFAIL\033[0m {asset} (code {code})")
     if result["errors"]:
-        print("Errors  :\n    -" + "\n    -".join(result["errors"]))
+        print("Errors  :\n    - " + "\n    - ".join(result["errors"]))
         print("\033[1m\033[91mFAIL\033[0m")
     else:
         print("\033[1m\033[92mOK\033[0m")
