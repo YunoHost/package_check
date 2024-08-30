@@ -30,14 +30,17 @@ The app is expected to contain a `tests.toml` file (see below) to tell package_c
 
 ## Usage
 
+<!--STARTHELP-->
+
 ```text
 > ./package_check.sh --help
  Usage: package_check.sh [OPTION]... PACKAGE_TO_CHECK
 
-    -b, --branch=BRANCH     Specify a branch to check.
+    -b, --branch=BRANCH         Specify a branch to check.
     -a, --arch=ARCH
     -d, --dist=DIST
     -y, --ynh-branch=BRANCH
+    -D, --dry-run               Show a JSON representing which tests are going to be ran (meant for debugging)
     -i, --interactive           Wait for the user to continue before each remove
     -e, --interactive-on-errors Wait for the user to continue on errors
     -s, --force-stop            Force the stop of running package_check
@@ -45,74 +48,14 @@ The app is expected to contain a `tests.toml` file (see below) to tell package_c
                                 (N.B.: you're not supposed to use this option,
                                 images are supposed to be fetch from
                                 devbaseimgs.yunohost.org automatically)
+    -S, --storage-dir DIRECTORY Where to store temporary test files like yunohost backups
+    -v, --verbose               Prints the complete debug log to screen
     -h, --help                  Display this help
+
+    Pass YNHDEV_BACKEND=incus|lxd to use a specific LXD-compatible backend.
 ```
 
-## Deploying package_check
-
-First you need to install the system dependencies.
-
-Package check is based on the LXD/LXC ecosystem. Be careful that
-**LXD can conflict with other installed virtualization technologies such as
-libvirt or vanilla LXCs**, especially because they all require a daemon based
-on DNSmasq which may list on port 53.
-
-On a Debian-based system (regular Debian, Ubuntu, Mint ...), LXD can be
-installed using `snapd`. On other systems like Archlinux, you will probably also
-be able to install `snapd` using the system package manager (or even
-`lxd` directly).
-
-```bash
-apt install git snapd lynx jq
-sudo snap install core
-sudo snap install lxd
-
-# Adding lxc/lxd to /usr/local/bin to make sure we can use them easily even
-# with sudo for which the PATH is defined in /etc/sudoers and probably doesn't
-# include /snap/bin
-sudo ln -s /snap/bin/lxc /usr/local/bin/lxc
-sudo ln -s /snap/bin/lxd /usr/local/bin/lxd
-```
-
-NB. : you should **make sure that your user is in the `lxd` group** so that it's
-able to run `lxc` commands without sudo... You can check this with the command
-`groups` where you should see `lxd`. Otherwise, add your user to this group
-(don't forget that you may need to reload your entire graphical session for this
-to propagate (sigh))
-
-Then you shall initialize LXD which will ask you a bunch of question. Usually
-answering the default (just pressing enter) to all questions is fine. Just pay
-attention to :
-
-- the storage backend driver. Possibly `zfs` is the best, but requires a kernel >= 5.x
-  and corresponding kernel module loaded. You can fallback to the `dir` driver.
-- the size of the default storage it'll create (the default is 5G but you may
-  want 10G for heavy usage ?) (if you're using the 'dir' driver, this won't be asked)
-
-```bash
-lxd init
-```
-
-The base images for tests are centralized on `devbaseimgs.yunohost.org` and we'll download them from there to speed things up:
-
-```bash
-lxc remote add yunohost https://devbaseimgs.yunohost.org --public
-```
-
-(At the time this README is written, fingerprint is d9ae6e76c374e3c58c3c20a881cffe7435809adb3b222ec393805f5bd01bb522 )
-
-Then you can install package check :
-
-```
-git clone https://github.com/YunoHost/package_check
-cd package_check
-```
-
-Then test your packages :
-
-```
-./package_check.sh your_app_ynh
-```
+<!--ENDHELP-->
 
 ## You can start a container on a different architecture with some hacks
 

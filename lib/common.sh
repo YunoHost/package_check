@@ -129,7 +129,13 @@ function log_small_title()
 
 function log_debug()
 {
-    echo "$1" >> /proc/self/fd/3
+    if [[ "$verbose_log" = "1" ]]; then
+        # Append to log file and print to screen
+        echo "${1}" | tee -a /proc/self/fd/3
+    else
+        # Only append to log file, don't print to screen
+        echo "$1" >> /proc/self/fd/3
+    fi
 }
 
 function log_info()
