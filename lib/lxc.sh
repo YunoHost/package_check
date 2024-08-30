@@ -57,7 +57,12 @@ LXC_CREATE () {
         log_critical "Failed to create the new LXC :/"
     fi
 
-    _LXC_START_AND_WAIT $LXC_NAME
+    # The first time around when we create the VM, if it fails, we want to abort early
+    # instead of keeping the timeout game until the end of times
+    if ! _LXC_START_AND_WAIT $LXC_NAME; then
+        log_critical "Fatal error starting container. See logs above."
+    fi
+
     sleep 3
 
     if ! $lxc exec $LXC_NAME -- test -e /etc/yunohost
@@ -220,70 +225,42 @@ LXC_RESET () {
 
 
 _LXC_START_AND_WAIT() {
+    # Try to start the container
 
-    restart_container()
-	{
-        LXC_STOP $1
-		$lxc start "$1"
-	}
+    # Wait for container to start, we are using systemd to check this,
+    # for the sake of brevity.
+    for j in $(seq 1 5); do
+        log_debug "Start container attempt $j"
+        if timeout -k 10 4 $lxc exec "$1" -- timeout 4 systemctl isolate multi-user.target >/dev/null 2>/dev/null; then
+            break
+        fi
 
-	# Try to start the container 3 times.
-	local max_try=3
-	local i=0
-	while [ $i -lt $max_try ]
-	do
-		i=$(( i +1 ))
-		local failstart=0
-
-		# Wait for container to start, we are using systemd to check this,
-		# for the sake of brevity.
-		for j in $(seq 1 10); do
-			if $lxc exec "$1" -- timeout 30 systemctl isolate multi-user.target >/dev/null 2>/dev/null; then
-				break
-			fi
-
-			if [ "$j" == "10" ]; then
-				log_debug 'Failed to start the container ... restarting ...'
-				failstart=1
-
-				restart_container "$1"
-			fi
-
-			sleep 1s
-		done
-
-		# Wait for container to access the internet
-		for j in $(seq 1 10); do
-			if $lxc exec "$1" -- timeout 10 curl -s http://wikipedia.org > /dev/null 2>/dev/null; then
-				break
-			fi
-
-			if [ "$j" == "10" ]; then
-				log_debug 'Failed to access the internet ... restarting'
-				failstart=1
-
-				restart_container "$1"
-			fi
-
-			sleep 1s
-		done
-
-		# Has started and has access to the internet
-		if [ $failstart -eq 0 ]
-		then
-			break
-		fi
-
-		# Fail if the container failed to start
-		if [ $i -eq $max_try ] && [ $failstart -eq 1 ]
-		then
-            log_error "The container miserably failed to start or to connect to the internet"
+        if [ "$j" == "5" ]; then
+            log_error 'Failed to start the container.'
             $lxc info --show-log $1
-			return 1
-		fi
-	done
+            return 1
+        fi
+    done
 
-    sleep 3
+    log_info "Container started successfully. Now waiting for internet access."
+
+    # Wait for container to access the internet
+    for j in $(seq 1 5); do
+        log_debug "Connect container internet attempt $j"
+        # Note: Sometimes this uses X00% CPU and never times out, so we use timeout SIGKILL
+        if timeout -k 10 4 $lxc exec "$1" -- timeout 4 curl -s http://wikipedia.org > /dev/null 2>/dev/null; then
+            break
+        fi
+
+        if [ "$j" == "5" ]; then
+            log_error 'Failed to access the internet'
+            $lxc info --show-log $1
+            return 1
+        fi
+
+        sleep 1s
+    done
+    log_debug "Container fully started"
 
     LXC_IP=$($lxc exec $1 -- hostname -I | cut -d' ' -f1 | grep -E -o "\<[0-9.]{8,}\>")
 }
