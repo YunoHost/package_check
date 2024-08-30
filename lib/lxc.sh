@@ -55,8 +55,7 @@ LXC_CREATE () {
     # The first time around when we create the VM, if it fails, we want to abort early
     # instead of keeping the timeout game until the end of times
     if ! _LXC_START_AND_WAIT $LXC_NAME; then
-        log_error "Fatal error creating VM. See logs above."
-        exit 1
+        log_critical "Fatal error starting container. See logs above."
     fi
 
     sleep 3
@@ -226,7 +225,7 @@ _LXC_START_AND_WAIT() {
     # Wait for container to start, we are using systemd to check this,
     # for the sake of brevity.
     for j in $(seq 1 5); do
-        log_debug "Start VM attempt $j"
+        log_debug "Start container attempt $j"
         if timeout -k 10 4 $lxc exec "$1" -- timeout 4 systemctl isolate multi-user.target >/dev/null 2>/dev/null; then
             break
         fi
@@ -242,7 +241,7 @@ _LXC_START_AND_WAIT() {
 
     # Wait for container to access the internet
     for j in $(seq 1 5); do
-        log_debug "Connect VM internet attempt $j"
+        log_debug "Connect container internet attempt $j"
         # Note: Sometimes this uses X00% CPU and never times out, so we use timeout SIGKILL
         if timeout -k 10 4 $lxc exec "$1" -- timeout 4 curl -s http://wikipedia.org > /dev/null 2>/dev/null; then
             break
