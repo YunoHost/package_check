@@ -291,7 +291,7 @@ def display_result(result):
             if code == 200:
                 print(f"  - {asset}")
             else:
-                print(f"  - \033[1m\033[91mFAIL\033[0m {asset} (code {code})")
+                print(f"  - \033[1m\033[91mFAIL\033[0m (code {code}) {asset}")
     if result["errors"]:
         print("Errors  :\n    - " + "\n    - ".join(result["errors"]))
         print("\033[1m\033[91mFAIL\033[0m")
