@@ -195,13 +195,13 @@ def test(
         stylesheets = [
             s
             for s in stylesheets
-            if "ynh_portal" not in s["href"] and "ynhtheme" not in s["href"]
+            if "ynh_portal" not in s["href"] and "ynhtheme" not in s["href"] and "ynh_overlay" not in s["href"]
         ]
         if stylesheets:
             assets_to_check.append(stylesheets[0]["href"])
         js = html.find_all("script", src=True)
         js = [
-            s for s in js if "ynh_portal" not in s["src"] and "ynhtheme" not in s["src"]
+            s for s in js if "ynh_portal" not in s["src"] and "ynhtheme" not in s["src"] and "ynh_overlay" not in s["src"]
         ]
         if js:
             assets_to_check.append(js[0]["src"])
