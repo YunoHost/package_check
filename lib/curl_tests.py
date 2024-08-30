@@ -210,8 +210,15 @@ def test(
                 "\033[1m\033[93mWARN\033[0m auto_test_assets set to true, but no js/css asset found in this page"
             )
         for asset in assets_to_check:
-            if asset.startswith(f"https://{domain}"):
-                asset = asset.replace(f"https://{domain}", "")
+            # FIXME : this is pretty clumsy, should probably be replaced with a proper URL parsing to serparate domains etc...
+            if asset.startswith(f"https://"):
+                if asset.startswith(f"https://{domain}"):
+                    asset = asset.replace(f"https://{domain}", "")
+                elif:
+                    print(
+                        "\033[1m\033[93mWARN\033[0m Found asset '{asset}' which seems to be hosted on a third party, external website ... Not super great for privacy etc... ?"
+                    )
+                    continue
             elif asset.startswith(f"{domain}/"):
                 asset = asset.replace(f"{domain}/", "")
             if not asset.startswith("/"):
