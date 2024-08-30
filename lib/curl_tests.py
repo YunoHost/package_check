@@ -214,7 +214,7 @@ def test(
             if asset.startswith(f"https://"):
                 if asset.startswith(f"https://{domain}"):
                     asset = asset.replace(f"https://{domain}", "")
-                elif:
+                else:
                     print(
                         "\033[1m\033[93mWARN\033[0m Found asset '{asset}' which seems to be hosted on a third party, external website ... Not super great for privacy etc... ?"
                     )
