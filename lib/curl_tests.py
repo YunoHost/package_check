@@ -163,7 +163,8 @@ def test(
     except Exception:
         title = ""
 
-    content = html.find("body").get_text().strip()
+    content = html.find("body")
+    content = content.get_text().strip() if content else ""
     content = re.sub(r"[\t\n\s]{3,}", "\n\n", content)
 
     errors = []
