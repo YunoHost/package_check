@@ -189,8 +189,8 @@ def test(
         )
 
     assets = []
-    # Auto-check assets - though skip this if we ended up with a 502 to prevent displaying warnings etc.
-    if auto_test_assets and not str(code).startswith("5"):
+    # Auto-check assets - though skip this if we have an unexpected return code for the main page, because there's very likely no asset to find
+    if auto_test_assets and code == expect_return_code:
         assets_to_check = []
         stylesheets = html.find_all("link", rel="stylesheet", href=True)
         stylesheets = [
