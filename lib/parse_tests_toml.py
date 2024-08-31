@@ -164,7 +164,7 @@ def build_test_list(basedir: Path) -> dict[str, dict[str, Any]]:
 
     is_webapp = (
         os.system(
-            f"grep -q '^ynh_add_nginx_config\|^ynh_nginx_add_config' '{str(basedir)}/scripts/install'"
+            f"grep -q '^ynh_add_nginx_config\|^ynh_nginx_add_config\|^ynh_config_add_nginx' '{str(basedir)}/scripts/install'"
         )
         == 0
     )
