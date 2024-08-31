@@ -272,7 +272,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
 
     curl_result=${PIPESTATUS[0]}
 
-    # If we had a 50x error, try to display service info and logs to help debugging
+    # If we had a 50x error, try to display service info and logs to help debugging (but we don't display nginx logs because most of the time the issue ain't in nginx)
     if [[ $curl_result == 5 ]]
     then
         LXC_EXEC "systemctl --no-pager --all" | grep "$app_id_to_check.*service"
@@ -280,7 +280,13 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
         do
             LXC_EXEC "journalctl --no-pager --no-hostname -n 30 -u $SERVICE";
         done
-        LXC_EXEC "tail -v -n 15 \$(find /var/log/{nginx/,php*,$app_id_to_check} -mmin -3)"
+        LXC_EXEC "tail -v -n 15 \$(find /var/log/{php*,$app_id_to_check} -mmin -3 2>/dev/null)"
+    fi
+    # Display nginx logs only if for non-50x errors (sor for example 404) to avoid poluting the debug log
+    if [[ $curl_result != 5 ]] && [[ $curl_result != 0 ]]
+    then
+        LXC_EXEC "tail -v -n 15 \$(find /var/log/nginx/ -mmin -3)"
+
     fi
 
     return $curl_result
