@@ -25,9 +25,10 @@ _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT()
     pushd $package_path/scripts >/dev/null
         for SCRIPT in $(ls _common.sh install remove upgrade backup restore change_url config 2>/dev/null)
         do
+            echo $SCRIPT
             # bash -n / noexec option allows to find syntax issues without actually running the scripts
             # cf https://unix.stackexchange.com/questions/597743/bash-shell-noexec-option-usage-purpose
-            bash -n $SCRIPT | tee -a /proc/self/fd/3 || syntax_issue=true
+            bash -n $SCRIPT 2>&1 | tee -a /proc/self/fd/3 || syntax_issue=true
         done
     popd >/dev/null
     [[ $syntax_issue == true ]] && log_report_test_success || log_critical "Obvious syntax issues found which will make the scripts crash ... not running the actual tests until these are fixed"
