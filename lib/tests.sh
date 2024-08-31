@@ -280,12 +280,16 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED () {
         do
             LXC_EXEC "journalctl --no-pager --no-hostname -n 30 -u $SERVICE";
         done
-        LXC_EXEC "tail -v -n 15 \$(find /var/log/{php*,$app_id_to_check} -mmin -3 2>/dev/null)"
+        LXC_EXEC "test -d /var/log/$app_id_to_check && ls -ld /var/log/$app_id_to_check && ls -l /var/log/$app_id_to_check && tail -v -n 15 \$(find /var/log/$app_id_to_check 2>/dev/null)"
+        if grep -qi php $package_path/manifest.toml
+        then
+            LXC_EXEC "ls -l /var/log/php* 2>/dev/null; tail -v -n 15 \$(find /var/log/php* 2>/dev/null)"
+        fi
     fi
     # Display nginx logs only if for non-50x errors (sor for example 404) to avoid poluting the debug log
     if [[ $curl_result != 5 ]] && [[ $curl_result != 0 ]]
     then
-        LXC_EXEC "tail -v -n 15 \$(find /var/log/nginx/ -mmin -3)"
+        LXC_EXEC "tail -v -n 15 /var/log/nginx/*$domain_to_check*"
 
     fi
 
