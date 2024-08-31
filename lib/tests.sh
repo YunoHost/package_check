@@ -25,13 +25,12 @@ _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT()
     pushd $package_path/scripts >/dev/null
         for SCRIPT in $(ls _common.sh install remove upgrade backup restore change_url config 2>/dev/null)
         do
-            echo $SCRIPT
             # bash -n / noexec option allows to find syntax issues without actually running the scripts
             # cf https://unix.stackexchange.com/questions/597743/bash-shell-noexec-option-usage-purpose
             bash -n $SCRIPT 2>&1 | tee -a /proc/self/fd/3 || syntax_issue=true
         done
     popd >/dev/null
-    [[ $syntax_issue == true ]] && log_report_test_success || log_critical "Obvious syntax issues found which will make the scripts crash ... not running the actual tests until these are fixed"
+    [[ $syntax_issue == false ]] && log_report_test_success || log_critical "Obvious syntax issues found which will make the scripts crash ... not running the actual tests until these are fixed"
 
     # We filter apt deps starting with $app_id to prevent stupid issues with for example cockpit and transmission where the apt package is not properly reinstalled on reinstall-after-remove test ...
     local apt_deps=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); P = t['resources'].get('apt', {}).get('packages', ''); P = P.replace(',', ' ').split() if isinstance(P, str) else P; P = [p for p in P if p != '$app_id' and not p.startswith('$app_id-')]; print(' '.join(P));" < $package_path/manifest.toml)
