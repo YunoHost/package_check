@@ -13,10 +13,11 @@ The test results are printed directly in the terminal and stored in the log file
 > We use LXD or Incus, which may conflict with other virtualization technologies. It may conflict with libvirt or LXC due to
 > requiring dnsmasq on port 53. It will definitely conflict with Docker, but [some workarounds are documented](https://linuxcontainers.org/incus/docs/main/howto/network_bridge_firewalld/#prevent-connectivity-issues-with-incus-and-docker).
 
-- install basic dependencies: `sudo apt install lynx jq`
+- install basic dependencies: `sudo apt install lynx jq btrfs-progs`
 - install [LXD](https://canonical.com/lxd/install) or [Incus](https://linuxcontainers.org/incus/docs/main/installing/)
-- make sure LXC/Incus is initialized with `lxd init` or `incus admin init --minimal`; in the case of LXD, press enter to apply the default settings, or see below for more details about the settings
-- make sure your user is in the `lxd` or `incus-admin` group (`sudo usermod -a -G lxd MYUSER`), and **don't forget to restart your computer**
+- make sure your user is in the `lxd` or `incus-admin` group (`sudo usermod -a -G lxd MYUSER`)
+- **restart your computer**: this will ensure you have indeed the permissions, and that LXD/Incus can access the BTRFS kernel module
+- make sure LXC/Incus is initialized with `lxd init` or `incus admin init --minimal`; in the case of LXD, make sure to use the `btrfs` storage driver unless you know what you are doing
 - if using LXD, run this command to add the Yunohost image repository: `lxc remote add yunohost https://devbaseimgs.yunohost.org --public`; at the time this README is written, fingerprint is `d9ae6e76c374e3c58c3c20a881cffe7435809adb3b222ec393805f5bd01bb522`
 
 <details>
@@ -25,8 +26,7 @@ If you'd like to use non-default settings with Incus, run `incus admin init` wit
 default settings are just fine, but be aware that the storage backend driver may have a large impact on performance.
 
 Using the `btrfs` or `zfs` driver will provide best performance due to [CoW](https://en.wikipedia.org/wiki/Copy-on-write), but it may
-not be available on all systems. In that case, the default `5G` storage may not be enough for your needs. When using the default `dir` driver,
-it is not necessary to specify a dedicated size.
+not be available on all systems. In that case, the default storage may not be enough for your needs.
 </details>
 
 <details>
