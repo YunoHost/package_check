@@ -213,6 +213,8 @@ def test(
             )
         for asset in assets_to_check:
             # FIXME : this is pretty clumsy, should probably be replaced with a proper URL parsing to serparate domains etc...
+            if asset.startswith(f"//"):
+                asset = f"https:{asset}"
             if asset.startswith(f"https://") or asset.startswith(f"http://"):
                 if asset.startswith(f"https://{domain}"):
                     asset = asset.replace(f"https://{domain}", "")
