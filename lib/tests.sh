@@ -31,7 +31,7 @@ _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT() {
     if [[ $syntax_issue == false ]]; then
         log_report_test_success
     else
-        echo "{'level': 0}" >$result_json
+        echo '{"level": 0}' >$result_json
         touch $summary_png
         log_error "Obvious syntax issues found which will make the scripts crash ... not running the actual tests until these are fixed"
         # Exit with 0 instead of 1 such that the job gets flagged as failure and not as error
