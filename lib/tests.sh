@@ -33,8 +33,8 @@ _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT() {
     else
         echo "{'level': 0}" >$result_json
         log_error "Obvious syntax issues found which will make the scripts crash ... not running the actual tests until these are fixed"
-        # Return 0 instead of 1 such that the job gets flagged as failure and not as error
-        return 0
+        # Exit with 0 instead of 1 such that the job gets flagged as failure and not as error
+        exit 0
     fi
 
     # We filter apt deps starting with $app_id to prevent stupid issues with for example cockpit and transmission where the apt package is not properly reinstalled on reinstall-after-remove test ...
