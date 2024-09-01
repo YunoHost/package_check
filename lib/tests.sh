@@ -31,7 +31,13 @@ _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT()
             [[ ${PIPESTATUS[0]} == 0 ]] || syntax_issue=true
         done
     popd >/dev/null
-    [[ $syntax_issue == false ]] && log_report_test_success || log_critical "Obvious syntax issues found which will make the scripts crash ... not running the actual tests until these are fixed"
+    if [[ $syntax_issue == false ]]
+    then
+        log_report_test_success
+    else
+        echo "{'level': 0}" > $result_json
+        log_critical "Obvious syntax issues found which will make the scripts crash ... not running the actual tests until these are fixed"
+    fi
 
     # We filter apt deps starting with $app_id to prevent stupid issues with for example cockpit and transmission where the apt package is not properly reinstalled on reinstall-after-remove test ...
     local apt_deps=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); P = t['resources'].get('apt', {}).get('packages', ''); P = P.replace(',', ' ').split() if isinstance(P, str) else P; P = [p for p in P if p != '$app_id' and not p.startswith('$app_id-')]; print(' '.join(P));" < $package_path/manifest.toml)
