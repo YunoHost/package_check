@@ -27,7 +27,8 @@ _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT()
         do
             # bash -n / noexec option allows to find syntax issues without actually running the scripts
             # cf https://unix.stackexchange.com/questions/597743/bash-shell-noexec-option-usage-purpose
-            bash -n $SCRIPT 2>&1 | tee -a /proc/self/fd/3 || syntax_issue=true
+            bash -n $SCRIPT 2>&1 | tee -a /proc/self/fd/3
+            [[ ${PIPESTATUS[0]} == 0 ]] || syntax_issue=true
         done
     popd >/dev/null
     [[ $syntax_issue == false ]] && log_report_test_success || log_critical "Obvious syntax issues found which will make the scripts crash ... not running the actual tests until these are fixed"
