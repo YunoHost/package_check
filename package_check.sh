@@ -221,7 +221,9 @@ fi
 self_upgrade
 fetch_or_upgrade_package_linter
 
-if [[ -n "$storage_dir" ]]; then
+if [[ -n "${TEST_CONTEXT:-}" ]]; then
+    readonly TEST_CONTEXT="$TEST_CONTEXT"
+elif [[ -n "$storage_dir" ]]; then
     readonly TEST_CONTEXT=$(mktemp -d "$storage_dir/package_check.XXXXXX")
 else
     readonly TEST_CONTEXT=$(mktemp -d "/tmp/package_check.XXXXXX")
