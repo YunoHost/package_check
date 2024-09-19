@@ -24,7 +24,7 @@ DEFAULTS = {
     "logged_on_sso": False,
     "expect_title": None,
     "expect_content": None,
-    "expect_title": None,
+    "expect_return_code": 200,
     "expect_effective_url": None,
     "auto_test_assets": False,
 }
