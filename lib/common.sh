@@ -302,13 +302,11 @@ function fetch_or_upgrade_package_linter()
     then
         log_info "Installing Package linter"
         git clone --quiet $git_repository "./package_linter"
-        pip3 install pyparsing six imgkit toml
     else
         git -C "./package_linter" fetch origin --quiet
         git -C "./package_linter" reset --hard origin/master --quiet
-        python3 -c "import imgkit" 2>/dev/null || pip3 install imgkit
-        python3 -c "import toml" 2>/dev/null || pip3 install toml
     fi
+    pip3 install pyparsing six imgkit toml jsonschema
 }
 
 #=================================================
