@@ -306,7 +306,7 @@ function fetch_or_upgrade_package_linter()
         git -C "./package_linter" fetch origin --quiet
         git -C "./package_linter" reset --hard origin/master --quiet
     fi
-    pip3 install pyparsing six imgkit toml jsonschema
+    pip3 install pyparsing six imgkit toml jsonschema | grep -v "Requirement already satisfied"
 }
 
 #=================================================
