@@ -216,6 +216,13 @@ LXC_RESET () {
     fi
 
     $lxc delete $LXC_NAME --force 2>/dev/null
+
+    # If the container still exists ... maybe we're hitting the boring bug with LXC where
+    # /var/lib/lxd/containers/<container_name> is empty except for a single backup.yaml file
+    if $lxc info $LXC_NAME >/dev/null 2>/dev/null && [[ "$(ls /var/lib/*/containers/$LXC_NAME/ | wc -l)" == 1 ]] && [[ -e /var/lib/*/containers/$LXC_NAME/backup.yaml ]]; then
+        rm /var/lib/*/containers/$LXC_NAME/backup.yaml
+        $lxc delete $LXC_NAME --force 2>/dev/null
+    fi
 }
 
 
