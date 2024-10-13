@@ -20,7 +20,7 @@ print_help() {
     -r, --rebuild               (Re)Build the base container
                                 (N.B.: you're not supposed to use this option,
                                 images are supposed to be fetch from
-                                devbaseimgs.yunohost.org automatically)
+                                repo.yunohost.org/incus automatically)
     -S, --storage-dir DIRECTORY Where to store temporary test files like yunohost backups
     -h, --help                  Display this help
 

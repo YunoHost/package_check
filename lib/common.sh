@@ -16,7 +16,7 @@ DEFAULT_PHP_VERSION=${DEFAULT_PHP_VERSION:-7.4}
 YNH_BRANCH=${YNH_BRANCH:-stable}
 
 WORKER_ID=${WORKER_ID:-0}
-LXC_BASE="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-base"
+LXC_BASE="yunohost/$DIST-$YNH_BRANCH/appci"
 LXC_NAME="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-test-${WORKER_ID}"
 
 readonly lock_file="./pcheck-${WORKER_ID}.lock"
@@ -79,9 +79,13 @@ function check_incus_setup()
 
 function set_incus_remote()
 {
-    configured=$(incus remote list -f json | jq 'has("yunohost")')
-    if [[ "$configured" != "true" ]]; then
-        incus remote add yunohost https://devbaseimgs.yunohost.org --public
+    remote_url=$(incus remote list -f json | jq '.yunohost.Addr')
+    if [[ "${remote_url}" == *"devbaseimgs"* ]]; then
+        incus remote remove yunohost
+        remote_url=null
+    fi
+    if [[ "$remote_url" == "null" ]]; then
+        incus remote add yunohost https://repo.yunohost.org/incus --protocol simplestream --public
     fi
 }
 
