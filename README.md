@@ -18,7 +18,7 @@ The test results are printed directly in the terminal and stored in the log file
 - make sure your user is in the `lxd` or `incus-admin` group (`sudo usermod -a -G lxd MYUSER`)
 - **restart your computer**: this will ensure you have indeed the permissions, and that LXD/Incus can access the BTRFS kernel module
 - make sure LXC/Incus is initialized with `lxd init` or `incus admin init --minimal`; in the case of LXD, make sure to use the `btrfs` storage driver unless you know what you are doing
-- if using LXD, run this command to add the Yunohost image repository: `lxc remote add yunohost https://devbaseimgs.yunohost.org --public`; at the time this README is written, fingerprint is `d9ae6e76c374e3c58c3c20a881cffe7435809adb3b222ec393805f5bd01bb522`
+- if using LXD, run this command to add the Yunohost image repository: `lxc remote add yunohost https://repo.yunohost.org/incus --protocol simplestreams --public`; at the time this README is written, fingerprint is `d9ae6e76c374e3c58c3c20a881cffe7435809adb3b222ec393805f5bd01bb522`
 
 <details>
 <summary><b>More details about LXD/Incus settings</b></summary>
@@ -87,7 +87,7 @@ The app is expected to contain a `tests.toml` file (see below) to tell package_c
     -r, --rebuild               (Re)Build the base container
                                 (N.B.: you're not supposed to use this option,
                                 images are supposed to be fetch from
-                                devbaseimgs.yunohost.org automatically)
+                                https://repo.yunohost.org/incus automatically)
     -h, --help                  Display this help
 ```
 
