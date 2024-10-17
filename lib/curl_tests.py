@@ -6,7 +6,7 @@ import re
 import tempfile
 import pycurl
 from bs4 import BeautifulSoup
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urljoin
 from io import BytesIO
 
 DOMAIN = os.environ["DOMAIN"]
@@ -165,6 +165,9 @@ def test(
     content = content.get_text().strip() if content else ""
     content = re.sub(r"[\t\n\s]{3,}", "\n\n", content)
 
+    base_tag = html.find('base')
+    base = base_tag['href'] if base_tag else ''
+
     errors = []
     if expect_effective_url is None and "/yunohost/sso" in effective_url:
         errors.append(
@@ -230,15 +233,16 @@ def test(
             elif asset.startswith(f"{domain}/"):
                 asset = asset.replace(f"{domain}/", "")
             if not asset.startswith("/"):
-                asset = "/" + asset
+                asset = urljoin(base + "/", asset)
+            resolved_asset_url = urljoin(f"https://{domain}", asset)
             asset_code, _, effective_asset_url = curl(
-                f"https://{domain}{asset}", use_cookies=cookies
+                resolved_asset_url, use_cookies=cookies
             )
             if asset_code != 200:
                 errors.append(
-                    f"Asset https://{domain}{asset} (automatically derived from the page's html) answered with code {asset_code}, expected 200? Effective url: {effective_asset_url}"
+                    f"Asset {resolved_asset_url} (automatically derived from the page's html) answered with code {asset_code}, expected 200? Effective url: {effective_asset_url}"
                 )
-            assets.append((domain + asset, asset_code))
+            assets.append((resolved_asset_url, asset_code))
 
     return {
         "url": full_url,
