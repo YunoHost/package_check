@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2155,SC2164,SC2154
 
 #=================================================
 # "Low-level" logistic helpers
@@ -7,7 +8,7 @@
 _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT() {
     # Print the version of YunoHost from the LXC container
     log_small_title "YunoHost versions"
-    $lxc exec $LXC_NAME -t -- /bin/bash -c "yunohost --version" | tee -a "$full_log"
+    $lxc exec "$LXC_NAME" -t -- /bin/bash -c "yunohost --version" | tee -a "$full_log"
 
     log_title "Package linter"
     ./package_linter/package_linter.py "$package_path" | tee -a "$full_log"
@@ -20,8 +21,11 @@ _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT() {
     log_title "Basic bash syntax checks"
 
     local syntax_issue=false
-    pushd $package_path/scripts >/dev/null
-    for SCRIPT in $(ls _common.sh install remove upgrade backup restore change_url config 2>/dev/null); do
+    pushd "$package_path/scripts" >/dev/null
+    for SCRIPT in _common.sh install remove upgrade backup restore change_url config; do
+        if [ ! -f "$SCRIPT" ]; then
+            continue
+        fi
         # bash -n / noexec option allows to find syntax issues without actually running the scripts
         # cf https://unix.stackexchange.com/questions/597743/bash-shell-noexec-option-usage-purpose
         bash -n $SCRIPT 2>&1 | tee -a /proc/self/fd/3
@@ -31,26 +35,26 @@ _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT() {
     if [[ $syntax_issue == false ]]; then
         log_report_test_success
     else
-        echo '{"level": 0}' >$result_json
-        touch $summary_png
+        echo '{"level": 0}' > "$result_json"
+        touch "$summary_png"
         log_error "Obvious syntax issues found which will make the scripts crash ... not running the actual tests until these are fixed"
         # Exit with 0 instead of 1 such that the job gets flagged as failure and not as error
         exit 0
     fi
 
     # We filter apt deps starting with $app_id to prevent stupid issues with for example cockpit and transmission where the apt package is not properly reinstalled on reinstall-after-remove test ...
-    local apt_deps=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); P = t['resources'].get('apt', {}).get('packages', ''); P = P.replace(',', ' ').split() if isinstance(P, str) else P; P = [p for p in P if p != '$app_id' and not p.startswith('$app_id-')]; print(' '.join(P));" <$package_path/manifest.toml)
+    local apt_deps=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); P = t['resources'].get('apt', {}).get('packages', ''); P = P.replace(',', ' ').split() if isinstance(P, str) else P; P = [p for p in P if p != '$app_id' and not p.startswith('$app_id-')]; print(' '.join(P));" < "$package_path/manifest.toml")
 
     if [[ -n "$apt_deps" ]]; then
         log_title "Preinstalling apt dependencies before creating the initial snapshot..."
 
         apt="LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get --assume-yes --quiet -o=Acquire::Retries=3 -o=Dpkg::Use-Pty=0"
-        $lxc exec $LXC_NAME -t -- /bin/bash -c "$apt update; $apt install $apt_deps" | tee -a "$full_log" >/dev/null
+        $lxc exec "$LXC_NAME" -t -- /bin/bash -c "$apt update; $apt install $apt_deps" | tee -a "$full_log" >/dev/null
     fi
 
     # Gotta generate the psql password even though apparently it's not even useful anymore these days but it otherwise trigger warnings ~_~
     if echo "$apt_deps" | grep -q postgresql; then
-        $lxc exec $LXC_NAME -t -- /bin/bash -c "yunohost tools regen-conf postgresql" | tee -a "$full_log" >/dev/null
+        $lxc exec "$LXC_NAME" -t -- /bin/bash -c "yunohost tools regen-conf postgresql" | tee -a "$full_log" >/dev/null
     fi
 }
 
@@ -59,8 +63,8 @@ _RUN_YUNOHOST_CMD() {
     log_debug "Running yunohost $1"
 
     # Copy the package into the container.
-    $lxc exec $LXC_NAME -- rm -rf /app_folder
-    $lxc file push -p -r "$package_path" $LXC_NAME/app_folder --quiet
+    $lxc exec "$LXC_NAME" -- rm -rf /app_folder
+    $lxc file push -p -r "$package_path" "$LXC_NAME/app_folder" --quiet
 
     # --output-as none is to disable the json-like output for some commands like backup create
     LXC_EXEC "yunohost --output-as none --debug $1" \
@@ -68,11 +72,11 @@ _RUN_YUNOHOST_CMD() {
         | grep --line-buffered -v 'processing action'
 
     returncode=${PIPESTATUS[0]}
-    check_witness_files && return $returncode || return 2
+    check_witness_files && return "$returncode" || return 2
 }
 
 _PREINSTALL() {
-    local preinstall_template="$(jq -r '.preinstall_template' $current_test_infos)"
+    local preinstall_template="$(jq -r '.preinstall_template' "$current_test_infos")"
 
     # Exec the pre-install instruction, if there one
     if [ -n "$preinstall_template" ]; then
@@ -93,7 +97,7 @@ _PREINSTALL() {
 }
 
 _PREUPGRADE() {
-    local preupgrade_template="$(jq -r '.preupgrade_template' $current_test_infos)"
+    local preupgrade_template="$(jq -r '.preupgrade_template' "$current_test_infos")"
     local commit=${1:-HEAD}
 
     # Exec the pre-upgrade instruction, if there one
@@ -124,7 +128,7 @@ _TEST_CONFIG_PANEL() {
 }
 
 _INSTALL_APP() {
-    local install_args="$(jq -r '.install_args' $current_test_infos)"
+    local install_args="$(jq -r '.install_args' "$current_test_infos")"
 
     # Make sure we have a trailing & because that assumption is used in some sed regex later
     [[ ${install_args: -1} == '&' ]] || install_args+="&"
@@ -133,11 +137,12 @@ _INSTALL_APP() {
     # We have default values for domain, admin and is_public, but these
     # may still be overwritten by the args ($@)
     for arg_override in "domain=$SUBDOMAIN" "admin=$TEST_USER" "is_public=1" "init_main_permission=visitors" "$@"; do
-        key="$(echo $arg_override | cut -d '=' -f 1)"
-        value="$(echo $arg_override | cut -d '=' -f 2-)"
+        key="$(echo "$arg_override" | cut -d '=' -f 1)"
+        value="$(echo "$arg_override" | cut -d '=' -f 2-)"
 
-        install_args=$(echo $install_args | sed "s@\&$key=[^&]*\&@\&$key=$value\&@")
-        if ! echo $install_args | grep -q $key; then
+        # shellcheck disable=SC2001
+        install_args=$(echo "$install_args" | sed "s@\&$key=[^&]*\&@\&$key=$value\&@")
+        if ! echo "$install_args" | grep -q "$key"; then
             install_args+="$key=$value&"
         fi
     done
@@ -147,9 +152,9 @@ _INSTALL_APP() {
 
     # Fetch and loop over all manifest arg ... NB : we need to keep this as long as there are "upgrade from packaging v1" tests
     if [[ -e $package_path/manifest.json ]]; then
-        local manifest_args="$(jq -r '.arguments.install[].name' $package_path/manifest.json)"
+        local manifest_args="$(jq -r '.arguments.install[].name' "$package_path/manifest.json")"
     else
-        local manifest_args="$(grep -oE '^\s*\[install\.\w+]' $package_path/manifest.toml | tr -d '[]' | awk -F. '{print $2}')"
+        local manifest_args="$(grep -oE '^\s*\[install\.\w+]' "$package_path/manifest.toml" | tr -d '[]' | awk -F. '{print $2}')"
     fi
 
     for ARG in $manifest_args; do
@@ -157,14 +162,15 @@ _INSTALL_APP() {
         if ! echo "$install_args" | grep -q -E "\<$ARG="; then
             # NB : we need to keep this as long as there are "upgrade from packaging v1" tests
             if [[ -e $package_path/manifest.json ]]; then
-                local default_value=$(jq -e -r --arg ARG $ARG '.arguments.install[] | select(.name==$ARG) | .default' $package_path/manifest.json)
+                local default_value=$(jq -e -r --arg ARG "$ARG" '.arguments.install[] | select(.name==$ARG) | .default' "$package_path/manifest.json")
             else
-                local default_value=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); d = t['install']['$ARG'].get('default'); assert d is not None, 'Missing default value'; print(d)" <$package_path/manifest.toml)
+                local default_value=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); d = t['install']['$ARG'].get('default'); assert d is not None, 'Missing default value'; print(d)" < "$package_path/manifest.toml")
             fi
-            [[ $? -eq 0 ]] || {
+            local ret=$?
+            if (( ret != 0 )); then
                 log_error "Missing install arg $ARG ?"
                 return 1
-            }
+            fi
             [[ ${install_args: -1} == '&' ]] || install_args+="&"
             install_args+="$ARG=$default_value"
         fi
@@ -173,9 +179,13 @@ _INSTALL_APP() {
     # Install the application in a LXC container
     log_info "Running: yunohost app install --no-remove-on-failure --force /app_folder -a \"$install_args\""
     _RUN_YUNOHOST_CMD "app install --no-remove-on-failure --force /app_folder -a \"$install_args\""
-
     local ret=$?
-    [ $ret -eq 0 ] && log_debug "Installation successful." || log_error "Installation failed."
+
+    if [ $ret -eq 0 ]; then
+        log_debug "Installation successful."
+    else
+        log_error "Installation failed."
+    fi
 
     if LXC_EXEC "su nobody -s /bin/bash -c \"test -r /var/www/$app_id || test -w /var/www/$app_id || test -x /var/www/$app_id\""; then
         log_error "It looks like anybody can read/enter /var/www/$app_id, which ain't super great from a security point of view ... Config files or other files may contain secrets or information that should in most case not be world-readable. You should remove all 'others' permissions with 'chmod o-rwx', and setup appropriate, exclusive permissions to the appropriate owner/group with chmod/chown."
@@ -188,19 +198,19 @@ _INSTALL_APP() {
 _LOAD_SNAPSHOT_OR_INSTALL_APP() {
 
     local check_path="$1"
-    local _install_type="$(path_to_install_type $check_path)"
+    local _install_type="$(path_to_install_type "$check_path")"
     local snapname="snap_${_install_type}install"
 
-    if ! LXC_SNAPSHOT_EXISTS $snapname; then
+    if ! LXC_SNAPSHOT_EXISTS "$snapname"; then
         log_warning "Expected to find an existing snapshot $snapname but it doesn't exist yet .. will attempt to create it"
         LOAD_LXC_SNAPSHOT snap0 \
             && _PREINSTALL \
             && _INSTALL_APP "path=$check_path" \
-            && CREATE_LXC_SNAPSHOT $snapname
+            && CREATE_LXC_SNAPSHOT "$snapname"
     else
         # Or uses an existing snapshot
         log_info "(Reusing existing snapshot $snapname)" \
-            && LOAD_LXC_SNAPSHOT $snapname
+            && LOAD_LXC_SNAPSHOT "$snapname"
     fi
 }
 
@@ -213,9 +223,13 @@ _REMOVE_APP() {
 
     # Remove the application from the LXC container
     _RUN_YUNOHOST_CMD "app remove $app_id"
-
     local ret=$?
-    [ "$ret" -eq 0 ] && log_debug "Remove successful." || log_error "Remove failed."
+
+    if [ "$ret" -eq 0 ]; then
+        log_debug "Remove successful."
+    else
+        log_error "Remove failed."
+    fi
     return $ret
 }
 
@@ -247,11 +261,11 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED() {
     log_small_title "Validating that the app $app_id_to_check can/can't be accessed with its URL..."
 
     if [ -e "$package_path/tests.toml" ]; then
-        local current_test_serie=$(jq -r '.test_serie' $testfile)
-        python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); print(toml.dumps(t['$current_test_serie'].get('curl_tests', {})))" <"$package_path/tests.toml" >$TEST_CONTEXT/curl_tests.toml
+        local current_test_serie=$(jq -r '.test_serie' "$testfile")
+        python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); print(toml.dumps(t['$current_test_serie'].get('curl_tests', {})))" <"$package_path/tests.toml" > "$TEST_CONTEXT/curl_tests.toml"
     # Upgrade from older versions may still be in packaging v1 without a tests.toml
     else
-        echo "" >$TEST_CONTEXT/curl_tests.toml
+        echo "" > "$TEST_CONTEXT/curl_tests.toml"
     fi
 
     DIST="$DIST" \
@@ -261,7 +275,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED() {
         PASSWORD="SomeSuperStrongPassword" \
         LXC_IP="$LXC_IP" \
         BASE_URL="https://$domain_to_check$path_to_check" \
-        python3 lib/curl_tests.py <$TEST_CONTEXT/curl_tests.toml | tee -a "$full_log"
+        python3 lib/curl_tests.py < "$TEST_CONTEXT/curl_tests.toml" | tee -a "$full_log"
 
     curl_result=${PIPESTATUS[0]}
 
@@ -272,7 +286,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED() {
             LXC_EXEC "journalctl --no-pager --no-hostname -n 30 -u $SERVICE"
         done
         LXC_EXEC "test -d /var/log/$app_id_to_check && ls -ld /var/log/$app_id_to_check && ls -l /var/log/$app_id_to_check && tail -v -n 15 /var/log/$app_id_to_check/*"
-        if grep -qi php $package_path/manifest.toml; then
+        if grep -qi php "$package_path/manifest.toml"; then
             LXC_EXEC "tail -v -n 15 /var/log/php* /var/log/nginx/error.log /var/log/nginx/$domain_to_check-error.log"
         fi
     fi
@@ -282,7 +296,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED() {
 
     fi
 
-    return $curl_result
+    return "$curl_result"
 }
 
 #=================================================
@@ -296,9 +310,9 @@ TEST_PACKAGE_LINTER() {
     start_test "Package linter"
 
     # Execute package linter and linter_result gets the return code of the package linter
-    ./package_linter/package_linter.py "$package_path" --json | tee -a "$full_log" >$current_test_results
+    ./package_linter/package_linter.py "$package_path" --json | tee -a "$full_log" > "$current_test_results"
 
-    return ${PIPESTATUS[0]}
+    return "${PIPESTATUS[0]}"
 }
 
 TEST_INSTALL() {
@@ -350,9 +364,9 @@ TEST_INSTALL() {
 
     # Create the snapshot that'll be used by other tests later
     [ "$install_type" != "private" ] \
-        && ! LXC_SNAPSHOT_EXISTS $snapname \
+        && ! LXC_SNAPSHOT_EXISTS "$snapname" \
         && log_debug "Create a snapshot after app install" \
-        && CREATE_LXC_SNAPSHOT $snapname
+        && CREATE_LXC_SNAPSHOT "$snapname"
 
     # Remove and reinstall the application
     _REMOVE_APP \
@@ -378,10 +392,10 @@ _TEST_MULTI_INSTANCE() {
         && _LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path" \
         && log_small_title "Second installation: path=$DOMAIN$check_path" \
         && _INSTALL_APP "domain=$DOMAIN" "path=$check_path" \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN "$check_path" \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $DOMAIN "$check_path" "" ${app_id}__2 \
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" \
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$DOMAIN" "$check_path" "" "${app_id}__2" \
         && _REMOVE_APP \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $DOMAIN "$check_path" "" ${app_id}__2
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$DOMAIN" "$check_path" "" "${app_id}__2"
 
     return $?
 }
@@ -393,7 +407,7 @@ TEST_UPGRADE() {
     if [ "$commit" == "" ]; then
         start_test "Upgrade from the same version"
     else
-        upgrade_name="$(jq -r '.extra.upgrade_name' $current_test_infos)"
+        upgrade_name="$(jq -r '.extra.upgrade_name' "$current_test_infos")"
         [ -n "$upgrade_name" ] || upgrade_name="commit $commit"
         start_test "Upgrade from $upgrade_name"
     fi
@@ -481,9 +495,9 @@ TEST_PORT_ALREADY_USED() {
 
     # Build a service with netcat for use this port before the app.
     echo -e "[Service]\nExecStart=/bin/netcat -l -k -p $check_port\n
-    [Install]\nWantedBy=multi-user.target" >$TEST_CONTEXT/netcat.service
+    [Install]\nWantedBy=multi-user.target" > "$TEST_CONTEXT/netcat.service"
 
-    $lxc file push $TEST_CONTEXT/netcat.service $LXC_NAME/etc/systemd/system/netcat.service
+    $lxc file push "$TEST_CONTEXT/netcat.service" "$LXC_NAME/etc/systemd/system/netcat.service"
 
     # Then start this service to block this port.
     LXC_EXEC "systemctl enable --now netcat"
@@ -492,7 +506,7 @@ TEST_PORT_ALREADY_USED() {
 
     # Install the application in a LXC container
     _INSTALL_APP "path=$check_path" "port=$check_port" \
-        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $SUBDOMAIN "$check_path"
+        && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path"
 
     return $?
 }
@@ -524,7 +538,7 @@ TEST_BACKUP_RESTORE() {
         local ret=$?
 
         # Remove the previous residual backups
-        rm -rf $TEST_CONTEXT/ynh_backups
+        rm -rf "$TEST_CONTEXT/ynh_backups"
         RUN_INSIDE_LXC rm -rf /home/yunohost.backup/archives
 
         # BACKUP
@@ -549,7 +563,7 @@ TEST_BACKUP_RESTORE() {
         }
 
         # Grab the backup archive into the LXC container, and keep a copy
-        $lxc file pull -r $LXC_NAME/home/yunohost.backup/archives $TEST_CONTEXT/ynh_backups
+        $lxc file pull -r "$LXC_NAME/home/yunohost.backup/archives" "$TEST_CONTEXT/ynh_backups"
 
         # RESTORE
         # Try the restore process in 2 times, first after removing the app, second after a restore of the container.
@@ -571,7 +585,7 @@ TEST_BACKUP_RESTORE() {
                 RUN_INSIDE_LXC rm -rf /home/yunohost.backup/archives
 
                 # Place the copy of the backup archive in the container.
-                $lxc file push -r $TEST_CONTEXT/ynh_backups/archives $LXC_NAME/home/yunohost.backup/
+                $lxc file push -r "$TEST_CONTEXT/ynh_backups/archives" "$LXC_NAME/home/yunohost.backup/"
 
                 _PREINSTALL
 
@@ -619,42 +633,42 @@ TEST_CHANGE_URL() {
     local i=0
     for i in $(seq 1 8); do
         # Same domain, root to path
-        if [ $i -eq 1 ]; then
+        if [ "$i" -eq 1 ]; then
             local new_path=/path
             local new_domain=$SUBDOMAIN
 
         # Same domain, path to path
-        elif [ $i -eq 2 ]; then
+        elif [ "$i" -eq 2 ]; then
             local new_path=/path_2
             local new_domain=$SUBDOMAIN
 
         # Same domain, path to root
-        elif [ $i -eq 3 ]; then
+        elif [ "$i" -eq 3 ]; then
             local new_path=/
             local new_domain=$SUBDOMAIN
 
         # Other domain, root to path
-        elif [ $i -eq 4 ]; then
+        elif [ "$i" -eq 4 ]; then
             local new_path=/path
             local new_domain=$DOMAIN
 
         # Other domain, same path
-        elif [ $i -eq 5 ]; then
+        elif [ "$i" -eq 5 ]; then
             local new_path=/path
             local new_domain=$SUBDOMAIN
 
         # Other domain, path to path
-        elif [ $i -eq 6 ]; then
+        elif [ "$i" -eq 6 ]; then
             local new_path=/path_2
             local new_domain=$DOMAIN
 
         # Other domain, path to root
-        elif [ $i -eq 7 ]; then
+        elif [ "$i" -eq 7 ]; then
             local new_path=/
             local new_domain=$SUBDOMAIN
 
         # Other domain, same path
-        elif [ $i -eq 8 ]; then
+        elif [ "$i" -eq 8 ]; then
             local new_path=/
             local new_domain=$DOMAIN
         fi
@@ -669,7 +683,7 @@ TEST_CHANGE_URL() {
 
         log_small_title "Changing the URL from $current_domain$current_path to $new_domain$new_path..." \
             && _RUN_YUNOHOST_CMD "app change-url $app_id -d $new_domain -p $new_path" \
-            && _VALIDATE_THAT_APP_CAN_BE_ACCESSED $new_domain $new_path
+            && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$new_domain" "$new_path"
 
         local ret=$?
         [ $ret -eq 0 ] || { return 1; }

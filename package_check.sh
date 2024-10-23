@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd $(dirname $(realpath $0))
+cd "$(dirname "$(realpath "$0")")" || exit 1
 source "./lib/common.sh"
 source "./lib/tests_coordination.sh"
 source "./lib/build_base_lxc.sh"
@@ -54,19 +54,19 @@ function parse_args() {
     # Read the array value per value
     for i in $(seq 0 $(( ${#arguments[@]} -1 )))
     do
-        if [[ "${arguments[$i]}" =~ "--branch=" ]]
+        if [[ "${arguments[i]}" =~ "--branch=" ]]
         then
             getopts_built_arg+=(-b)
-            arguments[$i]=${arguments[$i]//--branch=/}
+            arguments[i]=${arguments[i]//--branch=/}
         fi
         # For each argument in the array, reduce to short argument for getopts
-        arguments[$i]=${arguments[$i]//--interactive/-i}
-        arguments[$i]=${arguments[$i]//--dry-run/-D}
-        arguments[$i]=${arguments[$i]//--rebuild/-r}
-        arguments[$i]=${arguments[$i]//--force-stop/-s}
-        arguments[$i]=${arguments[$i]//--storage-dir/-s}
-        arguments[$i]=${arguments[$i]//--help/-h}
-        getopts_built_arg+=("${arguments[$i]}")
+        arguments[i]=${arguments[i]//--interactive/-i}
+        arguments[i]=${arguments[i]//--dry-run/-D}
+        arguments[i]=${arguments[i]//--rebuild/-r}
+        arguments[i]=${arguments[i]//--force-stop/-s}
+        arguments[i]=${arguments[i]//--storage-dir/-s}
+        arguments[i]=${arguments[i]//--help/-h}
+        getopts_built_arg+=("${arguments[i]}")
     done
 
     # Read and parse all the arguments
@@ -136,7 +136,7 @@ function parse_args() {
                 shift_value=1
             fi
             # Shift the parameter and its argument
-            shift $shift_value
+            shift "$shift_value"
         done
     }
 
@@ -162,9 +162,9 @@ function cleanup()
 
 if [[ $force_stop == 1 ]]
 then
-    package_check_pid="$(cat $lock_file 2> /dev/null | cut -d: -f3)"
+    package_check_pid="$(cut -d: -f3 "$lock_file")"
     if [ -n "$package_check_pid" ]; then
-        kill -15 $package_check_pid
+        kill -15 "$package_check_pid"
     fi
     cleanup
     exit 0
@@ -175,12 +175,11 @@ fi
 #=================================================
 
 # If the lock file exist and corresponding process still exists
-if test -e "$lock_file" && ps --pid "$(cat $lock_file | cut -d: -f3)" | grep --quiet "$(cat $lock_file | cut -d: -f3)"
+if test -e "$lock_file" && ps --pid "$(cut -d: -f3 "$lock_file")" | grep --quiet "$(cut -d: -f3 "$lock_file")"
 then
     if [ $interactive -eq 1 ]; then
         echo "The lock file $lock_file already exists."
-        echo -n "Do you want to continue anyway? (y/n) :"
-        read answer
+        read -r -p "Do you want to continue anyway? (y/n) : " answer
     else
         log_critical "The lock file $lock_file already exists. Package check won't continue."
     fi
@@ -221,13 +220,14 @@ fi
 self_upgrade
 fetch_or_upgrade_package_linter
 
-if [[ -n "${TEST_CONTEXT:-}" ]]; then
-    readonly TEST_CONTEXT="$TEST_CONTEXT"
-elif [[ -n "$storage_dir" ]]; then
-    readonly TEST_CONTEXT=$(mktemp -d "$storage_dir/package_check.XXXXXX")
-else
-    readonly TEST_CONTEXT=$(mktemp -d "/tmp/package_check.XXXXXX")
+if [[ -z "${TEST_CONTEXT:-}" ]]; then
+    if [[ -n "$storage_dir" ]]; then
+        TEST_CONTEXT=$(mktemp -d "$storage_dir/package_check.XXXXXX")
+    else
+        TEST_CONTEXT=$(mktemp -d "/tmp/package_check.XXXXXX")
+    fi
 fi
+readonly TEST_CONTEXT
 
 fetch_package_to_test "$path_to_package_to_test"
 run_all_tests
