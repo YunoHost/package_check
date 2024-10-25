@@ -1,40 +1,45 @@
+#!/bin/bash
 
 set_witness_files () {
     # Create files to check if the remove script does not remove them accidentally
     log_debug "Create witness files..."
 
     create_witness_file () {
-        [ "$2" = "file" ] && local action="touch" || local action="mkdir -p"
-        RUN_INSIDE_LXC timeout --signal TERM 10 $action $1
+        case "$1" in
+            file)       local action=(touch) ;;
+            directory)  local action=(mkdir -p) ;;
+            *) exit 1 ;;
+        esac
+        RUN_INSIDE_LXC timeout --signal TERM 10 "${action[@]}" "$2"
     }
 
     # Nginx conf
-    create_witness_file "/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf" file
-    create_witness_file "/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf" file
+    create_witness_file file "/etc/nginx/conf.d/$DOMAIN.d/witnessfile.conf"
+    create_witness_file file "/etc/nginx/conf.d/$SUBDOMAIN.d/witnessfile.conf"
 
     # /etc
-    create_witness_file "/etc/witnessfile" file
+    create_witness_file file "/etc/witnessfile"
 
     # /opt directory
-    create_witness_file "/opt/witnessdir" directory
+    create_witness_file directory "/opt/witnessdir"
 
     # /var/www directory
-    create_witness_file "/var/www/witnessdir" directory
+    create_witness_file directory "/var/www/witnessdir"
 
     # /home/yunohost.app/
-    create_witness_file "/home/yunohost.app/witnessdir" directory
+    create_witness_file directory "/home/yunohost.app/witnessdir"
 
     # /var/log
-    create_witness_file "/var/log/witnessfile" file
+    create_witness_file file "/var/log/witnessfile"
 
     # Config fpm
-    #create_witness_file "/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf" file
+    #create_witness_file file "/etc/php/$DEFAULT_PHP_VERSION/fpm/pool.d/witnessfile.conf"
 
     # Config logrotate
-    create_witness_file "/etc/logrotate.d/witnessfile" file
+    create_witness_file file "/etc/logrotate.d/witnessfile"
 
     # Config systemd
-    create_witness_file "/etc/systemd/system/witnessfile.service" file
+    create_witness_file file "/etc/systemd/system/witnessfile.service"
 
     # Database
     #RUN_INSIDE_LXC mysqladmin --wait status > /dev/null 2>&1

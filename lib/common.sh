@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034,SC2155
 
 # YunoHost install parameters
 YUNO_PWD="admin"
@@ -6,6 +7,7 @@ DOMAIN="domain.tld"
 SUBDOMAIN="sub.$DOMAIN"
 TEST_USER="package_checker"
 
+# shellcheck disable=SC1091
 [[ -e "./config" ]] && source "./config"
 
 ARCH=${ARCH:-amd64}
@@ -32,6 +34,7 @@ assert_we_are_connected_to_the_internets() {
 }
 
 assert_we_have_all_dependencies() {
+    : "${lxc:=}"  # Initialize lxc to an invalid value if not already defined
     deps=("lynx" "jq" "python3" "pip3")
     if [[ "${lxc}" == "incus" ]]; then
         deps+=(incus)
@@ -40,7 +43,7 @@ assert_we_have_all_dependencies() {
     fi
 
     for dep in "${deps[@]}"; do
-        which $dep 2>&1 > /dev/null || log_critical "Please install $dep"
+        which "$dep" > /dev/null 2>&1 || log_critical "Please install $dep"
     done
 }
 
@@ -53,8 +56,9 @@ function check_lxd_setup()
     # Check that we'll be able to use lxc/lxd using sudo (for which the PATH is defined in /etc/sudoers and probably doesn't include /snap/bin)
     if [[ ! -e /usr/bin/lxc ]] && [[ ! -e /usr/bin/lxd ]]
     then
-        [[ -e /usr/local/bin/lxc ]] && [[ -e /usr/local/bin/lxd ]] \
-            || log_critical "You might want to add lxc and lxd inside /usr/local/bin so that there's no tricky PATH issue with sudo. If you installed lxd/lxc with snapd, this should do the trick: sudo ln -s /snap/bin/lxc /usr/local/bin/lxc && sudo ln -s /snap/bin/lxd /usr/local/bin/lxd"
+        if [[ ! -e /usr/local/bin/lxc ]] && [[ ! -e /usr/local/bin/lxd ]]; then
+            log_critical "You might want to add lxc and lxd inside /usr/local/bin so that there's no tricky PATH issue with sudo. If you installed lxd/lxc with snapd, this should do the trick: sudo ln -s /snap/bin/lxc /usr/local/bin/lxc && sudo ln -s /snap/bin/lxd /usr/local/bin/lxd"
+        fi
     fi
 
     ip a | grep -q lxdbr0 \
@@ -104,7 +108,7 @@ function check_lxc_setup()
 
 readonly NORMAL=$(printf '\033[0m')
 readonly BOLD=$(printf '\033[1m')
-readonly faint=$(printf '\033[2m')
+# readonly faint=$(printf '\033[2m')
 readonly UNDERLINE=$(printf '\033[4m')
 readonly NEGATIVE=$(printf '\033[7m')
 readonly RED=$(printf '\033[31m')
@@ -188,32 +192,34 @@ stop_timer () {
     # $1 = Type of message
     msg_type="${1:-}"
 
-    local finishtime=$(date +%s)
+    local finishtime
+    finishtime=$(date +%s)
     # Calculate the gap between the starting and the ending of the timer
-    local elapsedtime=$(echo $(( $finishtime - $starttime )))
+    local elapsedtime=$(( finishtime - starttime ))
     # Extract the number of hour
-    local hours=$(echo $(( $elapsedtime / 3600 )))
-    local elapsedtime=$(echo $(( $elapsedtime - ( 3600 * $hours) )))
+    local hours=$(( elapsedtime / 3600 ))
+    local elapsedtime=$(( elapsedtime - ( 3600 * hours) ))
     # Minutes
-    local minutes=$(echo $(( $elapsedtime / 60 )))
+    local minutes=$(( elapsedtime / 60 ))
     # And seconds
-    local seconds=$(echo $(( $elapsedtime - ( 60 * $minutes) )))
+    local seconds=$(( elapsedtime - ( 60 * minutes) ))
 
     local phours=""
     local pminutes=""
     local pseconds=""
 
     # Avoid null values
-    [ $hours -eq 0 ] || phours="$hours hour"
-    [ $minutes -eq 0 ] || pminutes="$minutes minute"
-    [ $seconds -eq 0 ] || pseconds="$seconds second"
+    [ "$hours" -eq 0 ] || phours="$hours hour"
+    [ "$minutes" -eq 0 ] || pminutes="$minutes minute"
+    [ "$seconds" -eq 0 ] || pseconds="$seconds second"
 
     # Add a 's' for plural values
-    [ $hours -eq 1 ] && phours="${phours}, " || test -z "$phours" || phours="${phours}s, "
-    [ $minutes -eq 1 ] && pminutes="${pminutes}, " || test -z "$pminutes" || pminutes="${pminutes}s, "
-    [ $seconds -gt 1 ] && pseconds="${pseconds}s" || pseconds="0s"
+    [ "$hours" -eq 1 ] && phours="${phours}, " || test -z "$phours" || phours="${phours}s, "
+    [ "$minutes" -eq 1 ] && pminutes="${pminutes}, " || test -z "$pminutes" || pminutes="${pminutes}s, "
+    [ "$seconds" -gt 1 ] && pseconds="${pseconds}s" || pseconds="0s"
 
-    local time="${phours}${pminutes}${pseconds} ($(date '+%T %Z' -u))"
+    local time
+    time="${phours}${pminutes}${pseconds} ($(date '+%T %Z' -u))"
     if [ "$msg_type" = "one_test" ]; then
         log_info "Working time for this test: $time"
     elif [ "$msg_type" = "all_tests" ]; then
@@ -259,6 +265,7 @@ metrics_start() {
 
 metrics_stop() {
     kill "$metrics_background_thread_pid"
+    # shellcheck disable=SC1091
     source "$TEST_CONTEXT/metrics_vars"
     ram_usage_end=$(get_ram_usage)
     disk_usage_end=$(get_disk_usage)
@@ -291,6 +298,7 @@ function self_upgrade()
 
     log_info "Upgrading package_check..."
     git reset --hard origin/master --quiet
+    # shellcheck disable=SC2154
     exec "./package_check.sh" "${arguments[@]}"
 }
 
@@ -351,14 +359,14 @@ function fetch_package_to_test() {
         log_info " on branch ${gitbranch}"
 
         # Clone the repository
-        git clone --quiet $path_to_package_to_test -b "$gitbranch" "$package_path"
+        git clone --quiet "$path_to_package_to_test" -b "$gitbranch" "$package_path"
 
         if [[ ! -e "$package_path" ]]
         then
             log_critical "Failed to git clone the repo / branch ?"
         fi
 
-        log_info " (commit $(git -C $package_path rev-parse HEAD))"
+        log_info " (commit $(git -C "$package_path" rev-parse HEAD))"
 
         # If it's a local directory
     else
@@ -366,7 +374,7 @@ function fetch_package_to_test() {
         cp -a "$path_to_package_to_test" "$package_path"
     fi
 
-    git -C $package_path rev-parse HEAD > $TEST_CONTEXT/commit
+    git -C "$package_path" rev-parse HEAD > "$TEST_CONTEXT/commit"
 
     # Check if the package directory is really here.
     if [ ! -d "$package_path" ]; then
