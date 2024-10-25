@@ -223,3 +223,18 @@ Note that you can run `python3 lib/parse_tests_toml.py /path/to/your/app/ | jq` 
 ##### Test ids
 
 The test IDs to be used in only/exclude statements are: `install.root`, `install.subdir`, `install.nourl`, `install.multi`, `backup_restore`, `upgrade`, `upgrade.someCommitId` `change_url`
+
+
+##### Curl tests
+
+Several curl tests can be defined under the `[suite.curl_tests]` block. Each curl test must have a unique ID to sort of "name" the test (for example `home`, `home_logged_in`, `dash`, `admin`, `file`, `caldav`, ...)
+
+For each curl test, you may define the following properties:
+- `path`: the app endpoint to test, relative to the defaults to `/`. Can be for example `/foo/bar`, `/assets/logo.png`, `/api/whatever.json`, ...
+- `logged_on_sso`: `true` or `false` wether the test is performed being logged in on the SSO or not (default: `false`)
+- `expect_title`: some text expected to be found in the HTML page's `<title>` (none/ignored by default)
+- `expect_content`: some text expected to be found in the HTTP payload
+- `expect_return_code`: integer, the expected HTTP return code (default `200`)
+- `auto_test_assets`: wether or not to test the first CSS and first JS asset found on the HTML page (default `false` except when the app provides no curl test and use the default mode)
+- `base_url`: defaults to the app's install URL (`$domain$path`). Can be changed to something like `https://__DOMAIN__` combined with `path` set to for example `/.well-known/foobar`, useful to test URLs which may be on a different domain or always at the domain root even when the app is on a subpath (such as well-known endpoints)
+
