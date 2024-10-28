@@ -164,9 +164,13 @@ LXC_EXEC () {
     start_timer
 
     # Execute the command given in argument in the container and log its results.
-    : "${full_log:=}"
+    logfiles=("${full_log:-}")
+    if [[ -n "${current_test_log:-}" ]]; then
+        logfiles+=("$current_test_log")
+    fi
+
     : "${current_test_log:=}"
-    $lxc exec "$LXC_NAME" --env PACKAGE_CHECK_EXEC=1 -t -- /bin/bash -c "$cmd" | tee -a "$full_log" "$current_test_log"
+    $lxc exec "$LXC_NAME" --env PACKAGE_CHECK_EXEC=1 -t -- /bin/bash -c "$cmd" | tee -a "${logfiles[@]}"
 
     # Store the return code of the command
     local returncode=${PIPESTATUS[0]}
