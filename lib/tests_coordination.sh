@@ -214,7 +214,7 @@ start_test() {
         && current_test_serie="($current_test_serie) " \
         || current_test_serie=""
 
-    total_number_of_test=$(find "$TEST_CONTEXT/tests" -name "*.json" -mindepth 1 -maxdepth 1 | wc -l)
+    total_number_of_test=$(find "$TEST_CONTEXT/tests" -mindepth 1 -maxdepth 1 -name "*.json" | wc -l)
 
     log_title " [Test $current_test_number/$total_number_of_test] $current_test_serie$1"
 }
