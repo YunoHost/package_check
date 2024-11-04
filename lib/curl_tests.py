@@ -141,12 +141,13 @@ def test(
     else:
         cookies = None
 
+    full_url = base_url + path
     code = None
     retried = 0
     while code is None or code in {502, 503, 504}:
         time.sleep(retried * 5)
         code, content, effective_url = curl(
-            base_url + path, post=post, use_cookies=cookies
+            full_url, post=post, use_cookies=cookies
         )
         retried += 1
         if retried > 3:
@@ -240,7 +241,7 @@ def test(
             assets.append((domain + asset, asset_code))
 
     return {
-        "url": f"{base_url}{path}",
+        "url": full_url,
         "effective_url": effective_url,
         "code": code,
         "title": title,
