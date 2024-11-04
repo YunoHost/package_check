@@ -146,9 +146,7 @@ def test(
     retried = 0
     while code is None or code in {502, 503, 504}:
         time.sleep(retried * 5)
-        code, content, effective_url = curl(
-            full_url, post=post, use_cookies=cookies
-        )
+        code, content, effective_url = curl(full_url, post=post, use_cookies=cookies)
         retried += 1
         if retried > 3:
             break
@@ -165,8 +163,8 @@ def test(
     content = content.get_text().strip() if content else ""
     content = re.sub(r"[\t\n\s]{3,}", "\n\n", content)
 
-    base_tag = html.find('base')
-    base = base_tag['href'] if base_tag else ''
+    base_tag = html.find("base")
+    base = base_tag["href"] if base_tag else ""
 
     errors = []
     if expect_effective_url is None and "/yunohost/sso" in effective_url:
