@@ -56,18 +56,17 @@ DEFAULTS = {
 
 
 def curl(
-    base_url,
-    path,
+    full_url,
     method="GET",
     use_cookies=None,
     save_cookies=None,
     post=None,
     referer=None,
 ):
-    domain = base_url.replace("https://", "").replace("http://", "").split("/")[0]
+    domain = full_url.replace("https://", "").replace("http://", "").split("/")[0]
 
     c = pycurl.Curl()  # curl
-    c.setopt(c.URL, f"{base_url}{path}")  # https://domain.tld/foo/bar
+    c.setopt(c.URL, full_url)  # https://domain.tld/foo/bar
     c.setopt(c.FOLLOWLOCATION, True)  # --location
     c.setopt(c.SSL_VERIFYPEER, False)  # --insecure
     c.setopt(
@@ -122,8 +121,7 @@ def test(
 
         if DIST == "bullseye":
             code, content, log_url = curl(
-                f"https://{DOMAIN}/yunohost/sso",
-                "/",
+                f"https://{DOMAIN}/yunohost/sso/",
                 save_cookies=cookies,
                 post={"user": USER, "password": PASSWORD},
                 referer=f"https://{DOMAIN}/yunohost/sso/",
@@ -133,8 +131,7 @@ def test(
             ), f"Failed to log in: got code {code} or cookie file was empty?"
         else:
             code, content, _ = curl(
-                f"https://{domain}/yunohost/portalapi",
-                "/login",
+                f"https://{domain}/yunohost/portalapi/login",
                 save_cookies=cookies,
                 post={"credentials": f"{USER}:{PASSWORD}"},
             )
@@ -149,7 +146,7 @@ def test(
     while code is None or code in {502, 503, 504}:
         time.sleep(retried * 5)
         code, content, effective_url = curl(
-            base_url, path, post=post, use_cookies=cookies
+            base_url + path, post=post, use_cookies=cookies
         )
         retried += 1
         if retried > 3:
@@ -234,7 +231,7 @@ def test(
             if not asset.startswith("/"):
                 asset = "/" + asset
             asset_code, _, effective_asset_url = curl(
-                f"https://{domain}", asset, use_cookies=cookies
+                f"https://{domain}{asset}", use_cookies=cookies
             )
             if asset_code != 200:
                 errors.append(
