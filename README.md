@@ -47,7 +47,7 @@ cd package_check
 ./package_check.sh your_app_ynh
 ```
 
-You can select the debian version and or the Yunohost Branch by adding a `config` file in `package_check` folder
+You can select the architecture, the debian version and/or the Yunohost Branch by adding a `config` file in `package_check` folder
 
 ````bash
 ARCH=amd64
