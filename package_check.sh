@@ -9,10 +9,7 @@ print_help() {
     cat << EOF
  Usage: package_check.sh [OPTION]... PACKAGE_TO_CHECK
 
-    -b, --branch=BRANCH     Specify a branch to check.
-    -a, --arch=ARCH
-    -d, --dist=DIST
-    -y, --ynh-branch=BRANCH
+    -b, --branch=BRANCH         Specify a branch to check.
     -D, --dry-run               Show a JSON representing which tests are going to be ran (meant for debugging)
     -i, --interactive           Wait for the user to continue before each remove
     -e, --interactive-on-errors Wait for the user to continue on errors
@@ -25,6 +22,8 @@ print_help() {
     -h, --help                  Display this help
 
     Pass YNHDEV_BACKEND=incus|lxd to use a specific LXD-compatible backend.
+    Pass DIST=bullseye|bookworm to use a specific distribution version
+    Pass YNH_BRANCH=stable|unstable to use a specific Yunohost branch
 
 EOF
 exit 0
