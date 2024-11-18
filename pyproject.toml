@@ -1,0 +1,35 @@
+[project]
+name = "package_check"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "Félix Piédallu", email = "felix@piedallu.me"},
+]
+dependencies = [
+    "pylxd>=2.3,<3.0",
+    "pingparsing>=1.4,<2.0",
+    "psutil>=6.0,<7.0",
+    "timeloop>=1.0,<2.0",
+    "gitpython>=3.1,<4.0",
+    "toml>=0.10.2,<1.0",
+]
+requires-python = ">=3.11"
+readme = "README.md"
+license = {text = "GPLv3"}
+
+[project.scripts]
+package_check = "package_check.package_check:main"
+package_check_rebuild_lxc = "package_check.package_check:rebuild_lxc"
+
+[tool.pdm]
+distribution = false
+
+# [tool.pdm.scripts]
+# package_check = "python src.package_check:main"
+# {call = "src.package_check:main"}
+
+[tool.pdm.dev-dependencies]
+test = [
+    "types-toml>=0.10.8.20240310",
+    "types-psutil>=5.9.5.20240205",
+]
