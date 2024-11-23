@@ -164,7 +164,7 @@ def test(
     content = re.sub(r"[\t\n\s]{3,}", "\n\n", content)
 
     base_tag = html.find("base")
-    base = base_tag["href"] if base_tag else ""
+    base = base_tag.get("href", "") if base_tag else ""
 
     errors = []
     if expect_effective_url is None and "/yunohost/sso" in effective_url:
