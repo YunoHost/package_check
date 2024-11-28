@@ -104,14 +104,20 @@ def curl(
     return (return_code, return_content, effective_url)
 
 def validate_and_normalize(domain, base, uri):
+    # parse URI as is
     parsed = urlparse(uri)
+    # no scheme = relative link, absolutize it anchored on domain
     if parsed.scheme == "":
         parsed = urlparse(f"https://{domain}/" + uri)
     if parsed.netloc != "" and parsed.netloc != domain:
+        # third-party hosting, not good for CI
         return False, ""
+    # prepend base path to path iff base is non-/
     if base != "" and base != "/":
         parsed = parsed._replace(path=f"{base}/{parsed.path}")
-    return True, parsed._replace(netloc=domain)._replace(scheme="https").geturl()
+
+    # domain, scheme and path should have been updated at this point
+    return True, parsed.geturl()
 
 def test(
     base_url,
