@@ -103,6 +103,15 @@ def curl(
 
     return (return_code, return_content, effective_url)
 
+def validate_and_normalize(domain, base, uri):
+    parsed = urlparse(uri)
+    if parsed.scheme == "":
+        parsed = urlparse(f"https://{domain}/" + uri)
+    if parsed.netloc != "" and parsed.netloc != domain:
+        return False, ""
+    if base != "" and base != "/":
+        parsed = parsed._replace(path=f"{base}/{parsed.path}")
+    return True, parsed._replace(netloc=domain)._replace(scheme="https").geturl()
 
 def test(
     base_url,
@@ -162,6 +171,8 @@ def test(
     content = html.find("body")
     content = content.get_text().strip() if content else ""
     content = re.sub(r"[\t\n\s]{3,}", "\n\n", content)
+    base_tag = html.find("base")
+    base = base_tag.get("href", "") if base_tag else ""
 
     errors = []
     if expect_effective_url is None and "/yunohost/sso" in effective_url:
@@ -199,11 +210,11 @@ def test(
         ]
         if stylesheets:
             for sheet in stylesheets:
-                parsed = urlparse(sheet)
-                if parsed.netloc != "" and parsed.netloc != domain:
+                (valid, uri) = validate_and_normalize(domain, base, sheet)
+                if not valid:
                     continue
                 assets_to_check.append(
-                    parsed._replace(netloc=domain)._replace(scheme="https").geturl()
+                    uri
                 )
                 break
 
@@ -217,11 +228,11 @@ def test(
         ]
         if js:
             for js in js:
-                parsed = urlparse(js)
-                if parsed.netloc != "" and parsed.netloc != domain:
+                (valid, uri) = validate_and_normalize(domain, base, js)
+                if not valid:
                     continue
                 assets_to_check.append(
-                    parsed._replace(netloc=domain)._replace(scheme="https").geturl()
+                    uri
                 )
                 break
 
