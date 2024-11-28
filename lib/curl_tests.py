@@ -202,7 +202,9 @@ def test(
                 parsed = urlparse(sheet)
                 if parsed.netloc != "" and parsed.netloc != domain:
                     continue
-                assets_to_check.append(parsed._replace(netloc=domain)._replace(scheme="https").geturl())
+                assets_to_check.append(
+                    parsed._replace(netloc=domain)._replace(scheme="https").geturl()
+                )
                 break
 
         js = html.find_all("script", src=True)
@@ -218,7 +220,9 @@ def test(
                 parsed = urlparse(js)
                 if parsed.netloc != "" and parsed.netloc != domain:
                     continue
-                assets_to_check.append(parsed._replace(netloc=domain)._replace(scheme="https").geturl())
+                assets_to_check.append(
+                    parsed._replace(netloc=domain)._replace(scheme="https").geturl()
+                )
                 break
 
         if not assets_to_check:
