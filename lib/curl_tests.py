@@ -6,7 +6,7 @@ import re
 import tempfile
 import pycurl
 from bs4 import BeautifulSoup
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urlencode, urlparse
 from io import BytesIO
 
 DOMAIN = os.environ["DOMAIN"]
@@ -163,9 +163,6 @@ def test(
     content = content.get_text().strip() if content else ""
     content = re.sub(r"[\t\n\s]{3,}", "\n\n", content)
 
-    base_tag = html.find("base")
-    base = base_tag.get("href", "") if base_tag else ""
-
     errors = []
     if expect_effective_url is None and "/yunohost/sso" in effective_url:
         errors.append(
@@ -194,45 +191,41 @@ def test(
         assets_to_check = []
         stylesheets = html.find_all("link", rel="stylesheet", href=True)
         stylesheets = [
-            s
+            s["href"]
             for s in stylesheets
             if "ynh_portal" not in s["href"]
             and "ynhtheme" not in s["href"]
             and "ynh_overlay" not in s["href"]
         ]
         if stylesheets:
-            assets_to_check.append(stylesheets[0]["href"])
+            for sheet in stylesheets:
+                parsed = urlparse(sheet)
+                if parsed.netloc != "" and parsed.netloc != domain:
+                    continue
+                assets_to_check.append(parsed._replace(netloc=domain)._replace(scheme="https").geturl())
+                break
+
         js = html.find_all("script", src=True)
         js = [
-            s
+            s["src"]
             for s in js
             if "ynh_portal" not in s["src"]
             and "ynhtheme" not in s["src"]
             and "ynh_overlay" not in s["src"]
         ]
         if js:
-            assets_to_check.append(js[0]["src"])
+            for js in js:
+                parsed = urlparse(js)
+                if parsed.netloc != "" and parsed.netloc != domain:
+                    continue
+                assets_to_check.append(parsed._replace(netloc=domain)._replace(scheme="https").geturl())
+                break
+
         if not assets_to_check:
             print(
                 "\033[1m\033[93mWARN\033[0m auto_test_assets set to true, but no js/css asset found in this page"
             )
-        for asset in assets_to_check:
-            # FIXME : this is pretty clumsy, should probably be replaced with a proper URL parsing to serparate domains etc...
-            if asset.startswith(f"//"):
-                asset = f"https:{asset}"
-            if asset.startswith(f"https://") or asset.startswith(f"http://"):
-                if asset.startswith(f"https://{domain}"):
-                    asset = asset.replace(f"https://{domain}", "")
-                else:
-                    print(
-                        f"\033[1m\033[93mWARN\033[0m Found asset '{asset}' which seems to be hosted on a third party, external website ... Not super great for privacy etc... ?"
-                    )
-                    continue
-            elif asset.startswith(f"{domain}/"):
-                asset = asset.replace(f"{domain}/", "")
-            if not asset.startswith("/"):
-                asset = urljoin(base + "/", asset)
-            resolved_asset_url = urljoin(f"https://{domain}", asset)
+        for resolved_asset_url in assets_to_check:
             asset_code, _, effective_asset_url = curl(
                 resolved_asset_url, use_cookies=cookies
             )
