@@ -16,3 +16,5 @@ curl_print
 .*.schema.json
 lib/__pycache__/
 package_linter/
+
+.venv
