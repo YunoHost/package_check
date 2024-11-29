@@ -6,7 +6,7 @@ import re
 import tempfile
 import pycurl
 from bs4 import BeautifulSoup
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlencode, urljoin, urlparse
 from io import BytesIO
 
 DOMAIN = os.environ["DOMAIN"]
@@ -103,6 +103,26 @@ def curl(
 
     return (return_code, return_content, effective_url)
 
+def validate_and_normalize(effective_url, base, uri):
+    parsed_domain = urlparse(effective_url)
+
+    # sometimes assets point to //asset/somethig.css
+    # when parsed 'asset' becomes a domain, strip extra slashes
+    while uri.startswith("//"):
+        uri = uri[1:]
+
+    # now, first join base on top of effective_url
+    effective_url = urljoin(effective_url, base)
+    # then potentially relative URI
+    effective_url = urljoin(effective_url, uri)
+
+    # at this point effective_url should contain absolute path to linked content
+    parsed = urlparse(effective_url)
+    if parsed.netloc != parsed_domain.netloc:
+        # third-party hosting, not good for CI
+        return False, ""
+
+    return True, parsed.geturl()
 
 def test(
     base_url,
@@ -162,6 +182,8 @@ def test(
     content = html.find("body")
     content = content.get_text().strip() if content else ""
     content = re.sub(r"[\t\n\s]{3,}", "\n\n", content)
+    base_tag = html.find("base")
+    base = base_tag.get("href", "") if base_tag else ""
 
     errors = []
     if expect_effective_url is None and "/yunohost/sso" in effective_url:
@@ -199,11 +221,11 @@ def test(
         ]
         if stylesheets:
             for sheet in stylesheets:
-                parsed = urlparse(sheet)
-                if parsed.netloc != "" and parsed.netloc != domain:
+                (valid, uri) = validate_and_normalize(effective_url, base, sheet)
+                if not valid:
                     continue
                 assets_to_check.append(
-                    parsed._replace(netloc=domain)._replace(scheme="https").geturl()
+                    uri
                 )
                 break
 
@@ -217,11 +239,11 @@ def test(
         ]
         if js:
             for js in js:
-                parsed = urlparse(js)
-                if parsed.netloc != "" and parsed.netloc != domain:
+                (valid, uri) = validate_and_normalize(effective_url, base, js)
+                if not valid:
                     continue
                 assets_to_check.append(
-                    parsed._replace(netloc=domain)._replace(scheme="https").geturl()
+                    uri
                 )
                 break
 
