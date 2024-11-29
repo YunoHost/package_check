@@ -103,21 +103,25 @@ def curl(
 
     return (return_code, return_content, effective_url)
 
-def validate_and_normalize(domain, base, uri):
-    parsed_domain = urlparse(domain)
+def validate_and_normalize(effective_url, base, uri):
+    parsed_domain = urlparse(effective_url)
 
+    # sometimes assets point to //asset/somethig.css
+    # when parsed 'asset' becomes a domain, strip extra slashes
     while uri.startswith("//"):
         uri = uri[1:]
-    # parse URI as is
-    domain = urljoin(domain, base)
-    domain = urljoin(domain, uri)
 
-    parsed = urlparse(domain)
+    # now, first join base on top of effective_url
+    effective_url = urljoin(effective_url, base)
+    # then potentially relative URI
+    effective_url = urljoin(effective_url, uri)
+
+    # at this point effective_url should contain absolute path to linked content
+    parsed = urlparse(effective_url)
     if parsed.netloc != parsed_domain.netloc:
         # third-party hosting, not good for CI
         return False, ""
 
-    # domain, scheme and path should have been updated at this point
     return True, parsed.geturl()
 
 def test(
