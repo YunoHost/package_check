@@ -103,6 +103,7 @@ def curl(
 
     return (return_code, return_content, effective_url)
 
+
 def validate_and_normalize(effective_url, base, uri):
     parsed_domain = urlparse(effective_url)
 
@@ -123,6 +124,7 @@ def validate_and_normalize(effective_url, base, uri):
         return False, ""
 
     return True, parsed.geturl()
+
 
 def test(
     base_url,
@@ -224,9 +226,7 @@ def test(
                 (valid, uri) = validate_and_normalize(effective_url, base, sheet)
                 if not valid:
                     continue
-                assets_to_check.append(
-                    uri
-                )
+                assets_to_check.append(uri)
                 break
 
         js = html.find_all("script", src=True)
@@ -242,9 +242,7 @@ def test(
                 (valid, uri) = validate_and_normalize(effective_url, base, js)
                 if not valid:
                     continue
-                assets_to_check.append(
-                    uri
-                )
+                assets_to_check.append(uri)
                 break
 
         if not assets_to_check:
