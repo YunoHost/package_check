@@ -6,7 +6,7 @@ import re
 import tempfile
 import pycurl
 from bs4 import BeautifulSoup
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlencode, urljoin, urlparse
 from io import BytesIO
 
 DOMAIN = os.environ["DOMAIN"]
@@ -104,17 +104,18 @@ def curl(
     return (return_code, return_content, effective_url)
 
 def validate_and_normalize(domain, base, uri):
+    parsed_domain = urlparse(domain)
+
+    while uri.startswith("//"):
+        uri = uri[1:]
     # parse URI as is
-    parsed = urlparse(uri)
-    # no scheme = relative link, absolutize it anchored on domain
-    if parsed.scheme == "":
-        parsed = urlparse(f"https://{domain}/" + uri)
-    if parsed.netloc != "" and parsed.netloc != domain:
+    domain = urljoin(domain, base)
+    domain = urljoin(domain, uri)
+
+    parsed = urlparse(domain)
+    if parsed.netloc != parsed_domain.netloc:
         # third-party hosting, not good for CI
         return False, ""
-    # prepend base path to path iff base is non-/
-    if base != "" and base != "/":
-        parsed = parsed._replace(path=f"{base}/{parsed.path}")
 
     # domain, scheme and path should have been updated at this point
     return True, parsed.geturl()
@@ -216,7 +217,7 @@ def test(
         ]
         if stylesheets:
             for sheet in stylesheets:
-                (valid, uri) = validate_and_normalize(domain, base, sheet)
+                (valid, uri) = validate_and_normalize(effective_url, base, sheet)
                 if not valid:
                     continue
                 assets_to_check.append(
@@ -234,7 +235,7 @@ def test(
         ]
         if js:
             for js in js:
-                (valid, uri) = validate_and_normalize(domain, base, js)
+                (valid, uri) = validate_and_normalize(effective_url, base, js)
                 if not valid:
                     continue
                 assets_to_check.append(
