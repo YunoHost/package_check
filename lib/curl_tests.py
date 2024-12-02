@@ -107,11 +107,6 @@ def curl(
 def validate_and_normalize(effective_url, base, uri):
     parsed_domain = urlparse(effective_url)
 
-    # sometimes assets point to //asset/somethig.css
-    # when parsed 'asset' becomes a domain, strip extra slashes
-    while uri.startswith("//"):
-        uri = uri[1:]
-
     # now, first join base on top of effective_url
     effective_url = urljoin(effective_url, base)
     # then potentially relative URI
