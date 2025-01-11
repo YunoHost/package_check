@@ -182,6 +182,13 @@ def test(
     base_tag = html.find("base")
     base = base_tag.get("href", "") if base_tag else ""
 
+    def code_was_expected(code: int) -> bool:
+        if isinstance(expect_return_code, int):
+            return code == expect_return_code
+        if isinstance(expect_return_code, list):
+            return code in expect_return_code
+        raise ValueError("expect_return_code should be list or int")
+
     errors = []
     if expect_effective_url is None and "/yunohost/sso" in effective_url:
         errors.append(
@@ -191,7 +198,7 @@ def test(
         errors.append(
             f"Ended up on URL '{effective_url}', but was expecting '{expect_effective_url}'"
         )
-    if expect_return_code and code != expect_return_code:
+    if not code_was_expected(code):
         errors.append(f"Got return code {code}, but was expecting {expect_return_code}")
     if expect_title is None and "Welcome to nginx" in title:
         errors.append("The request ended up on the default nginx page?")
@@ -206,7 +213,7 @@ def test(
 
     assets = []
     # Auto-check assets - though skip this if we have an unexpected return code for the main page, because there's very likely no asset to find
-    if auto_test_assets and code == expect_return_code:
+    if auto_test_assets and code_was_expected(code):
         assets_to_check = []
         stylesheets = html.find_all("link", rel="stylesheet", href=True)
         stylesheets = [
