@@ -289,15 +289,16 @@ function self_upgrade()
     # We only self-upgrade if we're in a git repo on master branch
     # (which should correspond to production contexts)
     [[ -d ".git" ]] || return
-    [[ $(git rev-parse --abbrev-ref HEAD) == "master" ]] || return
+    [[ $(git rev-parse --abbrev-ref HEAD) == "master" ]] || \
+    [[ $(git rev-parse --abbrev-ref HEAD) == "main" ]] || return
 
     git fetch origin --quiet
 
     # If already up to date, don't do anything else
-    [[ $(git rev-parse HEAD) == $(git rev-parse origin/master) ]] && return
+    [[ $(git rev-parse HEAD) == $(git rev-parse origin/main) ]] && return
 
     log_info "Upgrading package_check..."
-    git reset --hard origin/master --quiet
+    git reset --hard origin/main --quiet
     # shellcheck disable=SC2154
     exec "./package_check.sh" "${arguments[@]}"
 }
