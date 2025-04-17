@@ -316,7 +316,7 @@ function fetch_or_upgrade_package_linter()
         git clone --quiet $git_repository "./package_linter"
     else
         git -C "./package_linter" fetch origin --quiet
-        git -C "./package_linter" reset --hard origin/master --quiet
+        git -C "./package_linter" reset --hard origin/main --quiet
     fi
 }
 
