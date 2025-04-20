@@ -83,7 +83,7 @@ function parse_args() {
                 case $parameter in
                     b)
                         # --branch=branch-name
-                        gitbranch="-b $OPTARG"
+                        gitbranch="$OPTARG"
                         shift_value=2
                         ;;
                     i)
