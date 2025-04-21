@@ -286,7 +286,7 @@ metrics_stop() {
 
 function self_upgrade()
 {
-    # We only self-upgrade if we're in a git repo on master branch
+    # We only self-upgrade if we're in a git repo on main branch
     # (which should correspond to production contexts)
     [[ -d ".git" ]] || return
     [[ $(git rev-parse --abbrev-ref HEAD) == "master" ]] || \
@@ -342,9 +342,9 @@ function fetch_package_to_test() {
 
     # If the package is in a git repository
     if echo "$path_to_package_to_test" | grep -Eq "https?:\/\/"; then
-        # Force the branch master if no branch is specified.
+        # Force the branch main or master if no branch is specified.
         if [ -z "$gitbranch" ]; then
-            branches=(master main stable)
+            branches=(main master stable)
             for branch in "${branches[@]}"; do
                 if git ls-remote --quiet --exit-code "$path_to_package_to_test" "$branch" >/dev/null; then
                     gitbranch="$branch"
