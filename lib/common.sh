@@ -359,7 +359,7 @@ function fetch_package_to_test() {
         log_info " on branch ${gitbranch}"
 
         # Clone the repository
-        git clone --quiet "$path_to_package_to_test" -b "$gitbranch" "$package_path"
+        git clone --quiet "$path_to_package_to_test" --depth 1 -b "$gitbranch" "$package_path"
 
         if [[ ! -e "$package_path" ]]
         then
