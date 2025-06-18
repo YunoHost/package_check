@@ -375,6 +375,7 @@ function fetch_package_to_test() {
     fi
 
     git -C "$package_path" rev-parse HEAD > "$TEST_CONTEXT/commit"
+    git -C "$package_path" show --no-patch --format=%ct HEAD > "$TEST_CONTEXT/commit_timestamp"
 
     # Check if the package directory is really here.
     if [ ! -d "$package_path" ]; then
