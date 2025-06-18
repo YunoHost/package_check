@@ -347,7 +347,7 @@ else:
 summary = {
     "app": open(test_context + "/app_id").read().strip(),
     "commit": open(test_context + "/commit").read().strip(),
-    "commit_timestamp": open(test_context + "/commit_timestamp").read().strip(),
+    "commit_timestamp": int(open(test_context + "/commit_timestamp").read().strip()),
     "architecture": open(test_context + "/architecture").read().strip(),
     "yunohost_version": open(test_context + "/ynh_version").read().strip(),
     "yunohost_branch": open(test_context + "/ynh_branch").read().strip(),
