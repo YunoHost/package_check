@@ -346,6 +346,7 @@ else:
 
 summary = {
     "app": open(test_context + "/app_id").read().strip(),
+    "app_version": open(test_context + "/app_version").read().strip(),
     "commit": open(test_context + "/commit").read().strip(),
     "commit_timestamp": int(open(test_context + "/commit_timestamp").read().strip()),
     "architecture": open(test_context + "/architecture").read().strip(),

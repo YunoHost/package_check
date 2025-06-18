@@ -377,6 +377,8 @@ function fetch_package_to_test() {
     git -C "$package_path" rev-parse HEAD > "$TEST_CONTEXT/commit"
     git -C "$package_path" show --no-patch --format=%ct HEAD > "$TEST_CONTEXT/commit_timestamp"
 
+    grep "^\s*version\s*=" $package_path/manifest.toml | cut -d= -f2 | tr -d '" ' > "$TEST_CONTEXT/app_version"
+
     # Check if the package directory is really here.
     if [ ! -d "$package_path" ]; then
         log_critical "Unable to find the directory $package_path for the package..."
