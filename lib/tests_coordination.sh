@@ -209,13 +209,15 @@ break_before_continue() {
 }
 
 start_test() {
-    [[ "$current_test_serie" != "default" ]] \
-        && current_test_serie="($current_test_serie) " \
-        || current_test_serie=""
+    local test_name="$1"
+    local test_name_prefix=""
+    if [[ "$current_test_serie" != "default" ]]; then
+        test_name_prefix="($current_test_serie) "
+    fi
 
     total_number_of_test=$(find "$TEST_CONTEXT/tests" -mindepth 1 -maxdepth 1 -name "*.json" | wc -l)
 
-    log_title " [Test $current_test_number/$total_number_of_test] $current_test_serie$1"
+    log_title " [Test $current_test_number/$total_number_of_test] $test_name_prefix$test_name"
 }
 
 there_is_an_install_type() {
