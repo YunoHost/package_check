@@ -80,7 +80,7 @@ _PREINSTALL() {
 
     # Exec the pre-install instruction, if there one
     if [ -n "$preinstall_template" ]; then
-        log_small_title "Running pre-install steps"
+        log_small_title "Running pre-install steps before snapshoting..."
         # Copy all the instructions into a script
         local preinstall_script="$TEST_CONTEXT/preinstall.sh"
         echo "$preinstall_template" >"$preinstall_script"
@@ -94,6 +94,7 @@ _PREINSTALL() {
         # Then execute the script to execute the pre-install commands.
         LXC_EXEC "bash /preinstall.sh"
     fi
+    CREATE_LXC_SNAPSHOT "snap-preinstalled-$current_test_serie"
 }
 
 _PREUPGRADE() {
@@ -195,6 +196,16 @@ _INSTALL_APP() {
     return $ret
 }
 
+_LOAD_PREINSTALL_SNAPSHOT() {
+  local snapshot="snap-preinstalled-$current_test_serie"
+  if ! LXC_SNAPSHOT_EXISTS "$snapshot"; then
+      LOAD_LXC_SNAPSHOT snap0 \
+          && _PREINSTALL
+  else
+      LOAD_LXC_SNAPSHOT "$snapshot"
+  fi
+}
+
 _LOAD_SNAPSHOT_OR_INSTALL_APP() {
 
     local check_path="$1"
@@ -203,8 +214,7 @@ _LOAD_SNAPSHOT_OR_INSTALL_APP() {
 
     if ! LXC_SNAPSHOT_EXISTS "$snapname"; then
         log_warning "Expected to find an existing snapshot $snapname but it doesn't exist yet .. will attempt to create it"
-        LOAD_LXC_SNAPSHOT snap0 \
-            && _PREINSTALL \
+        _LOAD_PREINSTALL_SNAPSHOT \
             && _INSTALL_APP "path=$check_path" \
             && CREATE_LXC_SNAPSHOT "$snapname"
     else
@@ -261,7 +271,6 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED() {
     log_small_title "Validating that the app $app_id_to_check can/can't be accessed with its URL..."
 
     if [ -e "$package_path/tests.toml" ]; then
-        local current_test_serie=$(jq -r '.test_serie' "$testfile")
         python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); print(toml.dumps(t['$current_test_serie'].get('curl_tests', {})))" <"$package_path/tests.toml" > "$TEST_CONTEXT/curl_tests.toml"
     # Upgrade from older versions may still be in packaging v1 without a tests.toml
     else
@@ -345,9 +354,7 @@ TEST_INSTALL() {
     }
     local snapname=snap_${install_type}install
 
-    LOAD_LXC_SNAPSHOT snap0
-
-    _PREINSTALL
+    _LOAD_PREINSTALL_SNAPSHOT
 
     metrics_start
 
@@ -385,8 +392,6 @@ _TEST_MULTI_INSTANCE() {
     at_least_one_install_succeeded || return 1
 
     local check_path="$(default_install_path)"
-
-    LOAD_LXC_SNAPSHOT snap0
 
     log_small_title "First installation: path=$SUBDOMAIN$check_path" \
         && _LOAD_SNAPSHOT_OR_INSTALL_APP "$check_path" \
@@ -433,9 +438,7 @@ TEST_UPGRADE() {
         }
         popd
 
-        LOAD_LXC_SNAPSHOT snap0
-
-        _PREINSTALL
+        _LOAD_PREINSTALL_SNAPSHOT
 
         # Install the application
         _INSTALL_APP "path=$check_path"
@@ -491,7 +494,7 @@ TEST_PORT_ALREADY_USED() {
     local check_port="$1"
     local check_path="$(default_install_path)"
 
-    LOAD_LXC_SNAPSHOT snap0
+    _LOAD_PREINSTALL_SNAPSHOT
 
     # Build a service with netcat for use this port before the app.
     echo -e "[Service]\nExecStart=/bin/netcat -l -k -p $check_port\n
@@ -501,8 +504,6 @@ TEST_PORT_ALREADY_USED() {
 
     # Then start this service to block this port.
     LXC_EXEC "systemctl enable --now netcat"
-
-    _PREINSTALL
 
     # Install the application in a LXC container
     _INSTALL_APP "path=$check_path" "port=$check_port" \
@@ -579,15 +580,13 @@ TEST_BACKUP_RESTORE() {
                 # Second, restore the whole container to remove completely the application
             elif [ $j -eq 1 ]; then
 
-                LOAD_LXC_SNAPSHOT snap0
+                _LOAD_PREINSTALL_SNAPSHOT
 
                 # Remove the previous residual backups
                 RUN_INSIDE_LXC rm -rf /home/yunohost.backup/archives
 
                 # Place the copy of the backup archive in the container.
                 $lxc file push -r "$TEST_CONTEXT/ynh_backups/archives" "$LXC_NAME/home/yunohost.backup/"
-
-                _PREINSTALL
 
                 log_small_title "Restore on a fresh YunoHost system..."
             fi

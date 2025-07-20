@@ -100,6 +100,7 @@ TEST_LAUNCHER() {
     local global_start_timer=$starttime
 
     current_test_id=$(basename "$testfile" | cut -d. -f1)
+    current_test_serie=$(jq -r '.test_serie' "$testfile")
     current_test_infos="$TEST_CONTEXT/tests/$current_test_id.json"
     current_test_results="$TEST_CONTEXT/results/$current_test_id.json"
     current_test_log="$TEST_CONTEXT/logs/$current_test_id.log"
@@ -208,8 +209,6 @@ break_before_continue() {
 }
 
 start_test() {
-    local current_test_serie
-    current_test_serie=$(jq -r '.test_serie' "$testfile")
     [[ "$current_test_serie" != "default" ]] \
         && current_test_serie="($current_test_serie) " \
         || current_test_serie=""
