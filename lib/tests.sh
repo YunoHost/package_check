@@ -83,16 +83,19 @@ _PREINSTALL() {
         log_small_title "Running pre-install steps before snapshoting..."
         # Copy all the instructions into a script
         local preinstall_script="$TEST_CONTEXT/preinstall.sh"
-        echo "$preinstall_template" >"$preinstall_script"
-        # Hydrate the template with variables
-        sed -i "s/\$USER/$TEST_USER/g" "$preinstall_script"
-        sed -i "s/\$DOMAIN/$DOMAIN/g" "$preinstall_script"
-        sed -i "s/\$SUBDOMAIN/$SUBDOMAIN/g" "$preinstall_script"
-        sed -i "s/\$PASSWORD/$YUNO_PWD/g" "$preinstall_script"
+        cat <<EOF > "$preinstall_script"
+USER=$TEST_USER
+DOMAIN=$DOMAIN
+SUBDOMAIN=$SUBDOMAIN
+YUNO_PWD=$YUNO_PWD
+APP=$app_id
+
+$preinstall_template
+EOF
         # Copy the pre-install script into the container.
         $lxc file push "$preinstall_script" "$LXC_NAME/preinstall.sh"
         # Then execute the script to execute the pre-install commands.
-        LXC_EXEC "bash /preinstall.sh"
+        LXC_EXEC "bash -xeEu -o pipefail /preinstall.sh"
     fi
     CREATE_LXC_SNAPSHOT "snap-preinstalled-$current_test_serie"
 }
@@ -106,17 +109,20 @@ _PREUPGRADE() {
         log_small_title "Running pre-upgrade steps"
         # Copy all the instructions into a script
         local preupgrade_script="$TEST_CONTEXT/preupgrade.sh"
-        echo "$preupgrade_template" >>"$preupgrade_script"
-        # Hydrate the template with variables
-        sed -i "s/\$USER/$TEST_USER/g" "$preupgrade_script"
-        sed -i "s/\$DOMAIN/$DOMAIN/g" "$preupgrade_script"
-        sed -i "s/\$SUBDOMAIN/$SUBDOMAIN/g" "$preupgrade_script"
-        sed -i "s/\$PASSWORD/$YUNO_PWD/g" "$preupgrade_script"
-        sed -i "s/\$FROM_COMMIT/$commit/g" "$preupgrade_script"
+        cat <<EOF > "$preupgrade_script"
+USER=$TEST_USER
+DOMAIN=$DOMAIN
+SUBDOMAIN=$SUBDOMAIN
+PASSWORD=$YUNO_PWD
+FROM_COMMIT=$commit
+APP=$app_id
+
+$preupgrade_template
+EOF
         # Copy the pre-upgrade script into the container.
         $lxc file push "$preupgrade_script" "$LXC_NAME/preupgrade.sh"
         # Then execute the script to execute the pre-upgrade commands.
-        LXC_EXEC "bash /preupgrade.sh"
+        LXC_EXEC "bash -xeEu -o pipefail /preupgrade.sh"
         return $?
     fi
 }
