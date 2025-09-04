@@ -11,7 +11,7 @@ TEST_USER="package_checker"
 [[ -e "./config" ]] && source "./config"
 
 ARCH=${ARCH:-amd64}
-DIST=${DIST:-bullseye}
+DIST=${DIST:-bookworm}
 DEFAULT_PHP_VERSION=${DEFAULT_PHP_VERSION:-7.4}
 
 # YunoHost version: stable, testing or unstable
