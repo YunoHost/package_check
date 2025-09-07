@@ -78,6 +78,7 @@ def curl(
             f"{SUBDOMAIN}:443:{LXC_IP}",
         ],
     )  # --resolve
+    c.setopt(c.INTERFACE, 'if!incusbr0') # --interface
     c.setopt(c.HTTPHEADER, [f"Host: {domain}", "X-Requested-With: libcurl"])  # --header
     if use_cookies:
         c.setopt(c.COOKIEFILE, use_cookies)
