@@ -72,10 +72,8 @@ def curl(
     c.setopt(
         c.RESOLVE,
         [
-            f"{DOMAIN}:80:{LXC_IP}",
-            f"{DOMAIN}:443:{LXC_IP}",
-            f"{SUBDOMAIN}:80:{LXC_IP}",
-            f"{SUBDOMAIN}:443:{LXC_IP}",
+            f"*:80:{LXC_IP}",
+            f"*:443:{LXC_IP}",
         ],
     )  # --resolve
     c.setopt(c.INTERFACE, "if!incusbr0")  # --interface
