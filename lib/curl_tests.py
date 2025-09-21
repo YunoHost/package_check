@@ -135,25 +135,14 @@ def test(
     if logged_on_sso:
         cookies = tempfile.NamedTemporaryFile().name
 
-        if DIST == "bullseye":
-            code, content, log_url = curl(
-                f"https://{DOMAIN}/yunohost/sso/",
-                save_cookies=cookies,
-                post={"user": USER, "password": PASSWORD},
-                referer=f"https://{DOMAIN}/yunohost/sso/",
-            )
-            assert (
-                code == 200 and os.system(f"grep -q '{DOMAIN}' {cookies}") == 0
-            ), f"Failed to log in: got code {code} or cookie file was empty?"
-        else:
-            code, content, _ = curl(
-                f"https://{domain}/yunohost/portalapi/login",
-                save_cookies=cookies,
-                post={"credentials": f"{USER}:{PASSWORD}"},
-            )
-            assert (
-                code == 200 and content == "Logged in"
-            ), f"Failed to log in: got code {code} and content: {content}"
+        code, content, _ = curl(
+            f"https://{domain}/yunohost/portalapi/login",
+            save_cookies=cookies,
+            post={"credentials": f"{USER}:{PASSWORD}"},
+        )
+        assert (
+            code == 200 and content == "Logged in"
+        ), f"Failed to log in: got code {code} and content: {content}"
     else:
         cookies = None
 

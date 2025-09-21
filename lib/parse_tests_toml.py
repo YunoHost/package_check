@@ -54,14 +54,6 @@ def generate_test_list_base(
         else:
             yield test_suite_id, "install.nourl", default_meta
 
-        if (
-            os.environ.get("DIST") == "bullseye"
-            and is_webapp
-            and ("is_public" in install_args or "init_main_permission" in install_args)
-        ):
-            # Testing private vs. public install doesnt make that much sense, remote it for bookworm etc...
-            yield test_suite_id, "install.private", default_meta
-
         if is_multi_instance:
             yield test_suite_id, "install.multi", default_meta
 
