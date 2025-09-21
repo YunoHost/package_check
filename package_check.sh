@@ -22,7 +22,7 @@ print_help() {
     -h, --help                  Display this help
 
     Pass YNHDEV_BACKEND=incus|lxd to use a specific LXD-compatible backend.
-    Pass DIST=bullseye|bookworm to use a specific distribution version
+    Pass DIST=bookworm|trixie to use a specific distribution version
     Pass YNH_BRANCH=stable|unstable to use a specific Yunohost branch
 
 EOF
