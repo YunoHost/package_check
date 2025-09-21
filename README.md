@@ -51,7 +51,7 @@ You can select the architecture, the debian version and/or the Yunohost Branch b
 
 ````bash
 ARCH=amd64
-DIST=bullseye
+DIST=bookworm
 YNH_BRANCH=stable
 ````
 
@@ -103,13 +103,13 @@ The app is expected to contain a `tests.toml` file (see below) to tell package_c
 Install the package `qemu-user-static` and `binfmt-support`, then list of all available images :
 
 ```bash
-lxc image list images:debian/bullseye
+lxc image list images:debian/bookworm
 ```
 
 Export the image of the architecture you want to run (for example armhf):
 
 ```bash
-lxc image export images:debian/bullseye/armhf
+lxc image export images:debian/bookworm/armhf
 ```
 
 This command will create two files.
