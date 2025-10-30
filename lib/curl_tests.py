@@ -190,14 +190,18 @@ def test(
         raise ValueError("expect_return_code should be list or int")
 
     errors = []
-    if expect_effective_url is None and "/yunohost/sso" in effective_url:
+
+    if expect_effective_url:
+        expect_effective_url = expect_effective_url.replace("__DOMAIN__", APP_DOMAIN)
+        if expect_effective_url != effective_url:
+            errors.append(
+                f"Ended up on URL '{effective_url}', but was expecting '{expect_effective_url}'"
+            )
+    elif "/yunohost/sso" in effective_url:
         errors.append(
             f"The request was redirected to yunohost's portal ({effective_url})"
         )
-    if expect_effective_url and expect_effective_url != effective_url:
-        errors.append(
-            f"Ended up on URL '{effective_url}', but was expecting '{expect_effective_url}'"
-        )
+
     if not code_was_expected(code):
         errors.append(f"Got return code {code}, but was expecting {expect_return_code}")
     if expect_title is None and "Welcome to nginx" in title:
