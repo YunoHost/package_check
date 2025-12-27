@@ -54,7 +54,7 @@ _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT() {
             [[ $(echo "$specific_php_version" | wc -l) -eq 1 ]] \
                 || log_critical "Inconsistent php versions in dependencies ... found : $specific_php_version"
 
-            apt_deps+=", php${specific_php_version}, php${specific_php_version}-fpm, php${specific_php_version}-common"
+            apt_deps+=" php${specific_php_version} php${specific_php_version}-fpm php${specific_php_version}-common"
         fi
 
         log_title "Preinstalling apt dependencies before creating the initial snapshot..."
