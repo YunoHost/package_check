@@ -48,7 +48,7 @@ _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT() {
     if [[ -n "$apt_deps" ]]; then
 
         # This bit is copypasta of the apt helpers
-        local specific_php_version=$(grep -oP '(?<=php)[0-9.]+(?=-|\>|)' <<< "$apt_deps" | sort -u)i
+        local specific_php_version=$(grep -oP '(?<=php)[0-9.]+(?=-|\>|)' <<< "$apt_deps" | sort -u)
         if [[ -n "$specific_php_version" ]]; then
             # Cover a small edge case where a packager could have specified "php7.4-pwet php5-gni" which is confusing
             [[ $(echo "$specific_php_version" | wc -l) -eq 1 ]] \
