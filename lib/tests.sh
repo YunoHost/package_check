@@ -46,6 +46,17 @@ _STUFF_TO_RUN_BEFORE_INITIAL_SNAPSHOT() {
     local apt_deps=$(python3 -c "import toml, sys; t = toml.loads(sys.stdin.read()); P = t['resources'].get('apt', {}).get('packages', ''); P = P.replace(',', ' ').split() if isinstance(P, str) else P; P = [p for p in P if p != '$app_id' and not p.startswith('$app_id-')]; print(' '.join(P));" < "$package_path/manifest.toml")
 
     if [[ -n "$apt_deps" ]]; then
+
+        # This bit is copypasta of the apt helpers
+        local specific_php_version=$(grep -oP '(?<=php)[0-9.]+(?=-|\>|)' <<< "$apt_deps" | sort -u)i
+        if [[ -n "$specific_php_version" ]]; then
+            # Cover a small edge case where a packager could have specified "php7.4-pwet php5-gni" which is confusing
+            [[ $(echo "$specific_php_version" | wc -l) -eq 1 ]] \
+                || log_critical "Inconsistent php versions in dependencies ... found : $specific_php_version"
+
+            apt_deps+=", php${specific_php_version}, php${specific_php_version}-fpm, php${specific_php_version}-common"
+        fi
+
         log_title "Preinstalling apt dependencies before creating the initial snapshot..."
 
         apt="LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get --assume-yes --quiet -o=Acquire::Retries=3 -o=Dpkg::Use-Pty=0"
