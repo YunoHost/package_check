@@ -610,7 +610,7 @@ TEST_BACKUP_RESTORE() {
 
             # Restore the application from the previous backup
             metrics_start
-            _RUN_YUNOHOST_CMD "backup restore Backup_test --force --apps $app_id" \
+            _RUN_YUNOHOST_CMD "backup restore Backup_test --no-remove-on-failure --force --apps $app_id" \
                 && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" \
                 && _TEST_CONFIG_PANEL
 
