@@ -589,7 +589,9 @@ TEST_BACKUP_RESTORE() {
 
                 _PREINSTALL
 
-                log_small_title "Restore on a fresh YunoHost system..."
+                log_small_title "Restore on a (almost)fresh YunoHost system..."
+                # preinstall lightweight app that uses $data_dir, just to assert proper permission settings
+                _RUN_YUNOHOST_CMD "app install wasteofspace -a \"domain=$DOMAIN&path=/wasteofspace222&init_main_permission=visitors\""
             fi
 
             # Restore the application from the previous backup
