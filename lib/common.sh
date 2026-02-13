@@ -377,7 +377,12 @@ function fetch_package_to_test() {
     git -C "$package_path" rev-parse HEAD > "$TEST_CONTEXT/commit"
     git -C "$package_path" show --no-patch --format=%ct HEAD > "$TEST_CONTEXT/commit_timestamp"
 
-    grep "^\s*version\s*=" "$package_path/manifest.toml" | cut -d= -f2 | tr -d '" ' > "$TEST_CONTEXT/app_version"
+    python3 -c "
+import sys
+import toml
+with open(sys.argv[1], 'r') as f:
+    print(toml.load(f)['version'])
+    " "$package_path/manifest.toml" > "$TEST_CONTEXT/app_version"
 
     # Check if the package directory is really here.
     if [ ! -d "$package_path" ]; then
