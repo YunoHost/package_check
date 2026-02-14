@@ -217,7 +217,7 @@ def test(
         ]
         if stylesheets:
             for sheet in stylesheets:
-                (valid, uri) = validate_and_normalize(effective_url, base, sheet)
+                valid, uri = validate_and_normalize(effective_url, base, sheet)
                 if not valid:
                     continue
                 assets_to_check.append(uri)
@@ -233,7 +233,7 @@ def test(
         ]
         if js:
             for js in js:
-                (valid, uri) = validate_and_normalize(effective_url, base, js)
+                valid, uri = validate_and_normalize(effective_url, base, js)
                 if not valid:
                     continue
                 assets_to_check.append(uri)
