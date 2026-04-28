@@ -2,10 +2,13 @@
 # shellcheck disable=SC2034,SC2155
 
 # YunoHost install parameters
-YUNO_PWD="admin"
+YUNO_ADMIN="ciadmin"
+YUNO_ADMIN_FULLNAME="CI admin"
+YUNO_PWD="SuperSecretCIPassw0rd"
 DOMAIN="domain.tld"
 SUBDOMAIN="sub.$DOMAIN"
 TEST_USER="package_checker"
+TEST_USER_FULLNAME="Package Checker"
 
 # shellcheck disable=SC1091
 [[ -e "./config" ]] && source "./config"
@@ -18,7 +21,7 @@ DEFAULT_PHP_VERSION=${DEFAULT_PHP_VERSION:-7.4}
 YNH_BRANCH=${YNH_BRANCH:-stable}
 
 WORKER_ID=${WORKER_ID:-0}
-LXC_BASE="yunohost/$DIST-$YNH_BRANCH/appci"
+LXC_BASE="yunohost-$DIST-$YNH_BRANCH-appci"
 LXC_NAME="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-test-${WORKER_ID}"
 
 readonly lock_file="./pcheck-${WORKER_ID}.lock"
