@@ -581,7 +581,7 @@ TEST_BACKUP_RESTORE() {
         }
 
         # Grab the backup archive into the LXC container, and keep a copy
-        $lxc file pull -r "$LXC_NAME/home/yunohost.backup/archives" "$TEST_CONTEXT/ynh_backups"
+        $lxc file pull -r "$LXC_NAME/home/yunohost.backup/archives" "$TEST_CONTEXT/ynh_backups/"
 
         # RESTORE
         # Try the restore process in 2 times, first after removing the app, second after a restore of the container.
