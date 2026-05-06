@@ -53,16 +53,13 @@ function rebuild_base_lxc()
     $IN_LXC rm -f /etc/cron.daily/apt-compat
     $IN_LXC cp /bin/true /usr/lib/apt/apt.systemd.daily
 
-    # Disable password strength check
-    $IN_LXC yunohost tools postinstall --domain "$DOMAIN" --password "$YUNO_PWD" --force-password
+    $IN_LXC yunohost tools postinstall --domain "$DOMAIN" --username "$YUNO_ADMIN" --fullname "$YUNO_ADMIN_FULLNAME" --password "$YUNO_PWD" --i-have-read-terms-of-services --force-diskspace
 
-    $IN_LXC yunohost settings set security.password.admin.strength -v -1
-    $IN_LXC yunohost settings set security.password.user.strength -v -1
+    $IN_LXC yunohost settings set security.password.admin_strength -v -1
+    $IN_LXC yunohost settings set security.password.user_strength -v -1
 
     $IN_LXC yunohost domain add "$SUBDOMAIN"
-    TEST_USER_DISPLAY=${TEST_USER//"_"/""}
-    $IN_LXC yunohost user create "$TEST_USER" --firstname "$TEST_USER_DISPLAY" \
-        --mail "$TEST_USER@$DOMAIN" --lastname "$TEST_USER_DISPLAY" --password "$YUNO_PWD"
+    $IN_LXC yunohost user create "$TEST_USER" --fullname "$TEST_USER_FULLNAME" --domain "$DOMAIN" --password "$YUNO_PWD"
 
     $IN_LXC yunohost --version
 
