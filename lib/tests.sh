@@ -298,7 +298,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED() {
         DOMAIN="$DOMAIN" \
         SUBDOMAIN="$SUBDOMAIN" \
         USER="$TEST_USER" \
-        PASSWORD="SomeSuperStrongPassword" \
+        PASSWORD="$YUNO_PWD" \
         LXC_IP="$LXC_IP" \
         BASE_URL="https://$domain_to_check$path_to_check" \
         python3 lib/curl_tests.py < "$TEST_CONTEXT/curl_tests.toml" | tee -a "$full_log"
