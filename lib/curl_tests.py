@@ -13,6 +13,7 @@ DOMAIN = os.environ["DOMAIN"]
 DIST = os.environ["DIST"]
 SUBDOMAIN = os.environ["SUBDOMAIN"]
 USER = os.environ["USER"]
+ADMIN_USER = os.environ["YUNO_ADMIN"]
 PASSWORD = os.environ["PASSWORD"]
 LXC_IP = os.environ["LXC_IP"]
 BASE_URL = os.environ["BASE_URL"].rstrip("/")
@@ -22,6 +23,7 @@ DEFAULTS = {
     "base_url": BASE_URL,
     "path": "/",
     "logged_on_sso": False,
+    "logged_as_admin": False,
     "expect_title": None,
     "expect_content": None,
     "expect_return_code": 200,
@@ -40,6 +42,7 @@ DEFAULTS = {
 #
 # admin.path = "/settings/admin"
 # admin.logged_on_sso = true
+# admin.logged_as_admin = true
 # admin.expect_title = "Paramètres d'administration - Nextcloud"
 #
 # asset.path = "/core/img/logo/logo.svg"
@@ -125,6 +128,7 @@ def test(
     path,
     post=None,
     logged_on_sso=False,
+    logged_as_admin=False,
     expect_return_code=200,
     expect_content=None,
     expect_title=None,
@@ -138,7 +142,7 @@ def test(
         code, content, _ = curl(
             f"https://{domain}/yunohost/portalapi/login",
             save_cookies=cookies,
-            post={"credentials": f"{USER}:{PASSWORD}"},
+            post={"credentials": f"{ADMIN_USER if logged_as_admin else USER}:{PASSWORD}"},
         )
         assert (
             code == 200 and content == "Logged in"
@@ -272,9 +276,10 @@ def run(tests):
         full_params.update(params)
         for key, value in full_params.items():
             if isinstance(value, str):
-                full_params[key] = value.replace("__USER__", USER).replace(
-                    "__DOMAIN__", APP_DOMAIN
-                )
+                full_params[key] = value \
+                    .replace("__USER__", USER) \
+                    .replace("__ADMIN_USER__", ADMIN_USER) \
+                    .replace("__DOMAIN__", APP_DOMAIN)
 
         results[name] = test(**full_params)
         display_result(results[name])
