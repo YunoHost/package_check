@@ -298,6 +298,7 @@ _VALIDATE_THAT_APP_CAN_BE_ACCESSED() {
         DOMAIN="$DOMAIN" \
         SUBDOMAIN="$SUBDOMAIN" \
         USER="$TEST_USER" \
+        YUNO_ADMIN="$YUNO_ADMIN" \
         PASSWORD="$YUNO_PWD" \
         LXC_IP="$LXC_IP" \
         BASE_URL="https://$domain_to_check$path_to_check" \
