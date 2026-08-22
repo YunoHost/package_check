@@ -21,7 +21,7 @@ DEFAULT_PHP_VERSION=${DEFAULT_PHP_VERSION:-7.4}
 YNH_BRANCH=${YNH_BRANCH:-stable}
 
 WORKER_ID=${WORKER_ID:-0}
-LXC_BASE="yunohost-$DIST-$YNH_BRANCH-appci"
+LXC_BASE="yunohost/$DIST-$YNH_BRANCH/appci"
 LXC_NAME="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-test-${WORKER_ID}"
 
 readonly lock_file="./pcheck-${WORKER_ID}.lock"
