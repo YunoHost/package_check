@@ -249,7 +249,7 @@ _REMOVE_APP() {
     log_small_title "Removing the app..."
 
     # Remove the application from the LXC container
-    _RUN_YUNOHOST_CMD "app remove $app_id"
+    _RUN_YUNOHOST_CMD "app remove $app_id --purge"
     local ret=$?
 
     if [ "$ret" -eq 0 ]; then
